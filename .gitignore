@@ -1,0 +1,9 @@
+node_modules/
+vendor/
+.env
+docker-compose.override.yml
+dist/
+.angular/cache
+.DS_Store
+.idea
+npm-debug.log
