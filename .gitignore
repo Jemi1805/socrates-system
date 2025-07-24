@@ -1,9 +1,24 @@
-node_modules/
-vendor/
-.env
-docker-compose.override.yml
-dist/
-.angular/cache
+# === Archivos generales del sistema ===
 .DS_Store
 .idea
 npm-debug.log
+
+# === Frontend (Angular) ===
+node_modules/
+dist/
+.angular/cache
+frontend/node_modules/  # (Redundante, ya está cubierto por 'node_modules/' arriba)
+frontend/dist/         # (Redundante, ya está cubierto por 'dist/' arriba)
+
+# === Backend (Laravel) ===
+vendor/
+.env
+src/vendor/            # (Redundante, ya está cubierto por 'vendor/' arriba)
+src/.env               # (Redundante, ya está cubierto por '.env' arriba)
+src/storage/framework/cache/
+src/storage/framework/views/
+
+# === Docker y bases de datos ===
+docker-compose.override.yml
+mysql_data/
+.docker/
