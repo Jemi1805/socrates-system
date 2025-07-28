@@ -1,0 +1,105 @@
+<div class="modalidad-container">
+  <!-- Header reutilizable -->
+  <app-header 
+    pageTitle="Modalidad de Graduación"
+    (toggleSidebarEvent)="onToggleSidebar()">
+  </app-header>
+
+  <!-- Contenido principal -->
+  <div class="main-content">
+    <!-- Título principal -->
+    <h1 class="main-title">MODALIDAD DE GRADUACIÓN</h1>
+
+    <!-- Formulario de búsqueda -->
+    <div class="search-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="carrera">Carrera:</label>
+          <div class="select-wrapper">
+            <select 
+              id="carrera" 
+              [(ngModel)]="carreraSeleccionada" 
+              class="form-select">
+              <option value="">Seleccione una carrera</option>
+              <option *ngFor="let carrera of carreras" [value]="carrera">
+                {{ carrera }}
+              </option>
+            </select>
+            <i class="select-arrow">▼</i>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="codigoCeta">Código CETA:</label>
+          <div class="input-wrapper">
+            <input 
+              type="text" 
+              id="codigoCeta"
+              [(ngModel)]="codigoCeta" 
+              placeholder="Ingrese el código ceta" 
+              class="form-input">
+            <button 
+              type="button" 
+              (click)="buscarPorCeta()" 
+              class="search-btn" 
+              title="Buscar por CETA">
+              <i class="search-icon">🔍</i>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="numeroCI">CI:</label>
+          <div class="input-wrapper">
+            <input 
+              type="text" 
+              id="numeroCI"
+              [(ngModel)]="numeroCI" 
+              placeholder="Ingrese el número de CI" 
+              class="form-input">
+            <button 
+              type="button" 
+              (click)="buscarPorCI()" 
+              class="search-btn" 
+              title="Buscar por CI">
+              <i class="search-icon">🔍</i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Información del estudiante -->
+    <div class="student-info" *ngIf="estudiante">
+      <h2 class="section-title">Información del Estudiante:</h2>
+      
+      <div class="info-grid">
+        <div class="info-item">
+          <label>Apellido Paterno:</label>
+          <div class="info-value">{{ estudiante.apellidoPaterno }}</div>
+        </div>
+
+        <div class="info-item">
+          <label>Apellido Materno:</label>
+          <div class="info-value">{{ estudiante.apellidoMaterno }}</div>
+        </div>
+
+        <div class="info-item">
+          <label>Nombres:</label>
+          <div class="info-value">{{ estudiante.nombres }}</div>
+        </div>
+
+        <div class="info-item">
+          <label>Carrera:</label>
+          <div class="info-value">{{ estudiante.carrera }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones de acción -->
+    <div class="action-buttons" *ngIf="estudiante">
+      <button class="btn btn-primary">Continuar con Modalidad</button>
+      <button class="btn btn-secondary" (click)="limpiarFormulario()">Limpiar</button>
+    </div>
+  </div>
+</div> 

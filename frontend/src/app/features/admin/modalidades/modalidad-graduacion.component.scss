@@ -1,0 +1,305 @@
+// Variables del tema oscuro
+$dark-blue: #052544;
+$medium-blue: #78849A;
+$light-blue: #3949ab;
+$accent-blue: #4C9DBD;
+$text-white: #ffffff;
+$text-light: #e3f2fd;
+$text-muted: #b3e5fc;
+$text-dark: #333333;
+$input-bg: #f5f5f5;
+$border-color: #e0e0e0;
+$shadow: 0 4px 20px rgba(0,0,0,0.15);
+$border-radius: 8px;
+
+// Contenedor principal
+.modalidad-container {
+  min-height: 100vh;
+  background: $dark-blue
+}
+
+// El header ahora está en el componente HeaderComponent
+
+// Contenido principal
+.main-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 30px 20px;
+}
+
+// Título principal
+.main-title {
+  text-align: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: $text-white;
+  margin: 0 0 40px 0;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  letter-spacing: 2px;
+}
+
+// Formulario de búsqueda
+.search-form {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: $border-radius;
+  padding: 30px;
+  margin-bottom: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: $shadow;
+}
+
+.form-row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 15px;
+  }
+}
+
+.form-group {
+  flex: 1;
+  
+  label {
+    display: block;
+    color: $text-white;
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+  }
+}
+
+// Select personalizado
+.select-wrapper {
+  position: relative;
+  
+  .form-select {
+    width: 100%;
+    padding: 12px 40px 12px 15px;
+    background: $input-bg;
+    border: 2px solid transparent;
+    border-radius: $border-radius;
+    font-size: 1rem;
+    appearance: none;
+    transition: all 0.3s ease;
+    
+    &:focus {
+      outline: none;
+      border-color: $accent-blue;
+      box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.2);
+    }
+  }
+  
+  .select-arrow {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: $text-muted;
+    font-size: 0.8rem;
+    pointer-events: none;
+  }
+}
+
+// Input con botón de búsqueda
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  
+  .form-input {
+    flex: 1;
+    padding: 12px 50px 12px 15px;
+    background: $input-bg;
+    border: 2px solid transparent;
+    border-radius: $border-radius;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    
+    &:focus {
+      outline: none;
+      border-color: $accent-blue;
+      box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.2);
+    }
+    
+    &::placeholder {
+      color: #999;
+    }
+  }
+  
+  .search-btn {
+    position: absolute;
+    right: 5px;
+    background: $accent-blue;
+    border: none;
+    border-radius: 6px;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    
+    &:hover {
+      background: darken($accent-blue, 10%);
+      transform: scale(1.05);
+    }
+    
+    .search-icon {
+      color: white;
+      font-size: 1rem;
+    }
+  }
+}
+
+// Información del estudiante
+.student-info {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: $border-radius;
+  padding: 30px;
+  margin-bottom: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: $shadow;
+  
+  .section-title {
+    color: $text-white;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0 0 25px 0;
+    border-bottom: 2px solid $accent-blue;
+    padding-bottom: 10px;
+  }
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+}
+
+.info-item {
+  label {
+    display: block;
+    color: $text-light;
+    font-weight: 500;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+  }
+  
+  .info-value {
+    background: $input-bg;
+    padding: 12px 15px;
+    border-radius: $border-radius;
+    color: #333333;
+    font-weight: 500;
+    border: 1px solid $border-color;
+    min-height: 20px;
+  }
+}
+
+// Botones de acción
+.action-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 30px;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+.btn {
+  padding: 15px 30px;
+  border: none;
+  border-radius: $border-radius;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+  
+  &.btn-primary {
+    background: linear-gradient(135deg, $accent-blue, darken($accent-blue, 10%));
+    color: white;
+    
+    &:hover {
+      background: linear-gradient(135deg, darken($accent-blue, 5%), darken($accent-blue, 15%));
+    }
+  }
+  
+  &.btn-secondary {
+    background: rgba(255, 255, 255, 0.2);
+    color: $text-white;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.3);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+  }
+}
+
+// Animaciones
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.search-form,
+.student-info {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.student-info {
+  animation-delay: 0.2s;
+}
+
+// Estados de carga
+.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+// Responsive adicional
+@media (max-width: 480px) {
+  .main-content {
+    padding: 20px 15px;
+  }
+  
+  .main-title {
+    font-size: 2rem;
+  }
+  
+  .search-form,
+  .student-info {
+    padding: 20px;
+  }
+  
+  .form-row {
+    gap: 10px;
+  }
+} 

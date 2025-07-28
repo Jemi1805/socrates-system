@@ -1,0 +1,53 @@
+<header class="app-header">
+  <!-- Barra superior con logo y controles -->
+  <div class="header-top">
+    <div class="header-left">
+      <button class="sidebar-toggle" (click)="toggleSidebar()" title="Menú">
+        <i class="icon">☰</i>
+      </button>
+      
+      <div class="logo">
+        <h1 class="logo-text">Sistema de Control</h1>
+        <span class="logo-subtitle">Modalidades de Graduación</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <!-- Notificaciones -->
+      <button class="header-btn notification-btn" title="Notificaciones">
+        <i class="icon">🔔</i>
+        <span class="notification-badge">3</span>
+      </button>
+
+      <!-- Usuario -->
+      <div class="user-menu">
+        <button class="user-btn" (click)="logout()" title="Cerrar sesión">
+          <div class="user-avatar">
+            <i class="icon">👤</i>
+          </div>
+          <div class="user-info">
+            <span class="user-name">{{ currentUser.name }}</span>
+            <span class="user-role">{{ currentUser.role }}</span>
+          </div>
+          <i class="icon dropdown-icon">▼</i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra de navegación -->
+  <nav class="navigation-bar">
+    <ul class="nav-menu">
+      <li *ngFor="let item of menuItems" class="nav-item">
+        <a 
+          [routerLink]="item.route" 
+          routerLinkActive="active"
+          [class.active]="item.active"
+          class="nav-link"
+          (click)="setActiveItem(item.route)">
+          {{ item.label }}
+        </a>
+      </li>
+    </ul>
+  </nav>
+</header> 
