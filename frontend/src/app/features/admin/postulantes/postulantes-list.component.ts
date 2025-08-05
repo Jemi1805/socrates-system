@@ -5,6 +5,21 @@ import { Postulante } from './postulante.model';
 import { PostulanteService } from './postulante.service';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
 
+interface Estudiante {
+  cod_ceta: string;
+  nombres: string;
+  apellido_paterno: string;
+  apellido_materno: string;
+  ci: string;
+  carrera: string;
+}
+
+interface ModalidadGraduacion {
+  id: number;
+  nombre: string;
+  descripcion: string;
+}
+
 @Component({
   selector: 'app-postulantes-list',
   templateUrl: './postulantes-list.component.html',
@@ -15,11 +30,36 @@ import { HeaderComponent } from '../../../shared/components/header/header.compon
 export class PostulantesListComponent implements OnInit {
   postulantes: Postulante[] = [];
   postulanteActual: Partial<Postulante> = {};
+  
+  // Datos del estudiante y modalidad
+  estudiante: Estudiante | null = null;
+  modalidad: ModalidadGraduacion | null = null;
 
   constructor(private postulanteService: PostulanteService) {}
 
   ngOnInit() {
+    this.cargarDatosPostulacion();
     this.cargarPostulantes();
+  }
+
+  cargarDatosPostulacion() {
+    const datosPostulacion = sessionStorage.getItem('datos_postulacion');
+    if (datosPostulacion) {
+      const datos = JSON.parse(datosPostulacion);
+      this.estudiante = datos.estudiante;
+      this.modalidad = datos.modalidad;
+      
+      // Pre-llenar el formulario con los datos del estudiante
+      if (this.estudiante) {
+        this.postulanteActual = {
+          cod_ceta: parseInt(this.estudiante.cod_ceta),
+          nombres_est: this.estudiante.nombres,
+          apellidos_est: `${this.estudiante.apellido_paterno} ${this.estudiante.apellido_materno}`,
+          ci: this.estudiante.ci,
+          carrera: this.estudiante.carrera
+        };
+      }
+    }
   }
 
   cargarPostulantes() {

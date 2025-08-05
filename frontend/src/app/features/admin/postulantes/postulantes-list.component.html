@@ -12,7 +12,7 @@
     <h3 class="card-title">Registrar Postulante</h3>
     
     <form #postulanteForm="ngForm" (ngSubmit)="guardar()" class="postulante-form">
-      <input type="hidden" [(ngModel)]="postulanteActual.cod_ceta" name="cod_ceta">
+  <input type="hidden" [(ngModel)]="postulanteActual.cod_ceta" name="cod_ceta">
       
       <div class="form-row">
         <div class="form-group">
@@ -76,32 +76,32 @@
           Cancelar
         </button>
       </div>
-    </form>
+</form>
   </div>
 
   <!-- Tabla Card -->
   <div class="table-card">
     <h3 class="card-title">Lista de Postulantes</h3>
-    
+
     <div class="table-container">
       <table class="data-table">
-        <thead>
-          <tr>
-            <th>Código</th>
-            <th>Nombres</th>
-            <th>Apellidos</th>
-            <th>CI</th>
-            <th>Carrera</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
+  <thead>
+    <tr>
+      <th>Código</th>
+      <th>Nombres</th>
+      <th>Apellidos</th>
+      <th>CI</th>
+      <th>Carrera</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
           <tr *ngFor="let p of postulantes" class="table-row">
             <td class="code-cell">{{p.cod_ceta}}</td>
-            <td>{{p.nombres_est}}</td>
-            <td>{{p.apellidos_est}}</td>
-            <td>{{p.ci}}</td>
-            <td>{{p.carrera}}</td>
+      <td>{{p.nombres_est}}</td>
+      <td>{{p.apellidos_est}}</td>
+      <td>{{p.ci}}</td>
+      <td>{{p.carrera}}</td>
             <td class="actions-cell">
               <button (click)="editar(p)" class="btn btn-edit" title="Editar">
                 <i class="icon">✎</i>
@@ -109,10 +109,10 @@
               <button (click)="eliminar(p.cod_ceta)" class="btn btn-delete" title="Eliminar">
                 <i class="icon">🗑</i>
               </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      </td>
+    </tr>
+  </tbody>
+</table>
     </div>
   </div>
 </div>

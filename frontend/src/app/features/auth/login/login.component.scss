@@ -1,0 +1,150 @@
+@use "sass:color";
+
+// Variables
+$primary-color: #052544;
+$secondary-color: #757575;
+$success-color: #4CAF50;
+$danger-color: #F44336;
+$light-gray: #f5f5f5;
+$border-color: #e0e0e0;
+$text-dark: #333;
+$text-light: #666;
+$shadow: 0 4px 20px rgba(0,0,0,0.15);
+$border-radius: 8px;
+
+// Contenedor principal
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, $primary-color, $secondary-color);
+  padding: 20px;
+}
+
+// Tarjeta de login
+.login-card {
+  background: white;
+  border-radius: $border-radius;
+  box-shadow: $shadow;
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+
+// Header del login
+.login-header {
+  margin-bottom: 30px;
+  
+  .login-title {
+    color: $primary-color;
+    font-size: 2rem;
+    font-weight: 600;
+    margin: 0 0 10px 0;
+  }
+  
+  .login-subtitle {
+    color: $text-light;
+    font-size: 1rem;
+    margin: 0;
+  }
+}
+
+// Formulario
+.login-form {
+  .form-group {
+    margin-bottom: 20px;
+    text-align: left;
+  }
+  
+  .form-label {
+    display: block;
+    margin-bottom: 8px;
+    color: $text-dark;
+    font-weight: 500;
+    font-size: 0.9rem;
+  }
+  
+  .form-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid $border-color;
+    border-radius: $border-radius;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+    
+    &:focus {
+      outline: none;
+      border-color: $primary-color;
+      box-shadow: 0 0 0 3px rgba(5, 37, 68, 0.1);
+    }
+    
+    &::placeholder {
+      color: $text-light;
+    }
+  }
+}
+
+// Botón de login
+.btn-login {
+  width: 100%;
+  padding: 14px;
+  font-size: 1rem;
+  font-weight: 500;
+  border: none;
+  border-radius: $border-radius;
+  background: $primary-color;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  
+  &:hover:not(:disabled) {
+    background: color.adjust($primary-color, $lightness: -10%);
+  }
+  
+  &:disabled {
+    background: $text-light;
+    cursor: not-allowed;
+  }
+  
+  .spin {
+    animation: spin 1s linear infinite;
+  }
+}
+
+// Mensaje de error
+.error-message {
+  background: #ffebee;
+  color: $danger-color;
+  padding: 12px;
+  border-radius: $border-radius;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  
+  i {
+    font-size: 1rem;
+  }
+}
+
+// Footer
+.login-footer {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid $border-color;
+  
+  .text-muted {
+    color: $text-light;
+    font-size: 0.8rem;
+    margin: 0;
+  }
+}
+
+// Animación de spin
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+} 
