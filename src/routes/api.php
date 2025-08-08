@@ -66,9 +66,24 @@ Route::apiResource('postulantes', PostulanteController::class);
 
 // 🎓 RUTAS PARA SGA (Mantener existentes)
 Route::prefix('sga')->group(function () {
+    // Test simple sin controller
+    Route::get('test', function() {
+        return response()->json(['status' => 'OK', 'message' => 'SGA routes working']);
+    });
+    
+    // Rutas de conectividad y autenticación
+    Route::get('check-connection', [SgaController::class, 'checkConnection']);
+    Route::post('authenticate', [SgaController::class, 'authenticate']);
+    
+    // Rutas de estudiantes
     Route::get('estudiantes', [SgaController::class, 'getEstudiantes']);
     Route::get('estudiantes/{codCeta}', [SgaController::class, 'getEstudianteByCodigo']);
+    Route::post('buscar-estudiantes', [SgaController::class, 'buscarEstudiantes']);
+    
+    // Rutas de datos generales
     Route::get('carreras', [SgaController::class, 'getCarreras']);
     Route::get('gestiones', [SgaController::class, 'getGestiones']);
+    Route::get('inscripciones/{codCeta}', [SgaController::class, 'getInscripciones']);
+    
     Route::post('sync-estudiante', [SgaController::class, 'syncEstudiante']);
 });
