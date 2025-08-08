@@ -8,15 +8,72 @@ use Exception;
 
 class SocratesApiService
 {
-    private $baseUrl;
+    private $baseUrls;
     private $apiKey;
     private $token;
+    private $currentUrl;
 
     public function __construct()
     {
-        // URL base del SGA desde dentro del container Docker
-        $this->baseUrl = rtrim(env('SGA_API_URL', 'http://host.docker.internal/sga'), '/');
+        // URLs base del SGA desde dentro del container Docker para cada carrera
+        // Usamos el proxy nginx configurado en el servidor
+        // Las rutas /sga-electricidad/ y /sga-mecanica/ están configuradas como proxy en nginx
+        // Asegurarnos de que todas las URLs terminen con /
+        $this->baseUrls = [
+            'mecanica' => rtrim(env('SGA_MECANICA_URL', 'http://server/sga-mecanica'), '/') . '/',
+            'electricidad' => rtrim(env('SGA_ELECTRICIDAD_URL', 'http://server/sga-electricidad'), '/') . '/', 
+            'default' => rtrim(env('SGA_API_URL', 'http://server/sga-mecanica'), '/') . '/',
+        ];
+        
+        // URL por defecto
+        $this->currentUrl = $this->baseUrls['default'];
         $this->apiKey = env('SGA_API_KEY', 'SOCRATES_SGA_API_KEY_2025');
+        
+        // Registrar las URLs configuradas para debugging
+        Log::info('URLs del SGA configuradas', [
+            'mecanica' => $this->baseUrls['mecanica'],
+            'electricidad' => $this->baseUrls['electricidad'],
+            'default' => $this->baseUrls['default'],
+            'current' => $this->currentUrl
+        ]);
+    }
+    
+    /**
+     * Establecer la carrera para determinar la URL a usar
+     */
+    public function setCarrera($carrera)
+    {
+        $carrera = strtolower($carrera);
+        
+        if ($carrera == 'mecanica' || $carrera == 'mecánica' || $carrera == 'automotriz') {
+            $this->currentUrl = $this->baseUrls['mecanica'];
+            return true;
+        } elseif ($carrera == 'electricidad' || $carrera == 'electrónica' || $carrera == 'electronica') {
+            $this->currentUrl = $this->baseUrls['electricidad'];
+            return true;
+        } else {
+            // Si no se especifica o no coincide, usar la URL por defecto
+            $this->currentUrl = $this->baseUrls['default'];
+            return false;
+        }
+    }
+    
+    /**
+     * Obtener las URLs disponibles para las diferentes carreras
+     * @return array
+     */
+    public function getAvailableUrls()
+    {
+        return $this->baseUrls;
+    }
+    
+    /**
+     * Obtener la URL actual configurada
+     * @return string
+     */
+    public function getCurrentUrl()
+    {
+        return $this->currentUrl;
     }
 
     /**
@@ -25,7 +82,7 @@ class SocratesApiService
     public function authenticate($username, $password)
     {
         try {
-            $response = Http::post($this->baseUrl . '/api/socrates/authenticate', [
+            $response = Http::post($this->currentUrl . '/api/socrates/authenticate', [
                 'username' => $username,
                 'password' => $password
             ]);
@@ -55,6 +112,14 @@ class SocratesApiService
      */
     public function getEstudiantes($params = [])
     {
+        // Ya no necesitamos un tratamiento especial para Electricidad
+        // porque estamos usando el proxy Nginx configurado
+        
+        // Configurar carrera si se especifica (para otras carreras)
+        if (isset($params['carrera'])) {
+            $this->setCarrera($params['carrera']);
+        }
+        
         // Si hay cod_ceta, usar búsqueda por código
         if (isset($params['cod_ceta'])) {
             return $this->buscarEstudiantesPorCodigo($params['cod_ceta']);
@@ -70,9 +135,15 @@ class SocratesApiService
 
     /**
      * Obtener un estudiante por código CETA
+     * @param string $codCeta Código del estudiante
+     * @param string|null $carrera Carrera para determinar la URL del SGA
      */
-    public function getEstudianteByCodigo($codCeta)
+    public function getEstudianteByCodigo($codCeta, $carrera = null)
     {
+        if ($carrera) {
+            $this->setCarrera($carrera);
+        }
+        
         return $this->buscarEstudiantesPorCodigo($codCeta);
     }
 
@@ -82,6 +153,13 @@ class SocratesApiService
     private function buscarEstudiantesPorCodigo($codigo)
     {
         try {
+            // Verificar que tenemos una URL configurada
+            $carrera = array_search($this->currentUrl, $this->baseUrls) ?: 'unknown';
+            Log::info('URL actual para buscar estudiante por código', [
+                'carrera' => $carrera,
+                'url' => $this->currentUrl
+            ]);
+            
             // Probar diferentes nombres de parámetros que puede esperar el SGA
             $params = [
                 'cod_ceta' => $codigo,
@@ -90,14 +168,23 @@ class SocratesApiService
                 'estudiante' => $codigo
             ];
             
+            $endpoint = 'index.php/main/buscar_estudiantes_por_cod';
+            $requestUrl = $this->currentUrl . $endpoint;
+            
             Log::info('Enviando request al SGA', [
-                'url' => $this->baseUrl . '/index.php/main/buscar_estudiantes_por_cod',
+                'url' => $requestUrl,
                 'params' => $params
             ]);
 
+            // Configuración mejorada para la solicitud HTTP
             $response = Http::asForm()
-                ->timeout(8)
-                ->post($this->baseUrl . '/index.php/main/buscar_estudiantes_por_cod', $params);
+                ->timeout(15) // Timeout aumentado
+                ->withOptions([
+                    'allow_redirects' => true, // Seguir redirecciones automáticamente
+                    'http_errors' => false, // No lanzar excepción por errores HTTP
+                    'connect_timeout' => 5 // Timeout de conexión
+                ])
+                ->post($requestUrl, $params);
 
             Log::info('Respuesta del SGA', [
                 'status' => $response->status(),
@@ -108,7 +195,6 @@ class SocratesApiService
             if ($response->successful()) {
                 $html = $response->body();
                 
-                // Si el HTML contiene errores PHP, no es una respuesta válida
                 if (strpos($html, 'PHP Error') !== false || strpos($html, 'Fatal error') !== false) {
                     Log::warning('SGA devuelve errores PHP', [
                         'codigo' => $codigo,
@@ -125,34 +211,69 @@ class SocratesApiService
                 ];
             }
 
+            // Si el código es 301 o 302, probablemente se debe a un problema de redirección
+            if ($response->status() == 301 || $response->status() == 302) {
+                $redirectUrl = $response->header('Location');
+                Log::warning('SGA intentó redireccionar', [
+                    'status' => $response->status(),
+                    'redirect_to' => $redirectUrl
+                ]);
+                
+                // Intentar seguir la redirección manualmente
+                if ($redirectUrl) {
+                    Log::info('Siguiendo redirección manualmente', ['url' => $redirectUrl]);
+                    $response = Http::asForm()->timeout(15)->post($redirectUrl, $params);
+                    
+                    if ($response->successful()) {
+                        $html = $response->body();
+                        $estudiantes = $this->parseEstudiantesHtml($html);
+                        
+                        return [
+                            'success' => true,
+                            'data' => $estudiantes
+                        ];
+                    }
+                }
+            }
+
             Log::warning('SGA buscar_estudiantes_por_cod no exitoso', [
                 'codigo' => $codigo,
                 'status' => $response->status(),
                 'headers' => $response->headers(),
-                'response_body' => substr($response->body(), 0, 1000),
-                'url' => $this->baseUrl . '/index.php/main/buscar_estudiantes_por_cod'
+                'response_body' => substr($response->body(), 0, 500)
             ]);
             
-            return ['success' => false, 'message' => 'Error en consulta SGA'];
-        } catch (Exception $e) {
-            Log::error('Excepción SGA buscar_estudiantes_por_cod', [
-                'codigo' => $codigo,
+            return [
+                'success' => false, 
+                'message' => 'Error en consulta SGA: ' . $response->status()
+            ];
+        } catch (\Exception $e) {
+            Log::error('Error en buscarEstudiantesPorCodigo', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTrace(),
+                'codigo' => $codigo
             ]);
             
-            return ['success' => false, 'message' => 'Error de conexión'];
+            return [
+                'success' => false, 
+                'message' => 'Error de conexión: ' . $e->getMessage()
+            ];
         }
     }
 
     /**
      * Buscar estudiantes por nombre usando el endpoint real del SGA
+     * @param string $nombre Nombre del estudiante
+     * @param int $limit Límite de resultados
+     * @param int $offset Desplazamiento para paginación
+     * @param string|null $carrera Carrera para determinar la URL del SGA
      */
-    public function buscarEstudiantesPorNombre($nombre, $limit = 100, $offset = 0)
+    public function buscarEstudiantesPorNombre($nombre, $limit = 100, $offset = 0, $carrera = null)
     {
         try {
             $response = Http::asForm()
                 ->timeout(8)
-                ->post($this->baseUrl . '/index.php/main/buscar_estudiantes/nombre', [
+                ->post($this->currentUrl . '/index.php/main/buscar_estudiantes/nombre', [
                     'nombre' => $nombre
                 ]);
 
@@ -190,7 +311,7 @@ class SocratesApiService
         return $this->makeApiRequest('GET', '/api/socrates/carreras');
     }
 
-    /**
+    /**s
      * Obtener gestiones activas
      */
     public function getGestiones()
@@ -253,19 +374,24 @@ class SocratesApiService
 
     /**
      * Verificar si la conexión al SGA está disponible
+     * @param string|null $carrera Carrera para determinar la URL del SGA
      */
-    public function checkConnection()
+    public function checkConnection($carrera = null)
     {
+        if ($carrera) {
+            $this->setCarrera($carrera);
+        }
+
         try {
             // Verificar acceso a la página principal del SGA
-            $response = Http::timeout(5)->get($this->baseUrl . '/index.php/main');
+            $response = Http::timeout(5)->get($this->currentUrl . '/index.php/main');
             $status = $response->status();
             
             // 200 = página cargada, 302 = redirección (normal en apps web)
             return in_array($status, [200, 302]);
         } catch (Exception $e) {
             Log::error('Error de conexión al SGA', [
-                'url' => $this->baseUrl . '/index.php/main',
+                'url' => $this->currentUrl . '/index.php/main',
                 'error' => $e->getMessage()
             ]);
             return false;

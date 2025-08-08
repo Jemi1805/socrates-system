@@ -73,6 +73,8 @@ Route::prefix('sga')->group(function () {
     
     // Rutas de conectividad y autenticación
     Route::get('check-connection', [SgaController::class, 'checkConnection']);
+    Route::get('available-urls', [SgaController::class, 'getAvailableUrls']);
+    Route::get('diagnostico/{carrera}', [SgaController::class, 'diagnosticarConexion']);
     Route::post('authenticate', [SgaController::class, 'authenticate']);
     
     // Rutas de estudiantes
