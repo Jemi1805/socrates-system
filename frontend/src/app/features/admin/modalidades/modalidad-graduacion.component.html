@@ -32,6 +32,22 @@
           </button>
         </div>
 
+        <!-- Selector de carrera -->
+        <div class="form-group mb-3">
+          <label for="carrera" class="form-label">
+            <i class="bi bi-building me-2"></i>
+            Seleccionar carrera
+          </label>
+          <select 
+            id="carrera" 
+            name="carrera"
+            [(ngModel)]="carreraSeleccionada"
+            class="form-select">
+            <option *ngFor="let carrera of carreras" [value]="carrera.valor">{{ carrera.nombre }}</option>
+          </select>
+          <small class="form-text text-muted">Seleccione la carrera antes de buscar al estudiante.</small>
+        </div>
+        
         <!-- Formulario de búsqueda -->
         <div class="search-form">
           <!-- Búsqueda por CETA -->

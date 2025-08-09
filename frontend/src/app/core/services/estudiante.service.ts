@@ -13,8 +13,9 @@ export interface Estudiante {
 
 export interface EstudianteResponse {
   success: boolean;
-  message: string;
-  data?: Estudiante;
+  message?: string;
+  data?: Estudiante | null;
+  carrera?: string;
 }
 
 @Injectable({
@@ -25,15 +26,15 @@ export class EstudianteService {
 
   constructor(private http: HttpClient) {}
 
-  buscarPorCeta(codCeta: string): Observable<EstudianteResponse> {
-    return this.http.get<EstudianteResponse>(`${this.apiUrl}/sga/estudiantes/${codCeta}`);
+  buscarPorCeta(codCeta: string, carrera: string = 'mecanica'): Observable<EstudianteResponse> {
+    return this.http.get<EstudianteResponse>(`${this.apiUrl}/sga/estudiantes?carrera=${carrera}&cod_ceta=${codCeta}`);
   }
 
-  buscarPorCI(ci: string): Observable<EstudianteResponse> {
-    return this.http.get<EstudianteResponse>(`${this.apiUrl}/sga/estudiantes/ci/${ci}`);
+  buscarPorCI(ci: string, carrera: string = 'mecanica'): Observable<EstudianteResponse> {
+    return this.http.get<EstudianteResponse>(`${this.apiUrl}/sga/estudiantes/ci?carrera=${carrera}&ci=${ci}`);
   }
 
   listarEstudiantes(): Observable<EstudianteResponse> {
     return this.http.get<EstudianteResponse>(`${this.apiUrl}/sga/estudiantes`);
   }
-} 
+}

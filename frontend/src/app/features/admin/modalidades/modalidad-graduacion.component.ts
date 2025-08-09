@@ -3,16 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
-import { EstudianteService } from '../../../core/services/estudiante.service';
-
-interface Estudiante {
-  cod_ceta: string;
-  nombres: string;
-  apellido_paterno: string;
-  apellido_materno: string;
-  ci: string;
-  carrera: string;
-}
+import { Estudiante, EstudianteService } from '../../../core/services/estudiante.service';
 
 interface ModalidadGraduacion {
   id: number;
@@ -32,6 +23,11 @@ export class ModalidadGraduacionComponent implements OnInit {
   // Formulario de búsqueda
   codigoCeta: string = '';
   numeroCI: string = '';
+  carreraSeleccionada: string = 'mecanica';
+  carreras = [
+    { valor: 'mecanica', nombre: 'Mecánica Automotriz' },
+    { valor: 'electricidad', nombre: 'Electricidad y Electrónica Automotriz' }
+  ];
   tiposBusqueda: 'ceta' | 'ci' = 'ceta';
   intentoBusqueda = false;
   
@@ -73,19 +69,49 @@ export class ModalidadGraduacionComponent implements OnInit {
       return;
     }
 
+    if (!this.carreraSeleccionada) {
+      this.error = 'Por favor, seleccione una carrera';
+      return;
+    }
+
     this.loading = true;
     this.error = '';
     this.estudiante = null;
     this.estudianteEncontrado = false;
 
-    this.estudianteService.buscarPorCeta(this.codigoCeta).subscribe({
-      next: (response) => {
+    this.estudianteService.buscarPorCeta(this.codigoCeta, this.carreraSeleccionada).subscribe({
+      next: (response: any) => {
         this.loading = false;
-        if (response.success && response.data) {
-          this.estudiante = response.data;
-          this.estudianteEncontrado = true;
-          this.intentoBusqueda = false;
+        console.log('Respuesta API estudiante:', response);
+        
+        if (response.success) {
+          try {
+            // Intentar extraer datos del estudiante de diferentes estructuras posibles
+            if (response.data && response.data.data && Array.isArray(response.data.data) && response.data.data.length > 0) {
+              // Caso: response.data.data[0]
+              this.estudiante = response.data.data[0];
+            } else if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+              // Caso: response.data[0]
+              this.estudiante = response.data[0];
+            } else if (response.data && !Array.isArray(response.data)) {
+              // Caso: response.data como objeto directo
+              this.estudiante = response.data;
+            }
+            
+            console.log('Estudiante asignado:', this.estudiante);
+            
+            if (this.estudiante) {
+              this.estudianteEncontrado = true;
+              this.intentoBusqueda = false;
+            } else {
+              this.error = 'No se encontraron datos del estudiante';
+            }
+          } catch (e) {
+            console.error('Error al procesar datos:', e);
+            this.error = 'Error al procesar los datos del estudiante';
+          }
         } else {
+          console.error('No se encontraron datos del estudiante:', response);
           this.error = 'No se encontró ningún estudiante con el código CETA proporcionado';
         }
       },
@@ -101,7 +127,12 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.intentoBusqueda = true;
     
     if (!this.numeroCI.trim()) {
-      this.error = 'Por favor, ingrese un número de CI válido';
+      this.error = 'Por favor, ingrese un CI válido';
+      return;
+    }
+
+    if (!this.carreraSeleccionada) {
+      this.error = 'Por favor, seleccione una carrera';
       return;
     }
 
@@ -110,15 +141,40 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.estudiante = null;
     this.estudianteEncontrado = false;
 
-    this.estudianteService.buscarPorCI(this.numeroCI).subscribe({
-      next: (response) => {
+    this.estudianteService.buscarPorCI(this.numeroCI, this.carreraSeleccionada).subscribe({
+      next: (response: any) => {
         this.loading = false;
-        if (response.success && response.data) {
-          this.estudiante = response.data;
-          this.estudianteEncontrado = true;
-          this.intentoBusqueda = false;
+        console.log('Respuesta API (CI):', response);
+        
+        if (response.success) {
+          try {
+            // Intentar extraer datos del estudiante de diferentes estructuras posibles
+            if (response.data && response.data.data && Array.isArray(response.data.data) && response.data.data.length > 0) {
+              // Caso: response.data.data[0]
+              this.estudiante = response.data.data[0];
+            } else if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+              // Caso: response.data[0]
+              this.estudiante = response.data[0];
+            } else if (response.data && !Array.isArray(response.data)) {
+              // Caso: response.data como objeto directo
+              this.estudiante = response.data;
+            }
+            
+            console.log('Estudiante asignado (CI):', this.estudiante);
+            
+            if (this.estudiante) {
+              this.estudianteEncontrado = true;
+              this.intentoBusqueda = false;
+            } else {
+              this.error = 'No se encontraron datos del estudiante';
+            }
+          } catch (e) {
+            console.error('Error al procesar datos (CI):', e);
+            this.error = 'Error al procesar los datos del estudiante';
+          }
         } else {
-          this.error = 'No se encontró ningún estudiante con el número de CI proporcionado';
+          console.error('No se encontraron datos del estudiante:', response);
+          this.error = 'No se encontró ningún estudiante con el CI proporcionado';
         }
       },
       error: (error) => {
