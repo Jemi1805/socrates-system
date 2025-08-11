@@ -111,5 +111,10 @@ body {
     line-height: 1;
     vertical-align: -.125em;
     -webkit-font-smoothing: antialiased;
-    color: white !important;
+    color: white;
+}
+
+.form-label {
+    margin-bottom: .5rem;
+    color: #052544 !important;
 }

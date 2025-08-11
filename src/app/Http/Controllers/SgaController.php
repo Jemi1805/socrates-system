@@ -264,9 +264,9 @@ class SgaController extends Controller
                 'carrera' => $carrera,
                 'server_info' => [
                     'php_version' => phpversion(),
-                    'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? 'unknown',
-                    'server_name' => $_SERVER['SERVER_NAME'] ?? 'unknown',
-                    'remote_addr' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+                    'server_software' => isset($_SERVER['SERVER_SOFTWARE']) ? $_SERVER['SERVER_SOFTWARE'] : 'unknown',
+                    'server_name' => isset($_SERVER['SERVER_NAME']) ? $_SERVER['SERVER_NAME'] : 'unknown',
+                    'remote_addr' => isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown',
                     'docker_networking' => shell_exec('hostname -I'),
                 ]
             ]);

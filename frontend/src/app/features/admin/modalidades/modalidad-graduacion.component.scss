@@ -15,12 +15,11 @@
 .search-card,
 .student-card,
 .modalidad-card {
-  background: rgba(255, 255, 255, 0.95);
+  background: #ffffffd2;
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   margin-bottom: 2rem;
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 // Tabs de búsqueda
@@ -28,6 +27,12 @@
   display: flex;
   gap: 0.5rem;
   margin-bottom: 1.5rem;
+
+  label.form-label {
+    font-weight: 600;
+    color: #052544 !important;
+    margin-bottom: 0.5rem;
+  }
   
   .tab-btn {
     flex: 1;
@@ -51,13 +56,43 @@
     
     &.active {
       background: #4C9DBD;
-      color: white;
+      color: white !important;
       border-color: #4C9DBD;
       box-shadow: 0 4px 12px rgba(76, 157, 189, 0.3);
+
+      .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+        color: white !important;
+      }
     }
     
     i {
       font-size: 1.1rem;
+    }
+  }
+}
+
+.form-group {
+  margin: 1rem 1rem 1.5rem;
+}
+
+select.form-select {
+  color: #052544;
+}
+
+.form-actions {
+  .btn {
+    margin-left: 1rem;
+    margin-bottom: 1rem;
+    color : #052544;
+    border-color: #4C9DBD;
+
+    &:hover {
+    color: white !important;
+    background-color: #4C9DBD;
+
+      .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+          color: white !important;
+      }
     }
   }
 }
@@ -162,6 +197,15 @@
   }
 }
 
+// Iconos de Bootstrap
+.bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+    display: inline-block;
+    font-family: bootstrap-icons !important;
+    vertical-align: -0.125em;
+    -webkit-font-smoothing: antialiased;
+    color: #4C9DBD;   
+}
+
 // Botones
 .btn {
   border-radius: 8px;
@@ -177,6 +221,10 @@
       background: #3a8aa3;
       border-color: #3a8aa3;
       transform: translateY(-1px);
+    }
+
+    .bi[_ngcontent-ng-c2514004928]:before, [class^=bi-][_ngcontent-ng-c2514004928]:before, [class*=" bi-"][_ngcontent-ng-c2514004928]:before {
+    color: white;
     }
   }
   
