@@ -8,6 +8,8 @@ export interface Estudiante {
   apellido_paterno: string;
   apellido_materno: string;
   ci: string;
+  procedencia: string;
+  telf_movil: string;
   carrera: string;
 }
 

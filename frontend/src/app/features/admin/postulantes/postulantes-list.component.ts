@@ -11,6 +11,8 @@ interface Estudiante {
   apellido_paterno: string;
   apellido_materno: string;
   ci: string;
+  procedencia: string;
+  telf_movil: string;
   carrera: string;
 }
 
@@ -56,7 +58,9 @@ export class PostulantesListComponent implements OnInit {
           nombres_est: this.estudiante.nombres,
           apellidos_est: `${this.estudiante.apellido_paterno} ${this.estudiante.apellido_materno}`,
           ci: this.estudiante.ci,
-          carrera: this.estudiante.carrera
+          expedido: this.estudiante.procedencia,
+          celular: this.estudiante.telf_movil,
+          carrera: this.estudiante.carrera,
         };
       }
     }
