@@ -105,6 +105,25 @@ select.form-select {
   }
 }
 
+.student-card > .card-body {
+  .mb-3 {
+    margin-left: 1rem;
+  }
+  .row {
+    padding: 1rem 1rem 0;
+  }
+}
+
+.modalidad-card > .card-body {
+  padding: 1rem;
+  .mt-4 > .btn-lg {
+    .bi[_ngcontent-ng-c2514004928]:before, [class^=bi-][_ngcontent-ng-c2514004928]:before, [class*=" bi-"][_ngcontent-ng-c2514004928]:before {
+      color: white !important;
+    }
+  }
+}
+
+
 // Items de información
 .info-item {
   margin-bottom: 1rem;
