@@ -1,0 +1,938 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Exception;
+
+class SocratesApiService
+{
+    private $baseUrls;
+    private $apiKey;
+    private $token;
+    private $currentUrl;
+
+    public function __construct()
+    {
+        // URLs base del SGA desde dentro del container Docker para cada carrera
+        // Usamos el proxy nginx configurado en el servidor
+        // Las rutas /sga-electricidad/ y /sga-mecanica/ están configuradas como proxy en nginx
+        // Asegurarnos de que todas las URLs terminen con /
+        $this->baseUrls = [
+            'mecanica' => rtrim(env('SGA_MECANICA_URL', 'http://server/sga-mecanica'), '/') . '/',
+            'electricidad' => rtrim(env('SGA_ELECTRICIDAD_URL', 'http://server/sga-electricidad'), '/') . '/', 
+            'default' => rtrim(env('SGA_API_URL', 'http://server/sga-mecanica'), '/') . '/',
+        ];
+        
+        // URL por defecto
+        $this->currentUrl = $this->baseUrls['default'];
+        $this->apiKey = env('SGA_API_KEY', 'SOCRATES_SGA_API_KEY_2025');
+        
+        // Registrar las URLs configuradas para debugging
+        Log::info('URLs del SGA configuradas', [
+            'mecanica' => $this->baseUrls['mecanica'],
+            'electricidad' => $this->baseUrls['electricidad'],
+            'default' => $this->baseUrls['default'],
+            'current' => $this->currentUrl
+        ]);
+    }
+    
+    /**
+     * Establecer la carrera para determinar la URL a usar
+     */
+    public function setCarrera($carrera)
+    {
+        $carrera = strtolower($carrera);
+        
+        if ($carrera == 'mecanica' || $carrera == 'mecánica' || $carrera == 'automotriz') {
+            $this->currentUrl = $this->baseUrls['mecanica'];
+            return true;
+        } elseif ($carrera == 'electricidad' || $carrera == 'electrónica' || $carrera == 'electronica') {
+            $this->currentUrl = $this->baseUrls['electricidad'];
+            return true;
+        } else {
+            // Si no se especifica o no coincide, usar la URL por defecto
+            $this->currentUrl = $this->baseUrls['default'];
+            return false;
+        }
+    }
+    
+    /**
+     * Obtener las URLs disponibles para las diferentes carreras
+     * @return array
+     */
+    public function getAvailableUrls()
+    {
+        return $this->baseUrls;
+    }
+    
+    /**
+     * Obtener la URL actual configurada
+     * @return string
+     */
+    public function getCurrentUrl()
+    {
+        return $this->currentUrl;
+    }
+
+    /**
+     * Autenticar con el SGA
+     */
+    public function authenticate($username, $password)
+    {
+        try {
+            $response = Http::post($this->currentUrl . '/api/socrates/authenticate', [
+                'username' => $username,
+                'password' => $password
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if ($data['success']) {
+                    $this->token = $data['token'];
+                    return $data;
+                }
+            }
+
+            Log::error('Error de autenticación SGA', [
+                'response' => $response->json(),
+                'status' => $response->status()
+            ]);
+
+            return null;
+        } catch (Exception $e) {
+            Log::error('Excepción en autenticación SGA', ['error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    /**
+     * Buscar estudiantes por código en el SGA
+     */
+    public function getEstudiantes($params = [])
+    {
+        // Ya no necesitamos un tratamiento especial para Electricidad
+        // porque estamos usando el proxy Nginx configurado
+        
+        // Configurar carrera si se especifica (para otras carreras)
+        if (isset($params['carrera'])) {
+            $this->setCarrera($params['carrera']);
+        }
+        
+        // Si hay cod_ceta, usar búsqueda por código
+        if (isset($params['cod_ceta'])) {
+            return $this->buscarEstudiantesPorCodigo($params['cod_ceta']);
+        }
+        
+        // Si hay nombre, usar búsqueda por nombre
+        if (isset($params['nombre'])) {
+            return $this->buscarEstudiantesPorNombre($params['nombre']);
+        }
+        
+        return ['success' => false, 'message' => 'Parámetro cod_ceta o nombre requerido'];
+    }
+
+    /**
+     * Obtener un estudiante por código CETA
+     * @param string $codCeta Código del estudiante
+     * @param string|null $carrera Carrera para determinar la URL del SGA
+     */
+    public function getEstudianteByCodigo($codCeta, $carrera = null)
+    {
+        if ($carrera) {
+            $this->setCarrera($carrera);
+        }
+        
+        return $this->buscarEstudiantesPorCodigo($codCeta);
+    }
+
+    /**
+     * Buscar estudiante por código usando el endpoint real del SGA
+     */
+    private function buscarEstudiantesPorCodigo($codigo)
+    {
+        try {
+            // Verificar que tenemos una URL configurada
+            $carrera = array_search($this->currentUrl, $this->baseUrls) ?: 'unknown';
+            Log::info('URL actual para buscar estudiante por código', [
+                'carrera' => $carrera,
+                'url' => $this->currentUrl
+            ]);
+            
+            // Restaurando los parámetros originales que funcionaban antes
+            // Enviamos múltiples variantes para mayor compatibilidad
+            $params = [
+                'cod_ceta' => $codigo,
+                'codigo' => $codigo,
+                'cod_estudiante' => $codigo,
+                'estudiante' => $codigo
+            ];
+            
+            // Registrar los parámetros que estamos enviando
+            Log::info('Parámetros enviados para buscar estudiante por código', $params);
+            
+            // Restaurando el endpoint original que funcionaba correctamente
+            $endpoint = 'index.php/main/buscar_estudiantes_por_cod';
+            // Mantenemos la concatenación mejorada de URL
+            $requestUrl = rtrim($this->currentUrl, '/') . '/' . $endpoint;
+            
+            Log::info('Enviando request al SGA', [
+                'url' => $requestUrl,
+                'params' => $params
+            ]);
+
+            // Configuración mejorada para la solicitud HTTP
+            $response = Http::asForm()
+                ->timeout(15) // Timeout aumentado
+                ->withOptions([
+                    'allow_redirects' => true, // Seguir redirecciones automáticamente
+                    'http_errors' => false, // No lanzar excepción por errores HTTP
+                    'connect_timeout' => 5 // Timeout de conexión
+                ])
+                ->post($requestUrl, $params);
+
+            Log::info('Respuesta del SGA', [
+                'status' => $response->status(),
+                'headers' => $response->headers(),
+                'body_preview' => substr($response->body(), 0, 500)
+            ]);
+
+            if ($response->successful()) {
+                $html = $response->body();
+                
+                // Registrar el HTML completo para depuración
+                Log::debug('HTML completo recibido en buscarEstudiantesPorCodigo', [
+                    'html' => $html,
+                    'codigo' => $codigo
+                ]);
+                
+                if (strpos($html, 'PHP Error') !== false || strpos($html, 'Fatal error') !== false) {
+                    Log::warning('SGA devuelve errores PHP', [
+                        'codigo' => $codigo,
+                        'errors' => substr($html, 0, 1000)
+                    ]);
+                    return ['success' => false, 'message' => 'Error interno del SGA'];
+                }
+                
+                // Verificar si hay algún resultado en el HTML
+                if (strpos($html, 'Fuentes') !== false || strpos($html, 'Choque') !== false ||
+                    strpos($html, 'estudiante') !== false || strpos($html, 'código') !== false) {
+                    Log::info('Se encontraron posibles datos de estudiantes en el HTML');
+                } else {
+                    Log::warning('No se detectaron datos de estudiantes en el HTML');
+                }
+                
+                $estudiantes = $this->parseEstudiantesHtml($html);
+                
+                // Verificar resultados después del parseo
+                Log::info('Resultados del parseo por código', [
+                    'codigo_buscado' => $codigo,
+                    'estudiantes_encontrados' => count($estudiantes),
+                    'primer_estudiante' => count($estudiantes) > 0 ? $estudiantes[0] : 'ninguno'
+                ]);
+                
+                return [
+                    'success' => true,
+                    'data' => $estudiantes
+                ];
+            }
+
+            // Si el código es 301 o 302, probablemente se debe a un problema de redirección
+            if ($response->status() == 301 || $response->status() == 302) {
+                $redirectUrl = $response->header('Location');
+                Log::warning('SGA intentó redireccionar', [
+                    'status' => $response->status(),
+                    'redirect_to' => $redirectUrl
+                ]);
+                
+                // Intentar seguir la redirección manualmente
+                if ($redirectUrl) {
+                    Log::info('Siguiendo redirección manualmente', ['url' => $redirectUrl]);
+                    $response = Http::asForm()->timeout(15)->post($redirectUrl, $params);
+                    
+                    if ($response->successful()) {
+                        $html = $response->body();
+                        $estudiantes = $this->parseEstudiantesHtml($html);
+                        
+                        return [
+                            'success' => true,
+                            'data' => $estudiantes
+                        ];
+                    }
+                }
+            }
+
+            Log::warning('SGA buscar_estudiantes_por_cod no exitoso', [
+                'codigo' => $codigo,
+                'status' => $response->status(),
+                'headers' => $response->headers(),
+                'response_body' => substr($response->body(), 0, 500)
+            ]);
+            
+            return [
+                'success' => false, 
+                'message' => 'Error en consulta SGA: ' . $response->status()
+            ];
+        } catch (\Exception $e) {
+            Log::error('Error en buscarEstudiantesPorCodigo', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTrace(),
+                'codigo' => $codigo
+            ]);
+            
+            return [
+                'success' => false, 
+                'message' => 'Error de conexión: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Buscar estudiantes por nombre usando el endpoint real del SGA
+     * @param string $nombre Nombre del estudiante
+     * @param int $limit Límite de resultados
+     * @param int $offset Desplazamiento para paginación
+     * @param string|null $carrera Carrera para determinar la URL del SGA
+     */
+    /**
+     * Busca estudiantes por nombre, apellido paterno y apellido materno
+     * 
+     * @param string $texto Texto de búsqueda que puede representar nombre, apellido paterno o apellido materno
+     * @param int $limit Límite de resultados
+     * @param int $offset Desplazamiento para paginación
+     * @param string|null $carrera Carrera para determinar la URL del SGA
+     * @return array Resultado de la búsqueda con formato {success: bool, data: array}
+     */
+    public function buscarEstudiantesPorNombre($texto, $limit = 100, $offset = 0, $carrera = null)
+    {
+        try {
+            // Configurar carrera si se especifica
+            if ($carrera) {
+                $this->setCarrera($carrera);
+            }
+            
+            // Intentamos primero buscar por apellido paterno
+            $resultado = $this->buscarPorApellidosYNombres($texto, "", "");
+            
+            // Si no hay resultados, intentamos por apellido materno
+            if (isset($resultado['success']) && $resultado['success'] && empty($resultado['data'])) {
+                $resultado = $this->buscarPorApellidosYNombres("", $texto, "");
+            }
+            
+            // Si todavía no hay resultados, intentamos por nombres
+            if (isset($resultado['success']) && $resultado['success'] && empty($resultado['data'])) {
+                $resultado = $this->buscarPorApellidosYNombres("", "", $texto);
+            }
+            
+            return $resultado;
+        } catch (\Exception $e) {
+            Log::error('Excepción en buscarEstudiantesPorNombre', [
+                'texto' => $texto,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return ['success' => false, 'message' => 'Error de conexión', 'data' => []];
+        }
+    }
+    
+    /**
+     * Realiza búsqueda de estudiantes por apellidos y nombres en el SGA
+     * 
+     * @param string $apellidoPaterno Apellido paterno a buscar
+     * @param string $apellidoMaterno Apellido materno a buscar
+     * @param string $nombres Nombres a buscar
+     * @param int $limit Límite de resultados
+     * @param int $offset Desplazamiento para paginación
+     * @param string|null $carrera Carrera para determinar la URL del SGA
+     * @return array Resultado con formato {success: bool, data: array}
+     */
+    public function buscarPorApellidosYNombres($apellidoPaterno = "", $apellidoMaterno = "", $nombres = "", $limit = 100, $offset = 0, $carrera = null)
+    {
+        try {
+            // Configurar carrera si se especifica - IMPORTANTE: esto selecciona la URL correcta
+            if ($carrera) {
+                $this->setCarrera($carrera);
+            }
+            
+            // Verificar que tenemos una URL configurada
+            $carreraActual = array_search($this->currentUrl, $this->baseUrls) ?: 'unknown';
+            Log::info('URL actual para buscar estudiante por nombre', [
+                'carrera' => $carreraActual,
+                'url' => $this->currentUrl
+            ]);
+            
+            // Verificamos que al menos uno de los parámetros no esté vacío
+            if (empty(trim($apellidoPaterno)) && empty(trim($apellidoMaterno)) && empty(trim($nombres))) {
+                return ['success' => false, 'message' => 'Se requiere al menos un parámetro de búsqueda', 'data' => []];
+            }
+            
+            // Preparamos los parámetros según el formato esperado por el SGA
+            $params = [
+                'ap_pat' => trim($apellidoPaterno),
+                'ap_mat' => trim($apellidoMaterno),
+                'nombres' => trim($nombres)
+            ];
+            
+            // Construimos el endpoint exacto que usa el SGA
+            $endpoint = 'main/buscar_estudiantes/nombre';
+            $requestUrl = rtrim($this->currentUrl, '/') . '/' . $endpoint;
+            
+            Log::info('Enviando request al SGA para búsqueda por nombre', [
+                'url' => $requestUrl,
+                'params' => $params
+            ]);
+
+            // Configuración mejorada para la solicitud HTTP - igual que en buscarEstudiantesPorCodigo
+            $response = Http::asForm()
+                ->timeout(15) // Timeout aumentado
+                ->withOptions([
+                    'allow_redirects' => true, // Seguir redirecciones automáticamente
+                    'http_errors' => false, // No lanzar excepción por errores HTTP
+                    'connect_timeout' => 5 // Timeout de conexión
+                ])
+                ->post($requestUrl, $params);
+            
+            Log::info('Respuesta del SGA para búsqueda por nombre', [
+                'status' => $response->status(),
+                'headers' => $response->headers(),
+                'body_preview' => substr($response->body(), 0, 500)
+            ]);
+            
+            if ($response->successful()) {
+                $html = $response->body();
+                
+                // Verificamos si hay error de PHP en la respuesta
+                if (strpos($html, 'PHP Error') !== false || strpos($html, 'Fatal error') !== false) {
+                    Log::warning('SGA devuelve errores PHP en búsqueda por nombre', [
+                        'ap_pat' => $apellidoPaterno,
+                        'ap_mat' => $apellidoMaterno,
+                        'nombres' => $nombres,
+                        'errors' => substr($html, 0, 1000)
+                    ]);
+                    return ['success' => false, 'message' => 'Error interno del SGA'];
+                }
+                
+                // Parsear los estudiantes directamente
+                $estudiantes = $this->parseEstudiantesHtml($html);
+                
+                // Mostrar los primeros resultados en el log para facilitar debugging
+                Log::info('Resultados de búsqueda por nombre', [
+                    'count' => count($estudiantes),
+                    'sample' => array_slice($estudiantes, 0, 3)
+                ]);
+                
+                return [
+                    'success' => true,
+                    'data' => $estudiantes
+                ];
+            }
+            
+            // Si el código es 301 o 302, probablemente se debe a un problema de redirección
+            if ($response->status() == 301 || $response->status() == 302) {
+                $redirectUrl = $response->header('Location');
+                Log::warning('SGA intentó redireccionar en búsqueda por nombre', [
+                    'status' => $response->status(),
+                    'redirect_to' => $redirectUrl
+                ]);
+                
+                // Intentar seguir la redirección manualmente
+                if ($redirectUrl) {
+                    Log::info('Siguiendo redirección manualmente', ['url' => $redirectUrl]);
+                    $response = Http::asForm()->timeout(15)->post($redirectUrl, $params);
+                    
+                    if ($response->successful()) {
+                        $html = $response->body();
+                        $estudiantes = $this->parseEstudiantesHtml($html);
+                        
+                        return [
+                            'success' => true,
+                            'data' => $estudiantes
+                        ];
+                    }
+                }
+            }
+            
+            Log::warning('SGA buscar_estudiantes/nombre no exitoso', [
+                'ap_pat' => $apellidoPaterno,
+                'ap_mat' => $apellidoMaterno,
+                'nombres' => $nombres,
+                'status' => $response->status(),
+                'headers' => $response->headers(),
+                'response_body' => substr($response->body(), 0, 500)
+            ]);
+            
+            return [
+                'success' => false, 
+                'message' => 'Error en consulta SGA: ' . $response->status()
+            ];
+        } catch (\Exception $e) {
+            Log::error('Error en buscarPorApellidosYNombres', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTrace(),
+                'ap_pat' => $apellidoPaterno,
+                'ap_mat' => $apellidoMaterno,
+                'nombres' => $nombres
+            ]);
+            
+            return [
+                'success' => false, 
+                'message' => 'Error de conexión: ' . $e->getMessage()
+            ];
+        }
+    }
+    
+    /**
+     * Obtener carreras activas
+     */
+    public function getCarreras()
+    {
+        return $this->makeApiRequest('GET', '/api/socrates/carreras');
+    }
+
+    /**s
+     * Obtener gestiones activas
+     */
+    public function getGestiones()
+    {
+        return $this->makeApiRequest('GET', '/api/socrates/gestiones');
+    }
+
+    /**
+     * Obtener inscripciones de un estudiante
+     */
+    public function getInscripciones($codCeta)
+    {
+        return $this->makeApiRequest('GET', '/api/socrates/inscripciones', ['cod_ceta' => $codCeta]);
+    }
+
+    /**
+     * Realizar petición a la API del SGA
+     */
+    private function makeApiRequest($method, $endpoint, $params = [])
+    {
+        try {
+            $headers = [
+                'X-API-Key' => $this->apiKey,
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json'
+            ];
+
+            if ($this->token) {
+                $headers['Authorization'] = 'Bearer ' . $this->token;
+            }
+
+            $response = Http::withHeaders($headers);
+
+            if ($method === 'GET') {
+                $response = $response->get($this->baseUrl . $endpoint, $params);
+            } else {
+                $response = $response->post($this->baseUrl . $endpoint, $params);
+            }
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            Log::error('Error en petición API SGA', [
+                'endpoint' => $endpoint,
+                'params' => $params,
+                'response' => $response->json(),
+                'status' => $response->status()
+            ]);
+
+            return null;
+        } catch (Exception $e) {
+            Log::error('Excepción en petición API SGA', [
+                'endpoint' => $endpoint,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Verificar si la conexión al SGA está disponible
+     * @param string|null $carrera Carrera para determinar la URL del SGA
+     */
+    public function checkConnection($carrera = null)
+    {
+        if ($carrera) {
+            $this->setCarrera($carrera);
+        }
+
+        try {
+            // Verificar acceso a la página principal del SGA
+            $response = Http::timeout(5)->get($this->currentUrl . '/index.php/main');
+            $status = $response->status();
+            
+            // 200 = página cargada, 302 = redirección (normal en apps web)
+            return in_array($status, [200, 302]);
+        } catch (Exception $e) {
+            Log::error('Error de conexión al SGA', [
+                'url' => $this->currentUrl . '/index.php/main',
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+                    
+        'ap_pat' => ['ap. paterno', 'ap. pat', 'ap pat', 'appaterno', 'ap_paterno', 'paterno', 'paternal', 'apellido paterno',
+                    'ap. pat.', 'ap.pat.', 'ap.pat', 'a. paterno', 'ape paterno', 'ap_pat', 'a pat', 'a. pat.', 
+                    '1er apellido', 'primer apellido', 'apellido 1', 'apellido1', 'ap1', 'ap. 1', 'ap.1', 'pat', 'pat.',
+                    'apellido p', 'ap. p.', 'ap.p', 'a.p.'],
+                    
+        'ap_mat' => ['ap. materno', 'ap. mat', 'ap mat', 'apmaterno', 'ap_materno', 'materno', 'maternal', 'apellido materno',
+                    'ap. mat.', 'ap.mat.', 'ap.mat', 'a. materno', 'ape materno', 'ap_mat', 'a mat', 'a. mat.', 
+                    '2do apellido', 'segundo apellido', 'apellido 2', 'apellido2', 'ap2', 'ap. 2', 'ap.2', 'mat', 'mat.',
+                    'apellido m', 'ap. m.', 'ap.m', 'a.m.'],
+                    
+        'nombres' => ['nombres', 'nombre', 'nom', 'names', 'nombre(s)', 'name', 'nombre completo', 'primer nombre',
+                     'nom.', 'nomb', 'nomb.', 'pnombre', 'pnom', 'nom', 'nom.', 'n.', 'first name', 'given name',
+                     'first n.', 'n', 'nombres completos', 'nombres y apellidos'],
+                     
+        'ci' => ['ci', 'cedula', 'cédula', 'céd', 'ced', 'id', 'c.i.', 'carnet', 'identidad', 'dni', 'doc', 
+                'documento', 'doc. id.', 'ci.', 'c.i', 'ced.', 'céd.', 'carnet id', 'carnet identidad',
+                'doc identidad', 'doc. identidad', 'nro doc', 'num doc'],
+                
+        'carrera' => ['carrera', 'carrera_id', 'id_carrera', 'carr', 'career', 'facultad', 'programa', 
+                     'esp', 'especialidad', 'car.', 'carr.', 'major', 'dept', 'departamento', 'fac'],
+    ];
+    
+    // También añadimos un mapeo para el caso de un campo unificado de apellidos
+    $combinedFields = [
+        'apellidos' => ['apellidos', 'apellido', 'ap', 'lastname', 'last name', 'surname', 'apellidos completos',
+                      'ape', 'ape.', 'apellido completo', 'apell', 'apell.', 'family name', 'apellidos y nombres',
+                      'aps', 'aps.', 'last', 'family'],
+    ];
+    
+    Log::info('Mapeo preparado para encabezados de estudiantes', [
+        'mapeo_ap_pat' => $headerToKey['ap_pat'],
+        'mapeo_ap_mat' => $headerToKey['ap_mat'],
+        'mapeo_apellidos_combinados' => $combinedFields['apellidos']
+    ]);
+    
+    // Palabras clave que indican una tabla de datos de estudiantes
+    $studentKeywords = [
+        'Ap. Paterno', 'Ap. Materno', 'Apellido', 'Nombres', 'Nombre', 'Código', 'CETA',
+        'Paterno', 'Materno', 'apellido', 'nombre', 'estudiante', 'Estudiante', 'código',
+        'Cédula', 'CI', 'Fuentes', 'Choque', 'Lista', 'Identificación', 'cod_est', 'cod_ceta',
+        'info_est', 'datos_est', 'carrera', 'Carrera', 'codigo'
+    ];
+    
+    // Enfoque robusto: buscar directamente tablas que puedan contener estudiantes
+    $estudiantesTable = null;
+    
+    foreach ($tables as $tableIndex => $table) {
+        // Verificar si esta tabla contiene texto relacionado con estudiantes
+        $tableHtml = $dom->saveHTML($table);
+        $matchCount = 0;
+        
+        // Contar cuántas palabras clave contiene esta tabla
+        foreach ($studentKeywords as $keyword) {
+            if (stripos($tableHtml, $keyword) !== false) { // stripos = case insensitive
+                $matchCount++;
+                Log::info('Palabra clave "'.$keyword.'" encontrada en tabla '.$tableIndex);
+            }
+        }
+        
+        // Si hay al menos 2 coincidencias, probablemente sea la tabla que buscamos
+        if ($matchCount >= 2) {
+            Log::info('Encontrada tabla con datos de estudiantes', [
+                'index' => $tableIndex,
+                'coincidencias' => $matchCount
+            ]);
+            $estudiantesTable = $table;
+            break;
+        }
+    }
+    
+    // Si encontramos una tabla de estudiantes, procesarla
+    if ($estudiantesTable) {
+        $rows = $xpath->query('.//tr', $estudiantesTable);
+        Log::info('Procesando tabla de estudiantes', ['rows_count' => $rows->length]);
+        
+        // Buscar la fila de encabezados
+        $headers = [];
+        $headerRowIndex = -1;
+        
+        for ($r = 0; $r < min(5, $rows->length); $r++) { // Solo revisar las primeras 5 filas
+            $rowText = $rows->item($r)->textContent;
+            
+            // Si la fila contiene palabras clave típicas de encabezados de estudiantes
+            if (strpos($rowText, 'Paterno') !== false || 
+                strpos($rowText, 'Materno') !== false ||
+                strpos($rowText, 'Código') !== false ||
+                strpos($rowText, 'CETA') !== false) {
+                
+                $headerRowIndex = $r;
+                
+                // Obtener celdas (pueden ser th o td)
+                $headerCells = $xpath->query('.//th|.//td', $rows->item($r));
+                foreach ($headerCells as $cell) {
+                    $headers[] = trim($cell->textContent);
+                }
+                
+                Log::info('Fila de encabezados encontrada', [
+                    'row_index' => $r,
+                    'headers' => $headers
+                ]);
+                
+                break;
+            Log::info('Procesando tabla de estudiantes', ['rows_count' => $rows->length]);
+            
+            // Buscar la fila de encabezados
+            $headers = [];
+            $headerRowIndex = -1;
+            
+            for ($r = 0; $r < min(5, $rows->length); $r++) { // Solo revisar las primeras 5 filas
+                $rowText = $rows->item($r)->textContent;
+                
+                // Si la fila contiene palabras clave típicas de encabezados de estudiantes
+                if (strpos($rowText, 'Paterno') !== false || 
+                    strpos($rowText, 'Materno') !== false ||
+                    strpos($rowText, 'Código') !== false ||
+                    strpos($rowText, 'CETA') !== false) {
+                    
+                    $headerRowIndex = $r;
+                    
+                    // Obtener celdas (pueden ser th o td)
+                    $headerCells = $xpath->query('.//th|.//td', $rows->item($r));
+                    foreach ($headerCells as $cell) {
+                        $headers[] = trim($cell->textContent);
+                    }
+                    
+                    Log::info('Fila de encabezados encontrada', [
+                        'row_index' => $r,
+                        'headers' => $headers
+                    ]);
+                    
+                    break;
+                }
+            }
+            
+            // Si no se encontraron encabezados, buscar de forma más directa
+            if ($headerRowIndex < 0) {
+                Log::warning('No se encontraron encabezados estándar, intentando alternativa');
+                
+                // Procesar toda la tabla como datos, asumiendo encabezados genéricos
+                for ($i = 0; $i < $rows->length; $i++) {
+                    $cells = $xpath->query('.//td', $rows->item($i));
+                    if ($cells->length <= 1) continue; // Ignorar filas con una sola celda
+                    
+                    // Extraer el texto de las primeras celdas para identificar si es un estudiante
+                    $rowText = $rows->item($i)->textContent;
+                    
+                    // Si encontramos texto que coincida con nuestros criterios de búsqueda
+                    if (strpos(strtolower($rowText), strtolower('Choque')) !== false ||
+                        strpos(strtolower($rowText), strtolower('Fuentes')) !== false) {
+                        
+                        Log::info('Encontrada fila con posible estudiante', ['row_index' => $i]);
+                        
+                        // Crear un estudiante con datos genéricos
+                        $estudiante = [
+                            'cod_ceta' => '',
+                            'ap_pat' => '',
+                            'ap_mat' => '',
+                            'nombres' => '',
+                            'ci' => '',
+                            'procedencia' => ''
+                        ];
+                        
+                        // Procesar cada celda
+                        for ($c = 0; $c < min($cells->length, 6); $c++) { // Limitar a 6 campos
+                            $key = array_keys($estudiante)[$c];
+                            $estudiante[$key] = trim($cells->item($c)->textContent);
+                        }
+                        
+                        Log::info('Estudiante encontrado directamente', $estudiante);
+                        $estudiantes[] = $estudiante;
+                    }
+                }
+                
+                // Si encontramos estudiantes, terminar
+                if (count($estudiantes) > 0) {
+                    Log::info('Estudiantes encontrados por búsqueda directa', ['count' => count($estudiantes)]);
+                    return $estudiantes;
+                }
+            }
+
+            // Si se encontraron encabezados, procesar de forma estándar
+            if ($headerRowIndex >= 0) {
+                Log::info('Procesando con encabezados encontrados', [
+                    'headers' => $headers,
+                    'header_row_index' => $headerRowIndex
+                ]);
+                
+                // Procesar filas de datos (después de los headers)
+                for ($i = $headerRowIndex + 1; $i < $rows->length; $i++) {
+                    $cells = $xpath->query('.//td', $rows->item($i));
+                    if ($cells->length <= 1) continue; // Ignorar filas con una sola celda
+                    
+                    // Crear array de datos
+                    $row = [];
+                    for ($c = 0; $c < $cells->length; $c++) {
+                        $key = isset($headers[$c]) ? $headers[$c] : 'col'.($c+1);
+                        $value = trim($cells->item($c)->textContent);
+                        $row[$key] = $value;
+                    }
+                    
+                    Log::info('Fila procesada', ['row_index' => $i]);
+                    
+                    // Mapear a estructura estándar de estudiante
+                    $estudiante = [
+                        'cod_ceta' => '',
+                        'ap_pat' => '',
+                        'ap_mat' => '',
+                        'nombres' => '',
+                        'ci' => '',
+                        'procedencia' => ''
+                    ];
+                    
+                    // Mapeo de campos comunes - ampliado para mayor flexibilidad
+                    $keyMappings = [
+                        'cod_ceta' => ['Código CETA', 'Cod. CETA', 'Código', 'Codigo', 'Cod', 'COD', 'cod_estudiante', 'cod_est', 'col1'],
+                        'ap_pat' => ['Ap. Paterno', 'Apellido Paterno', 'Paterno', 'AP. PATERNO', 'AP. PAT.', 'AP. PAT', 'PATERNO', 'Ap Paterno', 'ApPaterno', 'col2', 'Apellidos'],
+                        'ap_mat' => ['Ap. Materno', 'Apellido Materno', 'Materno', 'AP. MATERNO', 'AP. MAT.', 'AP. MAT', 'MATERNO', 'Ap Materno', 'ApMaterno', 'col3'],
+                        'nombres' => ['Nombres', 'Nombre', 'NOMBRES', 'NOMBRE', 'Nombre(s)', 'col4'],
+                        'ci' => ['Cédula de Identidad', 'Cédula', 'CI', 'Cedula', 'C.I.', 'col5', 'Carnet', 'Carnet de Identidad'],
+                        'procedencia' => ['Procedencia', 'Proc.', 'col6']
+                    ];
+                    
+                    // Registrar para depuración las columnas disponibles
+                    Log::info('Columnas disponibles para mapeo', ['columns' => array_keys($row)]);
+                    
+                    // Intentar mapear cada campo
+                    foreach ($keyMappings as $targetKey => $possibleKeys) {
+                        foreach ($possibleKeys as $possibleKey) {
+                            if (isset($row[$possibleKey])) {
+                                $estudiante[$targetKey] = $row[$possibleKey];
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Registrar valores encontrados para debugging
+                    Log::info('Valores encontrados para estudiante', [
+                        'cod_ceta' => $estudiante['cod_ceta'],
+                        'ap_pat' => $estudiante['ap_pat'], 
+                        'ap_mat' => $estudiante['ap_mat'],
+                        'nombres' => $estudiante['nombres']
+                    ]);
+                    
+                    // Solo agregar si tenemos datos mínimos
+                    if (!empty($estudiante['cod_ceta']) || !empty($estudiante['ap_pat']) || !empty($estudiante['nombres'])) {
+                        // Intentar extraer apellidos si solo encontramos un campo de apellidos
+                        if (empty($estudiante['ap_mat']) && !empty($estudiante['ap_pat']) && 
+                            strpos($estudiante['ap_pat'], ' ') !== false) {
+                            
+                            // Intentar separar "Fuentes Choque" en ["Fuentes", "Choque"]
+                            $apellidos = explode(' ', $estudiante['ap_pat'], 2);
+                            if (count($apellidos) > 1) {
+                                $estudiante['ap_pat'] = $apellidos[0];
+                                $estudiante['ap_mat'] = $apellidos[1];
+                                Log::info('Apellidos separados automáticamente', [
+                                    'original' => $estudiante['ap_pat'] . ' ' . $estudiante['ap_mat'],
+                                    'separados' => [$estudiante['ap_pat'], $estudiante['ap_mat']]
+                                ]);
+                            }
+                        }
+                        
+                        $estudiantes[] = $estudiante;
+                    }
+                }
+            }
+        }
+        
+        Log::info('Total estudiantes encontrados', ['count' => count($estudiantes)]);
+        return $estudiantes;
+    }
+    
+    /**
+     * Busca agresivamente un campo de teléfono o celular en el array de datos
+     * @param array $row Fila de datos
+     * @return string|null Número de teléfono/celular encontrado o null
+     */
+    private function findPhoneField($row)
+    {
+        // Registrar todas las claves disponibles para depuración
+        Log::info('Buscando teléfono en columnas disponibles', ['keys' => array_keys($row)]);
+        
+        // Comprobar si existe la columna exacta 'telf_movil'
+        if (isset($row['telf_movil']) && !empty(trim($row['telf_movil']))) {
+            Log::info('Encontrado teléfono móvil directo', ['valor' => $row['telf_movil']]);
+            return trim($row['telf_movil']);
+        }
+        
+        // 1. Primero intentar la búsqueda normal por claves específicas de teléfono/celular
+        $telefonoKeys = ['Celular', 'CELULAR', 'celular', 'Teléfono Celular', 'Teléfono Móvil', 
+                       'telf_movil', 'TELEFONO', 'Telefono', 'Tel.', 'Tel', 'Telf.', 'Telf', 'MOVIL', 'Movil', 'Móvil'];
+        foreach ($telefonoKeys as $key) {
+            if (isset($row[$key]) && !empty(trim($row[$key]))) {
+                Log::info('Teléfono encontrado por clave exacta', ['key' => $key, 'value' => $row[$key]]);
+                return trim($row[$key]);
+            }
+        }
+        
+        // 2. Buscar por coincidencia parcial en las claves especificamente para teléfono/celular
+        foreach ($row as $key => $value) {
+            // Evitar claves que puedan tener similitud pero NO son teléfonos
+            if (stripos($key, 'cod') !== false || stripos($key, 'ceta') !== false) {
+                continue;
+            }
+            
+            foreach (['movil', 'cel', 'fono', 'telf', 'tel', 'móvil', 'phone'] as $partial) {
+                if (stripos($key, $partial) !== false && !empty(trim($value))) {
+                    Log::info('Teléfono encontrado por clave parcial', ['key' => $key, 'value' => $value]);
+                    return trim($value);
+                }
+            }
+        }
+        
+        // 3. Buscar números de teléfono en cualquier campo (patrón de 7-10 dígitos)
+        // IMPORTANTE: Excluir específicamente las columnas que sabemos que NO son teléfonos
+        foreach ($row as $key => $value) {
+            // Lista expandida de campos que NO son teléfonos
+            $nonPhoneFields = ['cod_ceta', 'codigo', 'cedula', 'ci', 'nombre', 'nombres', 'apellido', 'paterno', 
+                            'materno', 'email', 'correo', 'fecha', 'direccion', 'edad', 'colegio', 'anio'];
+            
+            $skipField = false;
+            foreach ($nonPhoneFields as $nonPhoneField) {
+                if (stripos($key, $nonPhoneField) !== false) {
+                    $skipField = true;
+                    break;
+                }
+            }
+            
+            if ($skipField) continue;
+            
+            // Verificar si el valor parece un número de teléfono (patrón más específico)
+            if (is_string($value) && preg_match('/\b[0-9]{7,10}\b/', $value, $matches)) {
+                Log::info('Posible teléfono detectado por patrón numérico', ['key' => $key, 'value' => $value, 'match' => $matches[0]]);
+                return $matches[0]; // Devolver solo los dígitos
+            }
+        }
+        
+        // 4. Último recurso: buscar en la columna específica que vemos en el ejemplo
+        if (isset($row['telf_movil'])) {
+            return trim($row['telf_movil']);
+        }
+        
+        Log::warning('No se pudo encontrar un número de teléfono');
+        return null;
+    }
+    
+    /**
+     * Extraer campo de un array usando múltiples posibles claves
+     */
+    private function extractField($row, $possibleKeys)
+    {
+        foreach ($possibleKeys as $key) {
+            if (isset($row[$key]) && !empty(trim($row[$key]))) {
+                return trim($row[$key]);
+            }
+        }
+        return null;
+    }
+}

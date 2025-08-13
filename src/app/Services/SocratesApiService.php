@@ -485,7 +485,7 @@ class SocratesApiService
 
                 $row = [];
                 for ($c = 0; $c < $cells->length; $c++) {
-                    $key = $headers[$c] ?? 'col'.($c+1);
+                    $key = isset($headers[$c]) ? $headers[$c] : 'col'.($c+1);
                     $value = trim($cells->item($c)->textContent);
                     $row[$key] = $value;
                 }
