@@ -47,7 +47,7 @@
             <input 
               type="text" 
               id="ci"
-              [(ngModel)]="postulanteActual.ci" 
+              [(ngModel)]="postulanteActual.ci_completo" 
               name="ci" 
               placeholder="Número de CI" 
               required
@@ -69,11 +69,11 @@
 
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">
-            <i class="icon">✓</i>
+            <i class="bi bi-check me-1"></i>
             {{ postulanteActual.cod_ceta ? 'Actualizar' : 'Agregar' }}
           </button>
           <button type="button" (click)="cancelar()" *ngIf="postulanteActual.cod_ceta" class="btn btn-secondary">
-            <i class="icon">✕</i>
+            <i class="bi bi-x me-1"></i>
             Cancelar
           </button>
         </div>

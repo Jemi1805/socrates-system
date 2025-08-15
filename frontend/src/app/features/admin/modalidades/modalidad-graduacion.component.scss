@@ -20,6 +20,16 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   margin-bottom: 2rem;
   backdrop-filter: blur(10px);
+  padding: 1rem;
+
+  .card-title {
+    color: #052544;
+    margin: 0 0 20px 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+    border-bottom: 2px solid #4C9DBD;
+    padding-bottom: 10px;
+  }
 }
 
 // Tabs de búsqueda
@@ -72,7 +82,11 @@
 }
 
 .form-group {
-  margin: 1rem 1rem 1.5rem;
+  .input-group {
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+      color: white !important;
+    }
+  }
 }
 
 select.form-select {
@@ -81,8 +95,6 @@ select.form-select {
 
 .form-actions {
   .btn {
-    margin-left: 1rem;
-    margin-bottom: 1rem;
     color : #052544;
     border-color: #4C9DBD;
 
@@ -105,19 +117,9 @@ select.form-select {
   }
 }
 
-.student-card > .card-body {
-  .mb-3 {
-    margin-left: 1rem;
-  }
-  .row {
-    padding: 1rem 1rem 0;
-  }
-}
-
 .modalidad-card > .card-body {
-  padding: 1rem;
   .mt-4 > .btn-lg {
-    .bi[_ngcontent-ng-c2514004928]:before, [class^=bi-][_ngcontent-ng-c2514004928]:before, [class*=" bi-"][_ngcontent-ng-c2514004928]:before {
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
       color: white !important;
     }
   }

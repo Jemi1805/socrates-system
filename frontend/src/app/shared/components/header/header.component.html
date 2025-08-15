@@ -3,7 +3,7 @@
   <div class="header-top">
     <div class="header-left">
       <button class="sidebar-toggle" (click)="toggleSidebar()" title="Menú">
-        <i class="bi bi-list"></i>
+        <img [src]="'assets/images/LOGO-CETA.png'" alt="Logo CETA">
       </button>
       
       <div class="logo">
@@ -13,12 +13,6 @@
     </div>
 
     <div class="header-right">
-      <!-- Notificaciones -->
-      <button class="header-btn notification-btn" title="Notificaciones">
-        <i class="bi bi-bell"></i>
-        <span class="notification-badge">3</span>
-      </button>
-
       <!-- Usuario -->
       <div class="user-menu">
         <button class="user-btn" (click)="logout()" title="Cerrar sesión">

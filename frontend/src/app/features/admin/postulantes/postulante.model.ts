@@ -4,6 +4,7 @@ export interface Postulante {
   apellidos_est: string;
   ci: string;
   expedido: string;
+  ci_completo: string; // Nuevo campo para CI completo
   celular: string;
   carrera: string;
   reg_ini_c: string;

@@ -169,20 +169,20 @@ $border-radius: 12px;
 
 // Botones
 .btn {
-  padding: 12px 24px;
-  border: none;
-  border-radius: $border-radius;
-  font-size: 1rem;
+  color : #052544;
+  border-color: #4C9DBD;
+  border-radius: 8px;
   font-weight: 500;
-  cursor: pointer;
+  padding: 0.5rem 1rem;
   transition: all 0.3s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  text-decoration: none;
-  
-  .icon {
-    font-size: 1.1rem;
+
+  &:hover {
+  color: white !important;
+  background-color: #4C9DBD;
+
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+        color: white !important;
+    }
   }
   
   &:hover {
@@ -197,18 +197,28 @@ $border-radius: 12px;
   &.btn-primary {
     background: $primary-color;
     color: white;
-    
+
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+        color: white !important;
+    }
+
     &:hover {
       background: color.adjust($primary-color, $lightness: -10%);
-  }
+    }
   }
   
   &.btn-secondary {
-    background: $text-light;
-    color: white;
-    
+    background-color: white;
+    color : #052544;
+    border-color: #4C9DBD;
+
     &:hover {
-      background: color.adjust($text-light, $lightness: -10%);
+    color: white !important;
+    background-color: #4C9DBD;
+
+      .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+          color: white !important;
+      }
     }
   }
   
@@ -233,6 +243,15 @@ $border-radius: 12px;
       background: color.adjust($danger-color, $lightness: -10%);
     }
   }
+}
+
+// Iconos de Bootstrap
+.bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+    display: inline-block;
+    font-family: bootstrap-icons !important;
+    vertical-align: -0.125em;
+    -webkit-font-smoothing: antialiased;
+    color: #4C9DBD;   
 }
 
 // Tabla

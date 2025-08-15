@@ -57,8 +57,7 @@ export class PostulantesListComponent implements OnInit {
           cod_ceta: parseInt(this.estudiante.cod_ceta),
           nombres_est: this.estudiante.nombres,
           apellidos_est: `${this.estudiante.apellido_paterno} ${this.estudiante.apellido_materno}`,
-          ci: this.estudiante.ci,
-          expedido: this.estudiante.procedencia,
+          ci_completo: `${this.estudiante.ci} ${this.estudiante.procedencia}`,
           celular: this.estudiante.telf_movil,
           carrera: this.estudiante.carrera,
         };
