@@ -147,6 +147,15 @@ export class SgaService {
       .pipe(catchError(this.handleError));
   }
 
+  getPostulanteByName(nombres: string, apPat: string, apMat: string): Observable<ApiResponse<Postulante[]>> {
+  const params = new HttpParams()
+    .set('nombres', nombres)
+    .set('ap_pat', apPat)
+    .set('ap_mat', apMat);
+    
+  return this.http.get<ApiResponse<Postulante[]>>(`${this.baseUrl}/postulantes/nombre`, { params })
+    .pipe(catchError(this.handleError));
+}
   createPostulante(data: Postulante): Observable<ApiResponse<Postulante>> {
     return this.http.post<ApiResponse<Postulante>>(`${this.baseUrl}/postulantes`, data)
       .pipe(catchError(this.handleError));

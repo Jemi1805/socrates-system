@@ -5,8 +5,8 @@ import { Observable } from 'rxjs';
 export interface Estudiante {
   cod_ceta: string;
   nombres: string;
-  apellido_paterno: string;
-  apellido_materno: string;
+  ap_pat: string;
+  ap_mat: string;
   ci: string;
   procedencia: string;
   telf_movil: string;

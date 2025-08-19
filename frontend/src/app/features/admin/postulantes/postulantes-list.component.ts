@@ -8,8 +8,8 @@ import { HeaderComponent } from '../../../shared/components/header/header.compon
 interface Estudiante {
   cod_ceta: string;
   nombres: string;
-  apellido_paterno: string;
-  apellido_materno: string;
+  ap_pat: string;
+  ap_mat: string;
   ci: string;
   procedencia: string;
   telf_movil: string;
@@ -56,7 +56,7 @@ export class PostulantesListComponent implements OnInit {
         this.postulanteActual = {
           cod_ceta: parseInt(this.estudiante.cod_ceta),
           nombres_est: this.estudiante.nombres,
-          apellidos_est: `${this.estudiante.apellido_paterno} ${this.estudiante.apellido_materno}`,
+          apellidos_est: `${this.estudiante.ap_pat} ${this.estudiante.ap_mat}`,
           ci_completo: `${this.estudiante.ci} ${this.estudiante.procedencia}`,
           celular: this.estudiante.telf_movil,
           carrera: this.estudiante.carrera,

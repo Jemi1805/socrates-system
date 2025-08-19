@@ -539,8 +539,8 @@ class SocratesApiService
                 $estudiante = [
                     'cod_ceta' => $this->extractField($row, ['Cod. CETA', 'Código', 'CODIGO', 'Cod_ceta', 'COD_CETA', 'col1']),
                     'nombres' => $this->extractField($row, ['Nombres', 'NOMBRES', 'Nombre', 'NOMBRE']),
-                    'apellido_paterno' => $this->extractField($row, ['Ap. Paterno', 'Apellido Paterno', 'AP_PATERNO', 'Paterno']),
-                    'apellido_materno' => $this->extractField($row, ['Ap. Materno', 'Apellido Materno', 'AP_MATERNO', 'Materno']),
+                    'ap_pat' => $this->extractField($row, ['Ap. Paterno', 'Apellido Paterno', 'AP_PATERNO', 'Paterno']),
+                    'ap_mat' => $this->extractField($row, ['Ap. Materno', 'Apellido Materno', 'AP_MATERNO', 'Materno']),
                     'ci' => $this->extractField($row, ['Cédula de Identidad', 'CEDULA', 'Numero_doc', 'CI']),
                     'procedencia' => $this->extractField($row, ['Procedencia', 'PROCEDENCIA']),
                     'email' => $this->extractField($row, ['E-mail', 'EMAIL', 'Correo']),
