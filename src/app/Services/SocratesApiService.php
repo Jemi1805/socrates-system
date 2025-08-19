@@ -569,7 +569,7 @@ class SocratesApiService
                     'ci' => $this->extractField($row, ['Cédula de Identidad', 'CEDULA', 'Numero_doc', 'CI']),
                     'procedencia' => $this->extractField($row, ['Procedencia', 'PROCEDENCIA']),
                     'email' => $this->extractField($row, ['E-mail', 'EMAIL', 'Correo']),
-                    'telf_movil' => $telfMovilValue ?: $this->findPhoneField($row),
+                    'telf_movil' => $this->extractField($row, ['Celular', 'celular', 'CELULAR', 'Teléfono Celular', 'Teléfono Móvil', 'telf_movil', 'TELEFONO', 'Telefono', 'Tel.', 'Tel', 'Telf.', 'Telf', 'MOVIL', 'Movil', 'Móvil']),
                     'raw' => $row
                 ];
 
