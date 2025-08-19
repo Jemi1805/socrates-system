@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Exception;
+use \InvalidArgumentException;
 
 class SocratesApiService
 {
@@ -20,9 +21,9 @@ class SocratesApiService
         // Las rutas /sga-electricidad/ y /sga-mecanica/ están configuradas como proxy en nginx
         // Asegurarnos de que todas las URLs terminen con /
         $this->baseUrls = [
-            'mecanica' => rtrim(env('SGA_MECANICA_URL', 'http://server/sga-mecanica'), '/') . '/',
-            'electricidad' => rtrim(env('SGA_ELECTRICIDAD_URL', 'http://server/sga-electricidad'), '/') . '/', 
-            'default' => rtrim(env('SGA_API_URL', 'http://server/sga-mecanica'), '/') . '/',
+            'mecanica' => rtrim(env('SGA_MECANICA_URL', 'http://host.docker.internal/sgamea/'), '/') . '/',
+            'electricidad' => rtrim(env('SGA_ELECTRICIDAD_URL', 'http://host.docker.internal/sga/'), '/') . '/', 
+            'default' => rtrim(env('SGA_API_URL', 'http://host.docker.internal/sgamea/'), '/') . '/',
         ];
         
         // URL por defecto
@@ -120,14 +121,18 @@ class SocratesApiService
             $this->setCarrera($params['carrera']);
         }
         
-        // Si hay cod_ceta, usar búsqueda por código
+        // Búsqueda por código
         if (isset($params['cod_ceta'])) {
             return $this->buscarEstudiantesPorCodigo($params['cod_ceta']);
         }
         
-        // Si hay nombre, usar búsqueda por nombre
-        if (isset($params['nombre'])) {
-            return $this->buscarEstudiantesPorNombre($params['nombre']);
+        // Búsqueda por nombre completo
+        if (isset($params['nombres']) || isset($params['ap_pat']) || isset($params['ap_mat'])) {
+            return $this->buscarEstudiantesPorNombreCompleto(
+                $params['nombres'] ? $params['nombres']: '',
+                $params['ap_pat'] ? $params['ap_pat'] : '',
+                $params['ap_mat'] ? $params['ap_mat'] : ''
+            );
         }
         
         return ['success' => false, 'message' => 'Parámetro cod_ceta o nombre requerido'];
@@ -262,42 +267,62 @@ class SocratesApiService
     }
 
     /**
-     * Buscar estudiantes por nombre usando el endpoint real del SGA
-     * @param string $nombre Nombre del estudiante
-     * @param int $limit Límite de resultados
-     * @param int $offset Desplazamiento para paginación
-     * @param string|null $carrera Carrera para determinar la URL del SGA
+     * Buscar estudiantes por nombre completo (nombres, apellido paterno y materno)
      */
-    public function buscarEstudiantesPorNombre($nombre, $limit = 100, $offset = 0, $carrera = null)
+    public function buscarEstudiantesPorNombreCompleto($nombres = '', $apPat = '', $apMat = '', $limit = 100, $offset = 0, $carrera = null)
     {
-        try {
-            $response = Http::asForm()
-                ->timeout(8)
-                ->post($this->currentUrl . '/index.php/main/buscar_estudiantes/nombre', [
-                    'nombre' => $nombre
-                ]);
+        // Validar que la carrera sea obligatoria
+        if (empty($carrera)) {
+            throw new InvalidArgumentException("El parámetro 'carrera' es requerido");
+        }
 
+        // Validar que al menos un campo de nombre esté presente
+        if (empty($nombres) && empty($apPat) && empty($apMat)) {
+            return array(
+                'success' => false,
+                'message' => 'Debe proporcionar al menos un criterio (nombres, ap_pat o ap_mat)'
+            );
+        }
+
+        // Configurar carrera (obligatorio)
+        $this->setCarrera($carrera);
+
+        try {
+            $params = [
+                'criterio' => 'nombre',
+                'nombres' => isset($nombres) ? $nombres : '',
+                'ap_paterno' => isset($apPat) ? $apPat : '',
+                'ap_materno' => isset($apMat) ? $apMat : ''
+                ];
+
+            $response = Http::asForm()
+                ->timeout(15)
+                ->post($this->currentUrl . 'index.php/main/buscar', $params);
+            
             if ($response->successful()) {
                 $html = $response->body();
                 $estudiantes = $this->parseEstudiantesHtml($html);
                 
-                return [
+                return array(
                     'success' => true,
-                    'data' => $estudiantes
-                ];
+                    'data' => array_slice($estudiantes, $offset, $limit),
+                    'total' => count($estudiantes),
+                    'carrera' => $carrera,
+                    'params' => $params
+                );
             }
 
-            Log::warning('SGA buscar_estudiantes/nombre no exitoso', [
-                'nombre' => $nombre,
-                'status' => $response->status(),
+            Log::error('Error en búsqueda por nombre completo', [
+                'params' => $params,
+                'status' => $response->status()
             ]);
             
-            return ['success' => false, 'message' => 'Error en consulta SGA'];
-        } catch (Exception $e) {
-            Log::error('Excepción SGA buscar_estudiantes/nombre', [
-                'nombre' => $nombre,
-                'error' => $e->getMessage(),
-            ]);
+            return ['success' => false, 'message' => 'Error en la consulta al SGA'];
+
+        } catch (\Exception $e) {
+            Log::error('Excepción en búsqueda SGA', array(
+                'error' => $e->getMessage()
+            ));
             
             return ['success' => false, 'message' => 'Error de conexión'];
         }

@@ -27,8 +27,8 @@ services:
       - ./src:/var/www/html:delegated
     container_name: laravel_php
     extra_hosts:
-      - "sga-mecanica:192.168.0.130"
-      - "sga-electricidad:192.168.0.101"
+      - "sga-mecanica:127.0.0.1"
+      - "sga-electricidad:127.0.0.1"
     networks:
       - laravel_network
 
