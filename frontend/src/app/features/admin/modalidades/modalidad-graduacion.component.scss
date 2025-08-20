@@ -37,12 +37,19 @@
     width: 100%;
     border-collapse: collapse;
     border-radius: 12px;
+    background-color: #ffffffd2;
+
+
+  td {
+    color: #052544;
   }
 
-  th, td {
-    color: #052544;
-    background-color: #ffffffd2;
+  .table-dark {
+    --bs-table-bg: #4C9DBD !important;
+    --bs-table-border-color: #4C9DBD !important;
+    color: white !important;
   }
+}
 
 
 // Tabs de búsqueda
