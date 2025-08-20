@@ -173,7 +173,7 @@ class SocratesApiService
                 'estudiante' => $codigo
             ];
             
-            $endpoint = 'index.php/main/buscar_estudiantes_por_cod';
+            $endpoint = 'index.php/titulacion/serviciostitulacion/buscar_estudiantes_por_cod';
             $requestUrl = $this->currentUrl . $endpoint;
             
             Log::info('Enviando request al SGA', [
@@ -269,7 +269,7 @@ class SocratesApiService
     /**
      * Buscar estudiantes por nombre completo (nombres, apellido paterno y materno)
      */
-    public function buscarEstudiantesPorNombreCompleto($nombres = '', $apPat = '', $apMat = '', $limit = 100, $offset = 0, $carrera = null)
+    public function buscarEstudiantesPorNombre($nombres = '', $apPat = '', $apMat = '', $limit = 100, $offset = 0, $carrera = null)
     {
         // Validar que la carrera sea obligatoria
         if (empty($carrera)) {
@@ -297,7 +297,7 @@ class SocratesApiService
 
             $response = Http::asForm()
                 ->timeout(15)
-                ->post($this->currentUrl . 'index.php/main/buscar', $params);
+                ->post($this->currentUrl . 'index.php/titulacion/serviciostitulacion/buscar_estudiantes/nombre', $params);
             
             if ($response->successful()) {
                 $html = $response->body();
