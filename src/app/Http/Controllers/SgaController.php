@@ -168,15 +168,15 @@ class SgaController extends Controller
         if ($result && isset($result['success']) && $result['success']) {
             return response()->json([
                 'success' => true,
-                'data' => $result['data'] ?? [],
-                'total' => $result['total'] ?? count($result['data'] ?? []),
+                'data' => isset($result['data']) ? $result['data'] : array(),
+                'total' => isset($result['total']) ? $result['total'] : (isset($result['data']) ? count($result['data']) : 0),
                 'carrera' => $carrera
             ]);
         }
 
         return response()->json([
             'success' => false,
-            'message' => $result['message'] ?? 'Error al buscar estudiantes'
+            'message' => isset($result['message']) ? $result['message'] : 'Error al buscar estudiantes'
         ], 500);
     }
 
