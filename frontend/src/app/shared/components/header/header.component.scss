@@ -1,0 +1,286 @@
+// Variables del tema oscuro
+$dark-blue: #052544;
+$medium-blue: #78849A;
+$light-blue: #3949ab;
+$accent-blue: #4C9DBD;
+$text-white: #ffffff;
+$text-light: #e3f2fd;
+$text-muted: #b3e5fc;
+$shadow: 0 2px 10px rgba(0,0,0,0.15);
+$border-radius: 8px;
+
+// Header principal
+.app-header {
+  background: $dark-blue;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: $shadow;
+  position: sticky;
+  top: 0;
+  z-index: 1000
+}
+
+// Barra superior
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+  height: 60px;
+  min-height: 60px;
+  background: linear-gradient(150deg, $dark-blue, $medium-blue);;
+}
+
+.header-logo {
+  height: 36px;
+  width: auto;
+  filter: brightness(0) invert(1);
+  transition: transform 0.3s ease;
+  
+  &:hover {
+    transform: scale(1.05);
+  }
+}
+
+// Lado izquierdo
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.sidebar-toggle {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  border-radius: $border-radius;
+  transition: background-color 0.3s ease;
+  color: $text-white;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  img {
+    height: 50px;
+    width: auto;
+    transition: transform 0.3s ease;
+  }
+
+  .icon {
+    color: $text-white;
+  }
+}
+
+.logo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  
+  .logo-text {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: $text-white;
+    margin: 0;
+    line-height: 1.2;
+  }
+  
+  .logo-subtitle {
+    font-size: 0.8rem;
+    color: $text-light;
+    font-weight: 400;
+  }
+}
+
+// Lado derecho
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.header-btn {
+  background: none;
+  border: none;
+  padding: 8px;
+  border-radius: $border-radius;
+  cursor: pointer;
+  position: relative;
+  transition: background-color 0.3s ease;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .icon {
+    font-size: 1.2rem;
+    color: $text-white;
+  }
+}
+
+.notification-btn {
+  .notification-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: #f44336;
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+  }
+}
+
+// Menú de usuario
+.user-menu {
+  .user-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: none;
+    border: none;
+    padding: 8px 12px;
+    border-radius: $border-radius;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+  }
+  
+  .user-avatar {
+    width: 32px;
+    height: 32px;
+    background: $accent-blue;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    .icon {
+      color: white;
+      font-size: 1rem;
+    }
+  }
+  
+  .user-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    
+    .user-name {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: $text-white;
+      line-height: 1.2;
+    }
+    
+    .user-role {
+      font-size: 0.8rem;
+      color: $text-light;
+      line-height: 1.2;
+    }
+  }
+  
+  .dropdown-icon {
+    font-size: 0.8rem;
+    color: $text-light;
+  }
+}
+
+// Barra de navegación
+.navigation-bar {
+  background: $dark-blue;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-menu {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 50px;
+}
+
+.nav-item {
+  flex: 1;
+  
+  .nav-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: $text-white;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-bottom-color: $accent-blue;
+    }
+    
+    &.active {
+      background: rgba(255, 255, 255, 0.15);
+      border-bottom-color: $accent-blue;
+      font-weight: 600;
+    }
+  }
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .header-top {
+    padding: 0 15px;
+    height: 50px;
+  }
+  
+  .logo {
+    .logo-text {
+      display: none;
+    }
+    
+    .logo-subtitle {
+      display: none;
+    }
+  }
+  
+  .user-info {
+    display: none;
+  }
+  
+  .nav-menu {
+    height: 40px;
+    overflow-x: auto;
+    
+    .nav-item {
+      min-width: 180px;
+      
+      .nav-link {
+        font-size: 0.8rem;
+        padding: 0 10px;
+      }
+    }
+  }
+}
+
+// Animaciones
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.app-header {
+  animation: slideDown 0.3s ease-out;
+} 

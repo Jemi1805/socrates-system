@@ -1,0 +1,34 @@
+{
+  "tests": [
+    {
+      "name": "Test API Base",
+      "url": "http://localhost:8080/api",
+      "method": "GET",
+      "expected": "200 OK"
+    },
+    {
+      "name": "Test Postulantes API",
+      "url": "http://localhost:8080/api/postulantes",
+      "method": "GET",
+      "expected": "200 OK"
+    },
+    {
+      "name": "Test Productos API",
+      "url": "http://localhost:8080/api/productos",
+      "method": "GET",
+      "expected": "200 OK"
+    },
+    {
+      "name": "Test Angular Frontend",
+      "url": "http://localhost:4200",
+      "method": "GET",
+      "expected": "200 OK"
+    }
+  ],
+  "instructions": [
+    "1. Abrir http://localhost:4200 para ver Angular",
+    "2. Abrir http://localhost:8080/api/postulantes para ver la API",
+    "3. Abrir http://localhost:8080 para ver Laravel",
+    "4. Abrir http://localhost:8090 para phpMyAdmin"
+  ]
+}

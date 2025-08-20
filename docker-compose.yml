@@ -26,6 +26,9 @@ services:
     volumes:
       - ./src:/var/www/html:delegated
     container_name: laravel_php
+    extra_hosts:
+      - "sga-mecanica:127.0.0.1"
+      - "sga-electricidad:127.0.0.1"
     networks:
       - laravel_network
 
@@ -84,10 +87,10 @@ services:
       working_dir: /app
       volumes:
         - ./frontend:/app
-        - /app/frontend/node_modules
+        - /app/node_modules
       ports:
         - "4200:4200"
-      command: sh -c "npm install && npm start"
+      command: sh -c "npm install && npm start -- --host 0.0.0.0 --poll=5000"
       networks:
         - laravel_network
 

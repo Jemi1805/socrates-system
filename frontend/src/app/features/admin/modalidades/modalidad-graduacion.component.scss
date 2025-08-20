@@ -1,0 +1,319 @@
+// Estilos para la página de modalidad de graduación
+.modalidad-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #052544 0%, #4C9DBD 100%);
+  padding: 0;
+}
+
+.content-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+// Cards principales
+.search-card,
+.student-card,
+.modalidad-card {
+  background: #ffffffd2;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+  backdrop-filter: blur(10px);
+  padding: 1rem;
+
+  .card-title {
+    color: #052544;
+    margin: 0 0 20px 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+    border-bottom: 2px solid #4C9DBD;
+    padding-bottom: 10px;
+  }
+}
+
+// Tabs de búsqueda
+.search-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+
+  label.form-label {
+    font-weight: 600;
+    color: #052544 !important;
+    margin-bottom: 0.5rem;
+  }
+  
+  .tab-btn {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #052544;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: #4C9DBD;
+    }
+    
+    &.active {
+      background: #4C9DBD;
+      color: white !important;
+      border-color: #4C9DBD;
+      box-shadow: 0 4px 12px rgba(76, 157, 189, 0.3);
+
+      .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+        color: white !important;
+      }
+    }
+    
+    i {
+      font-size: 1.1rem;
+    }
+  }
+}
+
+.form-group {
+  .input-group {
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+      color: white !important;
+    }
+  }
+}
+
+select.form-select {
+  color: #052544;
+}
+
+.form-actions {
+  .btn {
+    color : #052544;
+    border-color: #4C9DBD;
+
+    &:hover {
+    color: white !important;
+    background-color: #4C9DBD;
+
+      .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+          color: white !important;
+      }
+    }
+  }
+}
+
+// Avatar del estudiante
+.student-avatar {
+  i {
+    font-size: 3rem;
+    color: #4C9DBD;
+  }
+}
+
+.modalidad-card > .card-body {
+  .mt-4 > .btn-lg {
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+      color: white !important;
+    }
+  }
+}
+
+
+// Items de información
+.info-item {
+  margin-bottom: 1rem;
+  
+  .form-label {
+    font-weight: 600;
+    color: #052544;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    
+    i {
+      color: #4C9DBD;
+    }
+  }
+  
+  .info-value {
+    background: #f8f9fa;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    border-left: 3px solid #4C9DBD;
+    font-weight: 500;
+  }
+}
+
+// Modalidades
+.modalidad-item {
+  background: white;
+  border: 2px solid #e9ecef;
+  border-radius: 10px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  height: 100%;
+  
+  &:hover {
+    border-color: #4C9DBD;
+    box-shadow: 0 4px 12px rgba(76, 157, 189, 0.2);
+    transform: translateY(-2px);
+  }
+  
+  &.selected {
+    border-color: #28a745;
+    background: linear-gradient(145deg, #f8fff9 0%, #e8f5e8 100%);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.2);
+  }
+  
+  .modalidad-icon {
+    i {
+      font-size: 2rem;
+      color: #4C9DBD;
+      padding: 0.5rem;
+      background: rgba(76, 157, 189, 0.1);
+      border-radius: 8px;
+    }
+  }
+  
+  .modalidad-title {
+    color: #052544;
+    font-weight: 600;
+  }
+  
+  .modalidad-desc {
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+  
+  .modalidad-features {
+    small {
+      font-size: 0.8rem;
+      
+      i {
+        color: #28a745;
+      }
+    }
+  }
+}
+
+// Información seleccionada
+.selected-info {
+  border-left: 4px solid #4C9DBD;
+  
+  h6 {
+    color: #052544;
+    font-weight: 600;
+    
+    i {
+      color: #4C9DBD;
+    }
+  }
+}
+
+// Iconos de Bootstrap
+.bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+    display: inline-block;
+    font-family: bootstrap-icons !important;
+    vertical-align: -0.125em;
+    -webkit-font-smoothing: antialiased;
+    color: #4C9DBD;   
+}
+
+// Botones
+.btn {
+  border-radius: 8px;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  transition: all 0.3s ease;
+  
+  &.btn-primary {
+    background: #4C9DBD;
+    border-color: #4C9DBD;
+    
+    &:hover {
+      background: #3a8aa3;
+      border-color: #3a8aa3;
+      transform: translateY(-1px);
+    }
+
+    .bi[_ngcontent-ng-c2514004928]:before, [class^=bi-][_ngcontent-ng-c2514004928]:before, [class*=" bi-"][_ngcontent-ng-c2514004928]:before {
+    color: white;
+    }
+  }
+  
+  &.btn-success {
+    background: #28a745;
+    border-color: #28a745;
+    
+    &:hover {
+      background: #218838;
+      border-color: #218838;
+      transform: translateY(-1px);
+    }
+  }
+  
+  &.btn-outline-secondary {
+    color: #6c757d;
+    border-color: #6c757d;
+    
+    &:hover {
+      background: #6c757d;
+      border-color: #6c757d;
+    }
+  }
+}
+
+// Animaciones
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+// Alertas
+.alert {
+  border-radius: 8px;
+  border: none;
+  
+  &.alert-danger {
+    background: rgba(220, 53, 69, 0.1);
+    color: #721c24;
+    border-left: 4px solid #dc3545;
+  }
+  
+  &.alert-info {
+    background: rgba(23, 162, 184, 0.1);
+    color: #0c5460;
+    border-left: 4px solid #17a2b8;
+  }
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .content-wrapper {
+    padding: 1rem 0.5rem;
+  }
+  
+  .search-tabs {
+    flex-direction: column;
+    
+    .tab-btn {
+      flex: none;
+    }
+  }
+  
+  .modalidad-item {
+    margin-bottom: 1rem;
+  }
+}

@@ -1,0 +1,394 @@
+@use "sass:color";
+
+// Variables
+$primary-color: #4C9DBD;
+$secondary-color: #FF9800;
+$success-color: #4CAF50;
+$danger-color: #F44336;
+$info-color: #17a2b8;
+$light-gray: #f5f5f5;
+$border-color: #e0e0e0;
+$text-dark-blue: #052544;
+$text-light: #666;
+$shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+$border-radius: 12px;
+
+// Estilos generales
+.postulantes-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #052544 0%, #4C9DBD 100%);
+  padding: 0;
+}
+
+.content-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+// Información del estudiante y modalidad
+.info-card {
+  background: #ffffffd2;
+  border-radius: $border-radius;
+  box-shadow: $shadow;
+  margin-bottom: 2rem;
+  backdrop-filter: blur(10px);
+  
+  .card-title {
+    color: $text-dark-blue;
+    margin: 0 0 20px 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    
+    i {
+      color: $info-color;
+    }
+  }
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.info-section {
+  h4 {
+    color: $primary-color;
+    margin: 0 0 15px 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+    border-bottom: 2px solid $primary-color;
+    padding-bottom: 5px;
+  }
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid $light-gray;
+  
+  label {
+    font-weight: 500;
+    color: $text-dark-blue;
+    min-width: 120px;
+  }
+  
+  span {
+    color: $text-light;
+    text-align: right;
+    font-weight: 400;
+  }
+}
+
+// Cards
+.form-card, .table-card {
+  background: #ffffffd2;
+  border-radius: $border-radius;
+  box-shadow: $shadow;
+  margin-bottom: 2rem;
+  backdrop-filter: blur(10px);
+  padding: 1rem;
+  
+  .card-title {
+    color: $text-dark-blue;
+    margin: 0 0 20px 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+    border-bottom: 2px solid $primary-color;
+    padding-bottom: 10px;
+  }
+}
+
+// Formulario
+.postulante-form {
+  .form-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+    
+    @media (max-width: 768px) {
+      flex-direction: column;
+      gap: 15px;
+    }
+  }
+  
+  .form-group {
+    flex: 1;
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: $text-dark-blue;
+      font-weight: 500;
+      font-size: 0.9rem;
+}
+
+    .form-input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid $border-color;
+      border-radius: $border-radius;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+      box-sizing: border-box;
+      color: $text-dark-blue;
+      
+      &:focus {
+        outline: none;
+        border-color: $primary-color;
+        box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+      }
+      
+      &::placeholder {
+        color: #999;
+      }
+    }
+  }
+  
+  .form-actions {
+  display: flex;
+    gap: 15px;
+    justify-content: flex-end;
+    margin-top: 25px;
+    
+    @media (max-width: 768px) {
+      flex-direction: column;
+    }
+  }
+}
+
+// Botones
+.btn {
+  color : #052544;
+  border-color: #4C9DBD;
+  border-radius: 8px;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  transition: all 0.3s ease;
+
+  &:hover {
+  color: white !important;
+  background-color: #4C9DBD;
+
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+        color: white !important;
+    }
+  }
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+  
+  &.btn-primary {
+    background: $primary-color;
+    color: white;
+
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+        color: white !important;
+    }
+
+    &:hover {
+      background: color.adjust($primary-color, $lightness: -10%);
+    }
+  }
+  
+  &.btn-secondary {
+    background-color: white;
+    color : #052544;
+    border-color: #4C9DBD;
+
+    &:hover {
+    color: white !important;
+    background-color: #4C9DBD;
+
+      .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+          color: white !important;
+      }
+    }
+  }
+  
+  &.btn-edit {
+    background: $secondary-color;
+    color: white;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    
+    &:hover {
+      background: color.adjust($secondary-color, $lightness: -10%);
+    }
+  }
+  
+  &.btn-delete {
+    background: $danger-color;
+    color: white;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    
+    &:hover {
+      background: color.adjust($danger-color, $lightness: -10%);
+    }
+  }
+}
+
+// Iconos de Bootstrap
+.bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+    display: inline-block;
+    font-family: bootstrap-icons !important;
+    vertical-align: -0.125em;
+    -webkit-font-smoothing: antialiased;
+    color: #4C9DBD;   
+}
+
+// Tabla
+.table-container {
+  overflow-x: auto;
+  border-radius: $border-radius;
+  border: 1px solid $border-color;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  
+  thead {
+    background: linear-gradient(135deg, $primary-color, color.adjust($primary-color, $lightness: -10%));
+    color: white;
+    
+    th {
+      padding: 15px 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border: none;
+      
+      &:first-child {
+        border-top-left-radius: $border-radius;
+}
+
+      &:last-child {
+        border-top-right-radius: $border-radius;
+      }
+    }
+  }
+  
+  tbody {
+    .table-row {
+      transition: background-color 0.3s ease;
+      
+      &:hover {
+        background: $light-gray;
+      }
+      
+      &:nth-child(even) {
+        background: #fafafa;
+        
+        &:hover {
+          background: $light-gray;
+        }
+      }
+      
+      td {
+        padding: 12px;
+        border-bottom: 1px solid $border-color;
+        color: $text-dark-blue;
+        font-size: 0.95rem;
+        
+        &.code-cell {
+          font-weight: 600;
+          color: $primary-color;
+}
+
+        &.actions-cell {
+          display: flex;
+          gap: 8px;
+          justify-content: flex-start;
+          align-items: center;
+        }
+      }
+    }
+  }
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .header {
+    .main-title {
+      font-size: 2rem;
+    }
+    
+    .section-title {
+      font-size: 1.3rem;
+    }
+  }
+  
+  .form-card, .table-card {
+    padding: 20px;
+  }
+  
+  .data-table {
+    font-size: 0.9rem;
+    
+    thead th, tbody td {
+      padding: 10px 8px;
+    }
+  }
+}
+
+// Animaciones
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form-card, .table-card {
+  animation: fadeIn 0.5s ease-out;
+}
+
+// Estados de carga
+.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+// Mensajes de estado
+.status-message {
+  padding: 12px 16px;
+  border-radius: $border-radius;
+  margin: 15px 0;
+  font-weight: 500;
+  
+  &.success {
+    background: rgba(76, 175, 80, 0.1);
+    color: $success-color;
+    border: 1px solid rgba(76, 175, 80, 0.3);
+  }
+  
+  &.error {
+    background: rgba(244, 67, 54, 0.1);
+    color: $danger-color;
+    border: 1px solid rgba(244, 67, 54, 0.3);
+  }
+}
+

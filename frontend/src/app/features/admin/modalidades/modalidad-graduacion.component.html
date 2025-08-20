@@ -1,0 +1,254 @@
+<div class="modalidad-container">
+  <!-- Header reutilizable -->
+  <app-header 
+    pageTitle="Modalidad de Graduación"
+    [breadcrumbItems]="[
+      { label: 'Inicio' },
+      { label: 'Modalidad de Graduación' }
+    ]">
+  </app-header>
+
+  <div class="content-wrapper">
+    <!-- Formulario de búsqueda -->
+    <div class="search-card">
+      <div class="card-body">
+        <h3 class="card-title">Busqueda de Estudiantes</h3>
+        <!-- Tabs de búsqueda -->
+        <div class="search-tabs mb-4">
+          <button 
+            type="button" 
+            class="tab-btn"
+            [class.active]="tiposBusqueda === 'ceta'"
+            (click)="cambiarTipoBusqueda('ceta')">
+            <i class="bi bi-person-badge"></i>
+            Por Código CETA
+          </button>
+          <button 
+            type="button" 
+            class="tab-btn"
+            [class.active]="tiposBusqueda === 'ci'"
+            (click)="cambiarTipoBusqueda('ci')">
+            <i class="bi bi-card-text"></i>
+            Por CI
+          </button>
+        </div>
+
+        <!-- Selector de carrera -->
+        <div class="form-group mb-3">
+          <label for="carrera" class="form-label">
+            <i class="bi bi-building me-2"></i>
+            Seleccionar carrera
+          </label>
+          <select 
+            id="carrera" 
+            name="carrera"
+            [(ngModel)]="carreraSeleccionada"
+            class="form-select">
+            <option *ngFor="let carrera of carreras" [value]="carrera.valor">{{ carrera.nombre }}</option>
+          </select>
+          <small class="form-text text-muted">Seleccione la carrera antes de buscar al estudiante.</small>
+        </div>
+        
+        <!-- Formulario de búsqueda -->
+        <div class="search-form">
+          <!-- Búsqueda por CETA -->
+          <div *ngIf="tiposBusqueda === 'ceta'" class="form-group">
+            <label for="codigoCeta" class="form-label">
+              <i class="bi bi-person-badge me-2"></i>
+              Código CETA
+            </label>
+            <div class="input-group">
+              <input 
+                type="text" 
+                id="codigoCeta"
+                [(ngModel)]="codigoCeta" 
+                name="codigoCeta" 
+                placeholder="Ingrese código CETA"
+                class="form-control"
+                (keyup.enter)="buscarPorCeta()">
+              <button 
+                type="button" 
+                (click)="buscarPorCeta()" 
+                [disabled]="loading || !codigoCeta.trim()"
+                class="btn btn-primary">
+                <i *ngIf="loading" class="bi bi-arrow-clockwise spin me-1"></i>
+                <i *ngIf="!loading" class="bi bi-search me-1"></i>
+                {{ loading ? 'Buscando...' : 'Buscar' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Búsqueda por CI -->
+          <div *ngIf="tiposBusqueda === 'ci'" class="form-group">
+            <label for="numeroCI" class="form-label">
+              <i class="bi bi-card-text me-2"></i>
+              Número de CI
+            </label>
+            <div class="input-group">
+              <input 
+                type="text" 
+                id="numeroCI"
+                [(ngModel)]="numeroCI" 
+                name="numeroCI" 
+                placeholder="Ingrese número de CI"
+                class="form-control"
+                (keyup.enter)="buscarPorCI()">
+              <button 
+                type="button" 
+                (click)="buscarPorCI()" 
+                [disabled]="loading || !numeroCI.trim()"
+                class="btn btn-primary">
+                <i *ngIf="loading" class="bi bi-arrow-clockwise spin me-1"></i>
+                <i *ngIf="!loading" class="bi bi-search me-1"></i>
+                {{ loading ? 'Buscando...' : 'Buscar' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Botón limpiar -->
+          <div class="form-actions mt-3">
+            <button 
+              type="button" 
+              (click)="limpiarFormulario()" 
+              class="btn btn-outline-secondary"
+              [disabled]="loading">
+              <i class="bi bi-arrow-clockwise me-1"></i>
+              Limpiar
+            </button>
+          </div>
+        </div>
+
+        <!-- Mensajes -->
+        <div *ngIf="error" class="alert alert-danger mt-3">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          {{ error }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Información del estudiante -->
+    <div *ngIf="estudianteEncontrado && estudiante" class="student-card">
+      <div class="card-body">
+        <div class="d-flex align-items-center mb-3">
+          <div class="student-avatar me-3">
+            <i class="bi bi-person-circle"></i>
+          </div>
+          <div>
+            <h5 class="mb-1">{{ estudiante.ap_pat }} {{ estudiante.ap_mat }} {{ estudiante.nombres }}</h5>
+            <div class="text-success">
+              <i class="bi bi-check-circle-fill me-1"></i>
+              Estudiante verificado
+            </div>
+          </div>
+        </div>
+        
+        <div class="row">
+          <div class="col-md-4">
+            <div class="info-item">
+              <label class="form-label">
+                <i class="bi bi-person-badge me-1"></i>
+                Código CETA
+              </label>
+              <div class="info-value">{{ estudiante.cod_ceta }}</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="info-item">
+              <label class="form-label">
+                <i class="bi bi-card-text me-1"></i>
+                CI
+              </label>
+              <div class="info-value">{{ estudiante.ci }} {{ estudiante.procedencia }}</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="info-item">
+              <label class="form-label">
+                <i class="bi bi-phone me-1"></i>
+                Celular
+              </label>
+              <div class="info-value">{{ estudiante.telf_movil }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Selección de modalidad -->
+    <div *ngIf="estudianteEncontrado && estudiante" class="modalidad-card">
+      <div class="card-body">
+        <h5 class="card-title mb-4">
+          <i class="bi bi-mortarboard me-2"></i>
+          Seleccionar Modalidad de Graduación
+        </h5>
+        
+        <div class="row">
+          <div 
+            *ngFor="let modalidad of modalidades" 
+            class="col-md-6 mb-3">
+            <div 
+              class="modalidad-item"
+              [class.selected]="modalidadSeleccionada?.id === modalidad.id"
+              (click)="seleccionarModalidad(modalidad)">
+              
+              <div class="d-flex align-items-start">
+                <div class="modalidad-icon me-3">
+                  <i [class]="getModalidadIcon(modalidad.id)"></i>
+                </div>
+                
+                <div class="flex-grow-1">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="modalidad-title mb-0">{{ modalidad.nombre }}</h6>
+                    <div class="selection-check" *ngIf="modalidadSeleccionada?.id === modalidad.id">
+                      <i class="bi bi-check-circle-fill text-success"></i>
+                    </div>
+                  </div>
+                  
+                  <p class="modalidad-desc text-muted mb-2">{{ modalidad.descripcion }}</p>
+                  
+                  <div class="modalidad-features">
+                    <small class="text-muted d-block" *ngFor="let feature of getModalidadFeatures(modalidad.id)">
+                      <i class="bi bi-check2 me-1"></i>
+                      {{ feature }}
+                    </small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Información adicional -->
+        <div *ngIf="modalidadSeleccionada" class="selected-info mt-4 p-3 bg-light rounded">
+          <h6 class="mb-3">
+            <i class="bi bi-info-circle me-2"></i>
+            Información de {{ modalidadSeleccionada.nombre }}
+          </h6>
+          
+          <div class="row">
+            <div class="col-md-4">
+              <strong>Duración:</strong><br>
+              <small class="text-muted">{{ getModalidadDuration(modalidadSeleccionada.id) }}</small>
+            </div>
+            <div class="col-md-8">
+              <strong>Requisitos:</strong><br>
+              <small class="text-muted">{{ getModalidadRequirements(modalidadSeleccionada.id) }}</small>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Botón continuar -->
+        <div class="text-center mt-4">
+          <button 
+            type="button" 
+            (click)="continuarConModalidad()" 
+            [disabled]="!modalidadSeleccionada"
+            class="btn btn-success btn-lg">
+            <i class="bi bi-arrow-right me-2"></i>
+            Continuar con {{ modalidadSeleccionada?.nombre || 'Modalidad Seleccionada' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

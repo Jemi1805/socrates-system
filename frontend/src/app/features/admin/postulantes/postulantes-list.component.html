@@ -1,0 +1,121 @@
+<div class="postulantes-container">
+  <!-- Header reutilizable -->
+  <app-header 
+    pageTitle="Gestión de Postulantes"
+    [breadcrumbItems]="[
+      { label: 'Postulantes' }
+    ]">
+  </app-header>
+
+  <div class="content-wrapper">
+  <!-- Formulario Card -->
+    <div class="form-card">
+      <h3 class="card-title">Registrar Postulante</h3>
+      
+      <form #postulanteForm="ngForm" (ngSubmit)="guardar()" class="postulante-form">
+    <input type="hidden" [(ngModel)]="postulanteActual.cod_ceta" name="cod_ceta">
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="nombres">Nombres</label>
+            <input 
+              type="text" 
+              id="nombres"
+              [(ngModel)]="postulanteActual.nombres_est" 
+              name="nombres_est" 
+              placeholder="Ingrese nombres" 
+              required
+              class="form-input">
+          </div>
+          
+          <div class="form-group">
+            <label for="apellidos">Apellidos</label>
+            <input 
+              type="text" 
+              id="apellidos"
+              [(ngModel)]="postulanteActual.apellidos_est" 
+              name="apellidos_est" 
+              placeholder="Ingrese apellidos" 
+              required
+              class="form-input">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="ci">CI</label>
+            <input 
+              type="text" 
+              id="ci"
+              [(ngModel)]="postulanteActual.ci_completo" 
+              name="ci" 
+              placeholder="Número de CI" 
+              required
+              class="form-input">
+          </div>
+          
+          <div class="form-group">
+            <label for="carrera">Carrera</label>
+            <input 
+              type="text" 
+              id="carrera"
+              [(ngModel)]="postulanteActual.carrera" 
+              name="carrera" 
+              placeholder="Ingrese carrera" 
+              required
+              class="form-input">
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check me-1"></i>
+            {{ postulanteActual.cod_ceta ? 'Actualizar' : 'Agregar' }}
+          </button>
+          <button type="button" (click)="cancelar()" *ngIf="postulanteActual.cod_ceta" class="btn btn-secondary">
+            <i class="bi bi-x me-1"></i>
+            Cancelar
+          </button>
+        </div>
+  </form>
+    </div>
+  
+
+    <!-- Tabla Card -->
+    <div class="table-card">
+      <h3 class="card-title">Lista de Postulantes</h3>
+
+      <div class="table-container">
+        <table class="data-table">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Nombres</th>
+        <th>Apellidos</th>
+        <th>CI</th>
+        <th>Carrera</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+            <tr *ngFor="let p of postulantes" class="table-row">
+              <td class="code-cell">{{p.cod_ceta}}</td>
+        <td>{{p.nombres_est}}</td>
+        <td>{{p.apellidos_est}}</td>
+        <td>{{p.ci}}</td>
+        <td>{{p.carrera}}</td>
+              <td class="actions-cell">
+                <button (click)="editar(p)" class="btn btn-edit" title="Editar">
+                  <i class="icon">✎</i>
+                </button>
+                <button (click)="eliminar(p.cod_ceta)" class="btn btn-delete" title="Eliminar">
+                  <i class="icon">🗑</i>
+                </button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+      </div>
+    </div>
+  </div>
+</div>

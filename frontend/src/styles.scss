@@ -1,1 +1,120 @@
-/* You can add global styles to this file, and also import other style files */
+/* Importar Bootstrap CSS */
+@import 'bootstrap/dist/css/bootstrap.min.css';
+
+/* Importar Bootstrap Icons */
+@import 'bootstrap-icons/font/bootstrap-icons.css';
+
+/* Estilos globales */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  background: #f5f5f5;
+  overflow-x: hidden;
+}
+
+/* Estilos para el contenedor principal de la aplicación */
+#root, app-root {
+  height: 100%;
+  width: 100%;
+}
+
+/* Gradiente personalizado para el fondo */
+.bg-gradient-primary {
+  background: linear-gradient(135deg, #052544 0%, #757575 50%, #D9D9D9 100%);
+}
+
+/* Efecto backdrop-blur para cards */
+.backdrop-blur {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Estilos para scrollbars personalizados */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Personalizaciones adicionales de Bootstrap */
+.navbar-brand h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.navbar-brand small {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+/* Animaciones suaves */
+.card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+}
+
+/* Estilos para botones personalizados */
+.btn-lg {
+  padding: 0.75rem 1.5rem;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .display-4 {
+    font-size: 2rem;
+  }
+  
+  .btn-lg {
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+  }
+}
+
+// Estilos de iconos de bootstrap
+.bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+    display: inline-block;
+    font-family: bootstrap-icons !important;
+    font-style: normal;
+    font-weight: 400 !important;
+    font-variant: normal;
+    text-transform: none;
+    line-height: 1;
+    vertical-align: -.125em;
+    -webkit-font-smoothing: antialiased;
+    color: white;
+}
+
+.form-label {
+    margin-bottom: .5rem;
+    color: #052544 !important;
+}
