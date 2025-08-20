@@ -136,8 +136,6 @@ class SgaController extends Controller
             'offset' => 'integer|min:0',
             'carrera' => 'required|string' // La carrera es obligatoria
         ]);
-
-        // Validar que al menos un criterio de búsqueda esté presente
         if (empty($request->nombres) && empty($request->ap_pat) && empty($request->ap_mat)) {
             return response()->json([
                 'success' => false,
@@ -166,12 +164,12 @@ class SgaController extends Controller
         );
 
         if ($result && isset($result['success']) && $result['success']) {
-            return response()->json([
+            return response()->json(array(
                 'success' => true,
                 'data' => isset($result['data']) ? $result['data'] : array(),
                 'total' => isset($result['total']) ? $result['total'] : (isset($result['data']) ? count($result['data']) : 0),
                 'carrera' => $carrera
-            ]);
+            ));
         }
 
         return response()->json([

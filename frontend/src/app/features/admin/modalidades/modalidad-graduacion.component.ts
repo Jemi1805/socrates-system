@@ -22,18 +22,22 @@ export class ModalidadGraduacionComponent implements OnInit {
   
   // Formulario de búsqueda
   codigoCeta: string = '';
-  numeroCI: string = '';
+  nombres: string = '';
+  ap_pat: string = '';
+  ap_mat: string = '';
   carreraSeleccionada: string = 'mecanica';
   carreras = [
     { valor: 'mecanica', nombre: 'Mecánica Automotriz' },
     { valor: 'electricidad', nombre: 'Electricidad y Electrónica Automotriz' }
   ];
-  tiposBusqueda: 'ceta' | 'ci' = 'ceta';
+  tiposBusqueda: 'ceta' | 'nombre' = 'nombre';
   intentoBusqueda = false;
   
   // Información del estudiante
   estudiante: Estudiante | null = null;
+  estudiantes: Estudiante[] = [];
   estudianteEncontrado = false;
+  estudiantesEncontrados = false;
   
   // Modalidades de graduación
   modalidades: ModalidadGraduacion[] = [
@@ -56,7 +60,7 @@ export class ModalidadGraduacionComponent implements OnInit {
 
   ngOnInit() {}
 
-  cambiarTipoBusqueda(tipo: 'ceta' | 'ci') {
+  cambiarTipoBusqueda(tipo: 'ceta' | 'nombre') {
     this.tiposBusqueda = tipo;
     this.limpiarFormulario();
   }
@@ -123,11 +127,12 @@ export class ModalidadGraduacionComponent implements OnInit {
     });
   }
 
-  buscarPorCI() {
+  buscarPorNombre() {
     this.intentoBusqueda = true;
     
-    if (!this.numeroCI.trim()) {
-      this.error = 'Por favor, ingrese un CI válido';
+    // Verificar que al menos uno de los campos de nombre tenga contenido
+    if (!this.nombres.trim() && !this.ap_pat.trim() && !this.ap_mat.trim()) {
+      this.error = 'Por favor, ingrese al menos un criterio de búsqueda (nombres, apellido paterno o apellido materno)';
       return;
     }
 
@@ -139,42 +144,53 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.loading = true;
     this.error = '';
     this.estudiante = null;
+    this.estudiantes = [];
     this.estudianteEncontrado = false;
+    this.estudiantesEncontrados = false;
 
-    this.estudianteService.buscarPorCI(this.numeroCI, this.carreraSeleccionada).subscribe({
+    this.estudianteService.buscarPorNombre(this.nombres, this.ap_pat, this.ap_mat, this.carreraSeleccionada).subscribe({
       next: (response: any) => {
         this.loading = false;
-        console.log('Respuesta API (CI):', response);
+        console.log('Respuesta API (Nombre):', response);
         
         if (response.success) {
           try {
-            // Intentar extraer datos del estudiante de diferentes estructuras posibles
-            if (response.data && response.data.data && Array.isArray(response.data.data) && response.data.data.length > 0) {
-              // Caso: response.data.data[0]
-              this.estudiante = response.data.data[0];
-            } else if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-              // Caso: response.data[0]
-              this.estudiante = response.data[0];
-            } else if (response.data && !Array.isArray(response.data)) {
-              // Caso: response.data como objeto directo
-              this.estudiante = response.data;
-            }
-            
-            console.log('Estudiante asignado (CI):', this.estudiante);
-            
-            if (this.estudiante) {
-              this.estudianteEncontrado = true;
-              this.intentoBusqueda = false;
+            // Procesar lista de estudiantes
+            if (response.data) {
+              if (Array.isArray(response.data)) {
+                // Caso: response.data es un array
+                this.estudiantes = response.data;
+              } else if (response.data.data && Array.isArray(response.data.data)) {
+                // Caso: response.data.data es un array
+                this.estudiantes = response.data.data;
+              } else {
+                // Caso: response.data es un objeto único
+                this.estudiantes = [response.data];
+              }
+              
+              console.log('Estudiantes encontrados:', this.estudiantes.length, this.estudiantes);
+              
+              if (this.estudiantes.length > 0) {
+                this.estudiantesEncontrados = true;
+                // Si solo hay un estudiante, seleccionarlo automáticamente
+                if (this.estudiantes.length === 1) {
+                  this.estudiante = this.estudiantes[0];
+                  this.estudianteEncontrado = true;
+                }
+                this.intentoBusqueda = false;
+              } else {
+                this.error = 'No se encontraron estudiantes con los criterios proporcionados';
+              }
             } else {
-              this.error = 'No se encontraron datos del estudiante';
+              this.error = 'No se recibieron datos de estudiantes';
             }
           } catch (e) {
-            console.error('Error al procesar datos (CI):', e);
+            console.error('Error al procesar datos (Nombre):', e);
             this.error = 'Error al procesar los datos del estudiante';
           }
         } else {
           console.error('No se encontraron datos del estudiante:', response);
-          this.error = 'No se encontró ningún estudiante con el CI proporcionado';
+          this.error = response.message || 'No se encontró ningún estudiante con los criterios proporcionados';
         }
       },
       error: (error) => {
@@ -187,6 +203,12 @@ export class ModalidadGraduacionComponent implements OnInit {
 
   seleccionarModalidad(modalidad: ModalidadGraduacion) {
     this.modalidadSeleccionada = modalidad;
+  }
+  
+  seleccionarEstudiante(estudiante: Estudiante) {
+    this.estudiante = estudiante;
+    this.estudianteEncontrado = true;
+    this.modalidadSeleccionada = null;
   }
 
   continuarConModalidad() {
@@ -208,9 +230,13 @@ export class ModalidadGraduacionComponent implements OnInit {
 
   limpiarFormulario() {
     this.codigoCeta = '';
-    this.numeroCI = '';
+    this.nombres = '';
+    this.ap_pat = '';
+    this.ap_mat = '';
     this.estudiante = null;
+    this.estudiantes = [];
     this.estudianteEncontrado = false;
+    this.estudiantesEncontrados = false;
     this.modalidadSeleccionada = null;
     this.error = '';
     this.intentoBusqueda = false;

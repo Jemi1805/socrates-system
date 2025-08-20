@@ -26,10 +26,10 @@
           <button 
             type="button" 
             class="tab-btn"
-            [class.active]="tiposBusqueda === 'ci'"
-            (click)="cambiarTipoBusqueda('ci')">
-            <i class="bi bi-card-text"></i>
-            Por CI
+            [class.active]="tiposBusqueda === 'nombre'"
+            (click)="cambiarTipoBusqueda('nombre')">
+            <i class="bi bi-person"></i>
+            Por Nombre
           </button>
         </div>
 
@@ -78,25 +78,60 @@
             </div>
           </div>
 
-          <!-- Búsqueda por CI -->
-          <div *ngIf="tiposBusqueda === 'ci'" class="form-group">
-            <label for="numeroCI" class="form-label">
-              <i class="bi bi-card-text me-2"></i>
-              Número de CI
-            </label>
-            <div class="input-group">
-              <input 
-                type="text" 
-                id="numeroCI"
-                [(ngModel)]="numeroCI" 
-                name="numeroCI" 
-                placeholder="Ingrese número de CI"
-                class="form-control"
-                (keyup.enter)="buscarPorCI()">
+          <!-- Búsqueda por Nombre -->
+          <div *ngIf="tiposBusqueda === 'nombre'" class="form-group">
+            <div class="row mb-3">
+              <div class="col-md-4">
+                <label for="ap_pat" class="form-label">
+                  <i class="bi bi-person me-2"></i>
+                  Apellido Paterno
+                </label>
+                <input 
+                  type="text" 
+                  id="ap_pat"
+                  [(ngModel)]="ap_pat" 
+                  name="ap_pat" 
+                  placeholder="Apellido paterno"
+                  class="form-control"
+                  (keyup.enter)="buscarPorNombre()">
+              </div>
+              
+              <div class="col-md-4">
+                <label for="ap_mat" class="form-label">
+                  <i class="bi bi-person me-2"></i>
+                  Apellido Materno
+                </label>
+                <input 
+                  type="text" 
+                  id="ap_mat"
+                  [(ngModel)]="ap_mat" 
+                  name="ap_mat" 
+                  placeholder="Apellido materno"
+                  class="form-control"
+                  (keyup.enter)="buscarPorNombre()">
+              </div>
+              
+              <div class="col-md-4">
+                <label for="nombres" class="form-label">
+                  <i class="bi bi-person me-2"></i>
+                  Nombres
+                </label>
+                <input 
+                  type="text" 
+                  id="nombres"
+                  [(ngModel)]="nombres" 
+                  name="nombres" 
+                  placeholder="Nombre(s) del estudiante"
+                  class="form-control"
+                  (keyup.enter)="buscarPorNombre()">
+              </div>
+            </div>
+            
+            <div class="d-flex justify-content-end">
               <button 
                 type="button" 
-                (click)="buscarPorCI()" 
-                [disabled]="loading || !numeroCI.trim()"
+                (click)="buscarPorNombre()" 
+                [disabled]="loading || (!nombres.trim() && !ap_pat.trim() && !ap_mat.trim())"
                 class="btn btn-primary">
                 <i *ngIf="loading" class="bi bi-arrow-clockwise spin me-1"></i>
                 <i *ngIf="!loading" class="bi bi-search me-1"></i>
@@ -126,7 +161,47 @@
       </div>
     </div>
 
-    <!-- Información del estudiante -->
+    <!-- Tabla de estudiantes encontrados -->
+    <div *ngIf="estudiantesEncontrados && estudiantes.length > 0" class="student-table-card">
+      <div class="card-body">
+        <h5 class="card-title mb-3">
+          <i class="bi bi-table me-2"></i>
+          Estudiantes encontrados ({{ estudiantes.length }})
+        </h5>
+        
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Código CETA</th>
+                <th>Nombre completo</th>
+                <th>CI</th>
+                <th>Celular</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let est of estudiantes">
+                <td>{{ est.cod_ceta }}</td>
+                <td>{{ est.ap_pat }} {{ est.ap_mat }} {{ est.nombres }}</td>
+                <td>{{ est.ci }} {{ est.procedencia }}</td>
+                <td>{{ est.telf_movil }}</td>
+                <td>
+                  <button 
+                    class="btn btn-sm btn-primary" 
+                    (click)="seleccionarEstudiante(est)">
+                    <i class="bi bi-check-circle me-1"></i>
+                    Seleccionar
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Información del estudiante seleccionado -->
     <div *ngIf="estudianteEncontrado && estudiante" class="student-card">
       <div class="card-body">
         <div class="d-flex align-items-center mb-3">
@@ -137,7 +212,7 @@
             <h5 class="mb-1">{{ estudiante.ap_pat }} {{ estudiante.ap_mat }} {{ estudiante.nombres }}</h5>
             <div class="text-success">
               <i class="bi bi-check-circle-fill me-1"></i>
-              Estudiante verificado
+              Estudiante seleccionado
             </div>
           </div>
         </div>

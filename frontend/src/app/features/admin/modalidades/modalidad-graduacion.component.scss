@@ -14,7 +14,8 @@
 // Cards principales
 .search-card,
 .student-card,
-.modalidad-card {
+.modalidad-card,
+.student-table-card {
   background: #ffffffd2;
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
@@ -31,6 +32,18 @@
     padding-bottom: 10px;
   }
 }
+
+.table-responsive {
+    width: 100%;
+    border-collapse: collapse;
+    border-radius: 12px;
+  }
+
+  th, td {
+    color: #052544;
+    background-color: #ffffffd2;
+  }
+
 
 // Tabs de búsqueda
 .search-tabs {
@@ -81,15 +94,15 @@
   }
 }
 
-.form-group {
-  .input-group {
+.form-group, td{
+  .btn {
     .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
       color: white !important;
     }
   }
 }
 
-select.form-select {
+select.form-select, .form-control {
   color: #052544;
 }
 

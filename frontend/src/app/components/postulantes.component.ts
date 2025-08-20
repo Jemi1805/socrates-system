@@ -38,11 +38,11 @@ import { RouterModule } from '@angular/router'; // opcional, si quieres usar rut
     <!-- Búsqueda de postulantes -->
     <div class="card mb-4">
       <div class="card-header">
-        <h5>Búsqueda de Postulantes</h5>
+        <h5>Búsqueda de Estudiantes</h5>
       </div>
       <div class="card-body">
         <form [formGroup]="searchForm" (ngSubmit)="searchPostulantes()">
-          <div class="row">
+          <div class="row mb-3">
             <div class="col-md-4">
               <label for="searchType" class="form-label">Tipo de búsqueda</label>
               <select id="searchType" class="form-select" formControlName="searchType">
@@ -50,19 +50,74 @@ import { RouterModule } from '@angular/router'; // opcional, si quieres usar rut
                 <option value="nombre">Por Nombre</option>
               </select>
             </div>
-            <div class="col-md-6">
-              <label for="searchValue" class="form-label">Valor</label>
+            
+            <div class="col-md-8" *ngIf="searchForm.get('searchType')?.value === 'codigo'">
+              <label for="searchValue" class="form-label">Código CETA</label>
               <input 
                 type="text" 
                 id="searchValue" 
                 class="form-control" 
                 formControlName="searchValue"
-                placeholder="Ingrese código CETA o nombre del postulante">
+                placeholder="Ingrese código CETA">
             </div>
-            <div class="col-md-2">
-              <label class="form-label">&nbsp;</label>
+          </div>
+          
+          <!-- Campos para búsqueda por nombre (aparecen solo cuando se selecciona búsqueda por nombre) -->
+          <div *ngIf="searchForm.get('searchType')?.value === 'nombre'">
+            <div class="row mb-3">
+              <div class="col-md-4">
+                <label for="nombres" class="form-label">Nombres</label>
+                <input 
+                  type="text" 
+                  id="nombres" 
+                  class="form-control" 
+                  formControlName="nombres"
+                  placeholder="Nombres del estudiante">
+              </div>
+              <div class="col-md-4">
+                <label for="ap_pat" class="form-label">Apellido Paterno</label>
+                <input 
+                  type="text" 
+                  id="ap_pat" 
+                  class="form-control" 
+                  formControlName="ap_pat"
+                  placeholder="Apellido paterno">
+              </div>
+              <div class="col-md-4">
+                <label for="ap_mat" class="form-label">Apellido Materno</label>
+                <input 
+                  type="text" 
+                  id="ap_mat" 
+                  class="form-control" 
+                  formControlName="ap_mat"
+                  placeholder="Apellido materno">
+              </div>
+            </div>
+            
+            <div class="row mb-3">
+              <div class="col-md-12">
+                <p class="text-muted small">Ingrese al menos un criterio de búsqueda (nombres, apellido paterno o apellido materno)</p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Selector de carrera (siempre visible) -->
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label for="carrera" class="form-label">Carrera <span class="text-danger">*</span></label>
+              <select id="carrera" class="form-select" formControlName="carrera" required>
+                <option value="">-- Seleccione una carrera --</option>
+                <option *ngFor="let c of carreras" [value]="c.nom_carrera">{{ c.nom_carrera }}</option>
+              </select>
+              <div *ngIf="searchForm.get('carrera')?.errors?.['required'] && searchForm.get('carrera')?.touched" class="text-danger">
+                La carrera es obligatoria
+              </div>
+            </div>
+            
+            <div class="col-md-6 d-flex align-items-end">
               <button type="submit" class="btn btn-primary w-100" [disabled]="searching || !searchForm.valid">
-                {{ searching ? 'Buscando...' : 'Buscar' }}
+                <i class="bi bi-search me-1"></i>
+                {{ searching ? 'Buscando...' : 'Buscar Estudiantes' }}
               </button>
             </div>
           </div>
@@ -205,14 +260,24 @@ export class PostulantesComponent implements OnInit {
   searching = false;
   loadingCarreras = false;
   connectionStatus: any = null;
+  
+  // Paginación y totales
+  total: number = 0;
+  limit: number = 100;
+  offset: number = 0;
+  selectedCarrera: string = '';
 
   constructor(
     private fb: FormBuilder,
     private sgaService: SgaService
   ) {
     this.searchForm = this.fb.group({
-      searchType: ['codigo', Validators.required],
-      searchValue: ['', Validators.required]
+      searchType: ['nombre', Validators.required],
+      searchValue: ['', Validators.required],
+      nombres: [''],
+      ap_pat: [''],
+      ap_mat: [''],
+      carrera: ['', Validators.required]
     });
   }
 
@@ -220,6 +285,11 @@ export class PostulantesComponent implements OnInit {
     this.checkConnection();
     this.loadCarreras();
     this.loadAllPostulanteCarreras();
+    
+    // Si la carrera no está definida y hay carreras disponibles, seleccionar la primera por defecto
+    this.searchForm.get('carrera')?.valueChanges.subscribe(value => {
+      console.log('Carrera seleccionada:', value);
+    });
   }
 
   checkConnection(): void {
@@ -240,33 +310,69 @@ export class PostulantesComponent implements OnInit {
   searchPostulantes(): void {
     if (this.searchForm.valid) {
       this.searching = true;
-      const { searchType, searchValue } = this.searchForm.value;
-
+      const { searchType, searchValue, nombres, ap_pat, ap_mat, carrera } = this.searchForm.value;
+      this.selectedCarrera = carrera;
+      
       if (searchType === 'codigo') {
+        // La búsqueda por código sigue igual
         this.sgaService.getPostulanteById(Number(searchValue)).subscribe({
           next: (response) => {
             if (response.success && response.data) {
               this.postulantes = [response.data];
+              this.total = 1;
             } else {
               this.postulantes = [];
+              this.total = 0;
             }
             this.searching = false;
           },
           error: (error) => {
             console.error('Error al buscar postulante:', error);
             this.postulantes = [];
+            this.total = 0;
             this.searching = false;
           }
         });
       } else {
-        this.sgaService.getPostulantes({ nombre: searchValue }).subscribe({
+        // Búsqueda por nombre usando el nuevo endpoint
+        let nombreBusqueda = '';
+        let apPatBusqueda = '';
+        let apMatBusqueda = '';
+        
+        if (searchType === 'nombre') {
+          // Si están llenos los campos específicos, usamos esos
+          if (nombres || ap_pat || ap_mat) {
+            nombreBusqueda = nombres || '';
+            apPatBusqueda = ap_pat || '';
+            apMatBusqueda = ap_mat || '';
+          } else if (searchValue) {
+            // Si no, intentamos extraer de searchValue (busca en todos los campos)
+            nombreBusqueda = searchValue;
+          }
+        }
+        
+        this.sgaService.getPostulanteByName(
+          nombreBusqueda, 
+          apPatBusqueda, 
+          apMatBusqueda, 
+          this.limit, 
+          this.offset,
+          carrera
+        ).subscribe({
           next: (response) => {
-            this.postulantes = response.data || [];
+            if (response.success) {
+              this.postulantes = response.data || [];
+              this.total = response.total || this.postulantes.length;
+            } else {
+              this.postulantes = [];
+              this.total = 0;
+            }
             this.searching = false;
           },
           error: (error) => {
-            console.error('Error al buscar postulantes:', error);
+            console.error('Error al buscar estudiantes:', error);
             this.postulantes = [];
+            this.total = 0;
             this.searching = false;
           }
         });
