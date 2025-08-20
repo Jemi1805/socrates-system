@@ -129,31 +129,54 @@ class SgaController extends Controller
     public function buscarEstudiantes(Request $request)
     {
         $request->validate([
-            'nombre' => 'required|string|min:2',
+            'nombres' => 'nullable|string',
+            'ap_pat' => 'nullable|string',
+            'ap_mat' => 'nullable|string',
             'limit' => 'integer|min:1|max:100',
             'offset' => 'integer|min:0',
-            'carrera' => 'string|nullable'
+            'carrera' => 'required|string' // La carrera es obligatoria
         ]);
 
+        // Validar que al menos un criterio de búsqueda esté presente
+        if (empty($request->nombres) && empty($request->ap_pat) && empty($request->ap_mat)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Debe proporcionar al menos un criterio de búsqueda (nombres, ap_pat o ap_mat)'
+            ], 400);
+        }
+
         $carrera = $request->get('carrera');
+        
+        // Log para verificar los parámetros que llegan desde el cliente
+        \Illuminate\Support\Facades\Log::info('Recibido request para buscarEstudiantes', [
+            'nombres' => $request->get('nombres'),
+            'ap_pat' => $request->get('ap_pat'),
+            'ap_mat' => $request->get('ap_mat'),
+            'carrera' => $carrera,
+            'all_params' => $request->all()
+        ]);
+        
         $result = $this->sgaService->buscarEstudiantesPorNombre(
-            $request->nombre,
+            $request->get('nombres', ''),
+            $request->get('ap_pat', ''), 
+            $request->get('ap_mat', ''),
             $request->get('limit', 100),
             $request->get('offset', 0),
             $carrera
         );
 
-        if ($result) {
+        if ($result && isset($result['success']) && $result['success']) {
             return response()->json([
                 'success' => true,
-                'data' => $result,
-                'carrera' => $carrera ?: 'default'
+                'data' => $result['data'] ?? [],
+                'total' => $result['total'] ?? count($result['data'] ?? []),
+                'carrera' => $carrera
             ]);
         }
 
         return response()->json([
             'success' => false,
-            'message' => 'Error al buscar estudiantes'
+            'message' => $result['message'] ?? 'Error al buscar estudiantes'
         ], 500);
     }
 

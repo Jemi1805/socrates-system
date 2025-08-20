@@ -288,43 +288,139 @@ class SocratesApiService
         $this->setCarrera($carrera);
 
         try {
-            $params = [
+            // Parámetros según la estructura del SGA original
+            // El código original usa $_POST['nombres'], $_POST['ap_pat'], $_POST['ap_mat']
+            // Y verifica if($criterio=='nombre'), por lo que necesitamos incluir este parámetro
+            $params = array(
                 'criterio' => 'nombre',
                 'nombres' => isset($nombres) ? $nombres : '',
-                'ap_paterno' => isset($apPat) ? $apPat : '',
-                'ap_materno' => isset($apMat) ? $apMat : ''
-                ];
+                'ap_pat' => isset($apPat) ? $apPat : '',
+                'ap_mat' => isset($apMat) ? $apMat : ''
+            );
+            
+            // Registrar los parámetros que estamos enviando
+            Log::info('Parámetros enviados para búsqueda por nombre', $params);
+            
+            $requestUrl = $this->currentUrl . 'titulacion/serviciostitulacion/buscar_estudiantes/nombre';
+            
+            Log::info('Enviando request al SGA para búsqueda por nombre', [
+                'url' => $requestUrl,
+                'params' => $params
+            ]);
 
-            $response = Http::asForm()
-                ->timeout(15)
-                ->post($this->currentUrl . 'index.php/titulacion/serviciostitulacion/buscar_estudiantes/nombre', $params);
+            // Intentar con cURL directamente para tener más control
+            $ch = curl_init($requestUrl);
+            
+            // Enviar los datos POST directamente como array
+            // cURL codificará correctamente los datos como multipart/form-data
+            
+            // Opciones de cURL
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $params);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+            // No establecer Content-Type, cURL lo configurará automáticamente
+            // al enviar un array en POSTFIELDS
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Accept: text/html,application/xhtml+xml'
+            ]);
+            
+            // Asegurar que se use la codificación correcta
+            curl_setopt($ch, CURLOPT_ENCODING, '');
+            
+            // Ejecutar la petición
+            $rawResponse = curl_exec($ch);
+            $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            // Guardar la respuesta cruda para debug
+            Log::debug('Respuesta raw del SGA (cURL):', [
+                'status' => $statusCode,
+                'error' => $error,
+                'body' => $rawResponse
+            ]);
+            
+            // Crear un objeto similar al que devuelve Http facade
+            $response = new \Illuminate\Http\Client\Response(
+                new \GuzzleHttp\Psr7\Response($statusCode, [], $rawResponse)
+            );
+            
+            Log::info('Respuesta del SGA búsqueda por nombre', [
+                'status' => $response->status(),
+                'headers' => $response->headers(),
+                'body_preview' => substr($response->body(), 0, 500)
+            ]);
             
             if ($response->successful()) {
                 $html = $response->body();
+                
+                if (strpos($html, 'PHP Error') !== false || strpos($html, 'Fatal error') !== false) {
+                    Log::warning('SGA devuelve errores PHP en búsqueda por nombre', [
+                        'params' => $params,
+                        'errors' => substr($html, 0, 1000)
+                    ]);
+                    return ['success' => false, 'message' => 'Error interno del SGA'];
+                }
+                
                 $estudiantes = $this->parseEstudiantesHtml($html);
                 
-                return array(
+                return [
                     'success' => true,
                     'data' => array_slice($estudiantes, $offset, $limit),
                     'total' => count($estudiantes),
                     'carrera' => $carrera,
                     'params' => $params
-                );
+                ];
+            }
+
+            // Si el código es 301 o 302, probablemente se debe a un problema de redirección
+            if ($response->status() == 301 || $response->status() == 302) {
+                $redirectUrl = $response->header('Location');
+                Log::warning('SGA intentó redireccionar en búsqueda por nombre', [
+                    'status' => $response->status(),
+                    'redirect_to' => $redirectUrl
+                ]);
+                
+                // Intentar seguir la redirección manualmente
+                if ($redirectUrl) {
+                    Log::info('Siguiendo redirección manualmente', ['url' => $redirectUrl]);
+                    $response = Http::asForm()->timeout(15)->post($redirectUrl, $params);
+                    
+                    if ($response->successful()) {
+                        $html = $response->body();
+                        $estudiantes = $this->parseEstudiantesHtml($html);
+                        
+                        return [
+                            'success' => true,
+                            'data' => array_slice($estudiantes, $offset, $limit),
+                            'total' => count($estudiantes),
+                            'carrera' => $carrera
+                        ];
+                    }
+                }
             }
 
             Log::error('Error en búsqueda por nombre completo', [
                 'params' => $params,
-                'status' => $response->status()
+                'status' => $response->status(),
+                'response_body' => substr($response->body(), 0, 500)
             ]);
             
-            return ['success' => false, 'message' => 'Error en la consulta al SGA'];
+            return ['success' => false, 'message' => 'Error en la consulta al SGA: ' . $response->status()];
 
         } catch (\Exception $e) {
-            Log::error('Excepción en búsqueda SGA', array(
-                'error' => $e->getMessage()
-            ));
+            Log::error('Excepción en búsqueda por nombre SGA', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTrace(),
+                'nombres' => $nombres,
+                'ap_pat' => $apPat,
+                'ap_mat' => $apMat
+            ]);
             
-            return ['success' => false, 'message' => 'Error de conexión'];
+            return ['success' => false, 'message' => 'Error de conexión: ' . $e->getMessage()];
         }
     }
 
@@ -503,14 +599,30 @@ class SocratesApiService
                 'header_row_index' => $headerRowIndex
             ]);
 
-            // Procesar filas de datos (después de los headers)
-            for ($i = $headerRowIndex + 1; $i < $rows->length; $i++) {
+            // Procesar filas de datos (después de los headers o desde la segunda fila si no hay headers)
+            // La primera fila suele ser la 1 o 2 según la estructura del SGA
+            $startRow = ($headerRowIndex > -1) ? $headerRowIndex + 1 : 1;
+            
+            for ($i = $startRow; $i < $rows->length; $i++) {
                 $cells = $xpath->query('.//td', $rows->item($i));
                 if ($cells->length === 0) { continue; }
 
+                // Definir nombres de columnas según la estructura del SGA
+                $columnNames = [
+                    'Nº',
+                    'Cod. CETA',
+                    'Ap. Paterno',
+                    'Ap. Materno',
+                    'Nombres',
+                    'Cédula de Identidad',
+                    'Procedencia',
+                    'Celular'
+                ];
+                
                 $row = [];
                 for ($c = 0; $c < $cells->length; $c++) {
-                    $key = isset($headers[$c]) ? $headers[$c] : 'col'.($c+1);
+                    // Usar el nombre definido o col# como fallback
+                    $key = isset($columnNames[$c]) ? $columnNames[$c] : 'col'.($c+1);
                     $value = trim($cells->item($c)->textContent);
                     $row[$key] = $value;
                 }
@@ -560,18 +672,22 @@ class SocratesApiService
                     }
                 }
                 
-                // Mapear a estructura conocida con más variaciones
+                // Mapeo utilizando los nombres descriptivos de columnas
                 $estudiante = [
-                    'cod_ceta' => $this->extractField($row, ['Cod. CETA', 'Código', 'CODIGO', 'Cod_ceta', 'COD_CETA', 'col1']),
-                    'nombres' => $this->extractField($row, ['Nombres', 'NOMBRES', 'Nombre', 'NOMBRE']),
-                    'ap_pat' => $this->extractField($row, ['Ap. Paterno', 'Apellido Paterno', 'AP_PATERNO', 'Paterno']),
-                    'ap_mat' => $this->extractField($row, ['Ap. Materno', 'Apellido Materno', 'AP_MATERNO', 'Materno']),
-                    'ci' => $this->extractField($row, ['Cédula de Identidad', 'CEDULA', 'Numero_doc', 'CI']),
-                    'procedencia' => $this->extractField($row, ['Procedencia', 'PROCEDENCIA']),
-                    'email' => $this->extractField($row, ['E-mail', 'EMAIL', 'Correo']),
+                    'cod_ceta' => isset($row['Cod. CETA']) ? $row['Cod. CETA'] : '',
+                    'ap_pat' => isset($row['Ap. Paterno']) ? $row['Ap. Paterno'] : '',
+                    'ap_mat' => isset($row['Ap. Materno']) ? $row['Ap. Materno'] : '',
+                    'nombres' => isset($row['Nombres']) ? $row['Nombres'] : '',
+                    'ci' => isset($row['Cédula de Identidad']) ? $row['Cédula de Identidad'] : '',
+                    'procedencia' => isset($row['Procedencia']) ? $row['Procedencia'] : '',
                     'telf_movil' => $this->extractField($row, ['Celular', 'celular', 'CELULAR', 'Teléfono Celular', 'Teléfono Móvil', 'telf_movil', 'TELEFONO', 'Telefono', 'Tel.', 'Tel', 'Telf.', 'Telf', 'MOVIL', 'Movil', 'Móvil']),
                     'raw' => $row
                 ];
+                
+                // Si existe una columna llamada "Celular", agregarla
+                if (isset($row['Celular'])) {
+                    $estudiante['telf_movil'] = $row['Celular'];
+                }
 
                 // Filtrar filas que tengan al menos cod_ceta o nombres
                 if (!empty($estudiante['cod_ceta']) || !empty($estudiante['nombres'])) {
