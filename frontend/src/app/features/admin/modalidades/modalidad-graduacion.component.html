@@ -189,7 +189,7 @@
                 <td>
                   <button 
                     class="btn btn-sm btn-primary" 
-                    (click)="seleccionarEstudiante(est)">
+                    (click)="seleccionarEstudianteYAbrirModal(est)">
                     <i class="bi bi-check-circle me-1"></i>
                     Seleccionar
                   </button>
@@ -201,129 +201,142 @@
       </div>
     </div>
 
-    <!-- Información del estudiante seleccionado -->
-    <div *ngIf="estudianteEncontrado && estudiante" class="student-card">
-      <div class="card-body">
-        <div class="d-flex align-items-center mb-3">
-          <div class="student-avatar me-3">
-            <i class="bi bi-person-circle"></i>
+    <!-- Modal para información del estudiante y selección de modalidad -->
+    <div class="modal fade" [ngClass]="{'show': modalVisible}" [style.display]="modalVisible ? 'block' : 'none'" tabindex="-1" role="dialog" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <i class="bi bi-mortarboard me-2"></i>
+              Seleccionar Modalidad de Graduación
+            </h5>
+            <button type="button" class="btn-close" aria-label="Close" (click)="cerrarModal()"></button>
           </div>
-          <div>
-            <h5 class="mb-1">{{ estudiante.ap_pat }} {{ estudiante.ap_mat }} {{ estudiante.nombres }}</h5>
-            <div class="text-success">
-              <i class="bi bi-check-circle-fill me-1"></i>
-              Estudiante seleccionado
-            </div>
-          </div>
-        </div>
-        
-        <div class="row">
-          <div class="col-md-4">
-            <div class="info-item">
-              <label class="form-label">
-                <i class="bi bi-person-badge me-1"></i>
-                Código CETA
-              </label>
-              <div class="info-value">{{ estudiante.cod_ceta }}</div>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="info-item">
-              <label class="form-label">
-                <i class="bi bi-card-text me-1"></i>
-                CI
-              </label>
-              <div class="info-value">{{ estudiante.ci }} {{ estudiante.procedencia }}</div>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="info-item">
-              <label class="form-label">
-                <i class="bi bi-phone me-1"></i>
-                Celular
-              </label>
-              <div class="info-value">{{ estudiante.telf_movil }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Selección de modalidad -->
-    <div *ngIf="estudianteEncontrado && estudiante" class="modalidad-card">
-      <div class="card-body">
-        <h5 class="card-title mb-4">
-          <i class="bi bi-mortarboard me-2"></i>
-          Seleccionar Modalidad de Graduación
-        </h5>
-        
-        <div class="row">
-          <div 
-            *ngFor="let modalidad of modalidades" 
-            class="col-md-6 mb-3">
-            <div 
-              class="modalidad-item"
-              [class.selected]="modalidadSeleccionada?.id === modalidad.id"
-              (click)="seleccionarModalidad(modalidad)">
-              
-              <div class="d-flex align-items-start">
-                <div class="modalidad-icon me-3">
-                  <i [class]="getModalidadIcon(modalidad.id)"></i>
-                </div>
-                
-                <div class="flex-grow-1">
-                  <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="modalidad-title mb-0">{{ modalidad.nombre }}</h6>
-                    <div class="selection-check" *ngIf="modalidadSeleccionada?.id === modalidad.id">
-                      <i class="bi bi-check-circle-fill text-success"></i>
+          
+          <div class="modal-body">
+            <!-- Información del estudiante seleccionado -->
+            <div *ngIf="estudianteEncontrado && estudiante" class="student-card mb-4">
+              <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                  <div class="student-avatar me-3">
+                    <i class="bi bi-person-circle"></i>
+                  </div>
+                  <div>
+                    <h5 class="mb-1">{{ estudiante.ap_pat }} {{ estudiante.ap_mat }} {{ estudiante.nombres }}</h5>
+                    <div class="text-success">
+                      <i class="bi bi-check-circle-fill me-1"></i>
+                      Estudiante seleccionado
                     </div>
                   </div>
-                  
-                  <p class="modalidad-desc text-muted mb-2">{{ modalidad.descripcion }}</p>
-                  
-                  <div class="modalidad-features">
-                    <small class="text-muted d-block" *ngFor="let feature of getModalidadFeatures(modalidad.id)">
-                      <i class="bi bi-check2 me-1"></i>
-                      {{ feature }}
-                    </small>
+                </div>
+                
+                <div class="row">
+                  <div class="col-md-4">
+                    <div class="info-item">
+                      <label class="form-label">
+                        <i class="bi bi-person-badge me-1"></i>
+                        Código CETA
+                      </label>
+                      <div class="info-value">{{ estudiante.cod_ceta }}</div>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <div class="info-item">
+                      <label class="form-label">
+                        <i class="bi bi-card-text me-1"></i>
+                        CI
+                      </label>
+                      <div class="info-value">{{ estudiante.ci }} {{ estudiante.procedencia }}</div>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <div class="info-item">
+                      <label class="form-label">
+                        <i class="bi bi-phone me-1"></i>
+                        Celular
+                      </label>
+                      <div class="info-value">{{ estudiante.telf_movil }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Selección de modalidad -->
+            <div class="modalidad-card">              
+              <div class="row">
+                <div 
+                  *ngFor="let modalidad of modalidades" 
+                  class="col-md-6 mb-3">
+                  <div 
+                    class="modalidad-item"
+                    [class.selected]="modalidadSeleccionada?.id === modalidad.id"
+                    (click)="seleccionarModalidad(modalidad)">
+                    
+                    <div class="d-flex align-items-start">
+                      <div class="modalidad-icon me-3">
+                        <i [class]="getModalidadIcon(modalidad.id)"></i>
+                      </div>
+                      
+                      <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                          <h6 class="modalidad-title mb-0">{{ modalidad.nombre }}</h6>
+                          <div class="selection-check" *ngIf="modalidadSeleccionada?.id === modalidad.id">
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                          </div>
+                        </div>
+                        
+                        <p class="modalidad-desc text-muted mb-2">{{ modalidad.descripcion }}</p>
+                        
+                        <div class="modalidad-features">
+                          <small class="text-muted d-block" *ngFor="let feature of getModalidadFeatures(modalidad.id)">
+                            <i class="bi bi-check2 me-1"></i>
+                            {{ feature }}
+                          </small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Información adicional -->
+              <div *ngIf="modalidadSeleccionada" class="selected-info mt-4 p-3 bg-light rounded">
+                <h6 class="mb-3">
+                  <i class="bi bi-info-circle me-2"></i>
+                  Información de {{ modalidadSeleccionada.nombre }}
+                </h6>
+                
+                <div class="row">
+                  <div class="col-md-4">
+                    <strong>Duración:</strong><br>
+                    <small class="text-muted">{{ getModalidadDuration(modalidadSeleccionada.id) }}</small>
+                  </div>
+                  <div class="col-md-8">
+                    <strong>Requisitos:</strong><br>
+                    <small class="text-muted">{{ getModalidadRequirements(modalidadSeleccionada.id) }}</small>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-        
-        <!-- Información adicional -->
-        <div *ngIf="modalidadSeleccionada" class="selected-info mt-4 p-3 bg-light rounded">
-          <h6 class="mb-3">
-            <i class="bi bi-info-circle me-2"></i>
-            Información de {{ modalidadSeleccionada.nombre }}
-          </h6>
           
-          <div class="row">
-            <div class="col-md-4">
-              <strong>Duración:</strong><br>
-              <small class="text-muted">{{ getModalidadDuration(modalidadSeleccionada.id) }}</small>
-            </div>
-            <div class="col-md-8">
-              <strong>Requisitos:</strong><br>
-              <small class="text-muted">{{ getModalidadRequirements(modalidadSeleccionada.id) }}</small>
-            </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" (click)="cerrarModal()">Cancelar</button>
+            <button 
+              type="button" 
+              class="btn btn-success" 
+              (click)="continuarConModalidad()" 
+              [disabled]="!modalidadSeleccionada">
+              <i class="bi bi-arrow-right me-2"></i>
+              Continuar con {{ modalidadSeleccionada?.nombre || 'Modalidad Seleccionada' }}
+            </button>
           </div>
-        </div>
-        
-        <!-- Botón continuar -->
-        <div class="text-center mt-4">
-          <button 
-            type="button" 
-            (click)="continuarConModalidad()" 
-            [disabled]="!modalidadSeleccionada"
-            class="btn btn-success btn-lg">
-            <i class="bi bi-arrow-right me-2"></i>
-            Continuar con {{ modalidadSeleccionada?.nombre || 'Modalidad Seleccionada' }}
-          </button>
         </div>
       </div>
     </div>
+
+    <!-- Overlay modal -->
+    <div *ngIf="modalVisible" class="modal-backdrop fade show"></div>
   </div>
 </div>

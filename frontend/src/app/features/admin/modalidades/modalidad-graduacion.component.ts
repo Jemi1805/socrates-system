@@ -30,7 +30,7 @@ export class ModalidadGraduacionComponent implements OnInit {
     { valor: 'mecanica', nombre: 'Mecánica Automotriz' },
     { valor: 'electricidad', nombre: 'Electricidad y Electrónica Automotriz' }
   ];
-  tiposBusqueda: 'ceta' | 'nombre' = 'nombre';
+  tiposBusqueda: 'ceta' | 'nombre' = 'ceta';
   intentoBusqueda = false;
   
   // Información del estudiante
@@ -52,6 +52,7 @@ export class ModalidadGraduacionComponent implements OnInit {
   // Estados
   loading = false;
   error = '';
+  modalVisible = false;
 
   constructor(
     private estudianteService: EstudianteService,
@@ -81,42 +82,49 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.loading = true;
     this.error = '';
     this.estudiante = null;
+    this.estudiantes = [];
     this.estudianteEncontrado = false;
+    this.estudiantesEncontrados = false;
 
     this.estudianteService.buscarPorCeta(this.codigoCeta, this.carreraSeleccionada).subscribe({
       next: (response: any) => {
         this.loading = false;
-        console.log('Respuesta API estudiante:', response);
+        console.log('Respuesta API estudiante (CETA):', response);
         
         if (response.success) {
           try {
+            let estudianteTmp: Estudiante | null = null;
+            
             // Intentar extraer datos del estudiante de diferentes estructuras posibles
             if (response.data && response.data.data && Array.isArray(response.data.data) && response.data.data.length > 0) {
               // Caso: response.data.data[0]
-              this.estudiante = response.data.data[0];
+              estudianteTmp = response.data.data[0];
+              this.estudiantes = response.data.data;
             } else if (response.data && Array.isArray(response.data) && response.data.length > 0) {
               // Caso: response.data[0]
-              this.estudiante = response.data[0];
+              estudianteTmp = response.data[0];
+              this.estudiantes = response.data;
             } else if (response.data && !Array.isArray(response.data)) {
               // Caso: response.data como objeto directo
-              this.estudiante = response.data;
+              estudianteTmp = response.data;
+              this.estudiantes = [response.data];
             }
             
-            console.log('Estudiante asignado:', this.estudiante);
+            console.log('Estudiantes encontrados (CETA):', this.estudiantes.length, this.estudiantes);
             
-            if (this.estudiante) {
-              this.estudianteEncontrado = true;
+            if (this.estudiantes.length > 0) {
+              this.estudiantesEncontrados = true;
               this.intentoBusqueda = false;
             } else {
-              this.error = 'No se encontraron datos del estudiante';
+              this.error = 'No se encontraron estudiantes con el código CETA proporcionado';
             }
           } catch (e) {
-            console.error('Error al procesar datos:', e);
+            console.error('Error al procesar datos (CETA):', e);
             this.error = 'Error al procesar los datos del estudiante';
           }
         } else {
-          console.error('No se encontraron datos del estudiante:', response);
-          this.error = 'No se encontró ningún estudiante con el código CETA proporcionado';
+          console.error('No se encontraron datos del estudiante (CETA):', response);
+          this.error = response.message || 'No se encontró ningún estudiante con el código CETA proporcionado';
         }
       },
       error: (error) => {
@@ -211,6 +219,21 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.modalidadSeleccionada = null;
   }
 
+  seleccionarEstudianteYAbrirModal(estudiante: Estudiante) {
+    this.seleccionarEstudiante(estudiante);
+    this.abrirModal();
+  }
+  
+  abrirModal() {
+    this.modalVisible = true;
+    document.body.classList.add('modal-open');
+  }
+  
+  cerrarModal() {
+    this.modalVisible = false;
+    document.body.classList.remove('modal-open');
+  }
+
   continuarConModalidad() {
     if (!this.estudiante || !this.modalidadSeleccionada) {
       this.error = 'Debe seleccionar un estudiante y una modalidad';
@@ -223,6 +246,9 @@ export class ModalidadGraduacionComponent implements OnInit {
       modalidad: this.modalidadSeleccionada
     };
     sessionStorage.setItem('datos_postulacion', JSON.stringify(datosPostulacion));
+    
+    // Cerrar el modal
+    this.cerrarModal();
 
     // Navegar a la página de postulantes
     this.router.navigate(['/postulantes']);
