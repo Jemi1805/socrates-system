@@ -58,7 +58,7 @@ docker-compose up -d server
 echo "✅ ¡Proyecto inicializado correctamente!"
 echo ""
 echo "🌐 Accesos:"
-echo "   - Aplicación: http://localhost:8070"
+echo "   - Aplicación: http://localhost:8080"
 echo "   - phpMyAdmin: http://localhost:8090"
 echo "   - Angular Dev: http://localhost:4200 (si usas angular-dev)"
 echo ""

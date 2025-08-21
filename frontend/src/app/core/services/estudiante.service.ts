@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../app/environments/environment';
 
 export interface Estudiante {
   cod_ceta: string;
@@ -25,7 +26,7 @@ export interface EstudianteResponse {
   providedIn: 'root'
 })
 export class EstudianteService {
-  private apiUrl = 'http://localhost:8080/api';
+  private apiUrl = environment.apiUrl;
 
   constructor(private http: HttpClient) {}
 

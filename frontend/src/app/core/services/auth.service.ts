@@ -22,7 +22,7 @@ export interface AuthResponse {
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = 'http://localhost:8080/api';
+  private apiUrl = 'http://192.168.0.78:8080/api';
   private tokenKey = 'auth_token';
   private userKey = 'auth_user';
   

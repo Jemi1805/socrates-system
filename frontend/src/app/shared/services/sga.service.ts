@@ -92,7 +92,7 @@ export interface ApiResponse<T> {
   providedIn: 'root'
 })
 export class SgaService {
-  private baseUrl = environment.apiUrl + '/api/sga';
+  private baseUrl = environment.apiUrl + '/sga';
 
   constructor(private http: HttpClient) {}
 

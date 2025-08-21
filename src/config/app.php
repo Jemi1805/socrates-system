@@ -53,6 +53,19 @@ return [
     */
 
     'url' => env('APP_URL', 'http://localhost'),
+    
+    /*
+    |--------------------------------------------------------------------------
+    | Application Host IP
+    |--------------------------------------------------------------------------
+    |
+    | This value represents the IP address of the host machine, which allows
+    | the application to be accessed from other devices on the network.
+    | This is useful for development and testing in a local network.
+    |
+    */
+
+    'host_ip' => env('HOST_IP', '192.168.0.78'),
 
     /*
     |--------------------------------------------------------------------------
@@ -99,12 +112,9 @@ return [
 
     'key' => env('APP_KEY'),
 
-    'previous_keys' => [
-        ...array_filter(
-            explode(',', (string) env('APP_PREVIOUS_KEYS', ''))
-        ),
-    ],
-
+    'previous_keys' => array_filter(
+        explode(',', (string) env('APP_PREVIOUS_KEYS', ''))
+    ),
     /*
     |--------------------------------------------------------------------------
     | Maintenance Mode Driver
