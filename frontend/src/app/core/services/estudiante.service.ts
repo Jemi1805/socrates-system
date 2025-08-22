@@ -5,12 +5,11 @@ import { environment } from '../../../app/environments/environment';
 
 export interface Estudiante {
   cod_ceta: string;
-  nombres: string;
   ap_pat: string;
   ap_mat: string;
+  nombres: string;
   ci: string;
   procedencia: string;
-  telf_movil: string;
   carrera: string;
 }
 
@@ -32,10 +31,6 @@ export class EstudianteService {
 
   buscarPorCeta(codCeta: string, carrera: string = 'mecanica'): Observable<EstudianteResponse> {
     return this.http.get<EstudianteResponse>(`${this.apiUrl}/sga/estudiantes?carrera=${carrera}&cod_ceta=${codCeta}`);
-  }
-
-  buscarPorCI(ci: string, carrera: string = 'mecanica'): Observable<EstudianteResponse> {
-    return this.http.get<EstudianteResponse>(`${this.apiUrl}/sga/estudiantes/ci?carrera=${carrera}&ci=${ci}`);
   }
 
   buscarPorNombre(nombres: string = '', ap_pat: string = '', ap_mat: string = '', carrera: string = 'mecanica', limit: number = 100, offset: number = 0): Observable<EstudianteResponse> {

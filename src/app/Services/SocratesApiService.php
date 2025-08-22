@@ -614,9 +614,13 @@ class SocratesApiService
                     'Ap. Paterno',
                     'Ap. Materno',
                     'Nombres',
+                    'Carrera',
+                    'Pensum',
+                    'Fecha de Nacimiento',
+                    'Lugar de Nacimiento',
                     'Cédula de Identidad',
                     'Procedencia',
-                    'Celular'
+                    'N° Serie Titulo de Bachiller'
                 ];
                 
                 $row = [];
@@ -630,64 +634,21 @@ class SocratesApiService
                 // Log detallado de la estructura de datos
                 Log::info('Fila procesada', ['row' => $row, 'keys' => array_keys($row)]);
                 
-                // Verificación específica para campos de teléfono/celular
-                $telefonoKeys = ['Celular', 'CELULAR', 'celular', 'Teléfono', 'TELEFONO', 'Telefono', 'Tel.', 'Tel', 'Telf.', 'Telf', 'MOVIL', 'Movil', 'Móvil'];
-                $foundPhoneFields = [];
-                foreach ($telefonoKeys as $phoneKey) {
-                    if (isset($row[$phoneKey])) {
-                        $foundPhoneFields[$phoneKey] = $row[$phoneKey];
-                    }
-                }
-                if (!empty($foundPhoneFields)) {
-                    Log::info('Campos de teléfono encontrados', ['phone_fields' => $foundPhoneFields]);
-                } else {
-                    Log::warning('No se encontraron campos de teléfono', ['available_keys' => array_keys($row)]);
-                }
-
-                // SOLUCIÓN DIRECTA: Usar columnas específicas por posición
-                // Basado en la tabla que el usuario mostró, sabemos que el celular está en una columna específica
-                Log::info('Columnas detectadas con índices', ["columnas" => array_keys($row)]);
-                
-                // Intentar identificar la columna de teléfono móvil por nombre exacto
-                $telfMovilValue = null;
-                $phoneColumnNames = ['telf_movil', 'Telf. Móvil', 'Teléfono Móvil', 'Celular'];
-                
-                foreach ($phoneColumnNames as $colName) {
-                    if (isset($row[$colName])) {
-                        $telfMovilValue = $row[$colName];
-                        Log::info('Encontrada columna de teléfono por nombre', ['columna' => $colName, 'valor' => $telfMovilValue]);
-                        break;
-                    }
-                }
-                
-                // Si no encontramos por nombre, intentar por posición como último recurso
-                // En la tabla del ejemplo el teléfono móvil estaba en el índice 13 (contando desde 0)
-                if (!$telfMovilValue) {
-                    // Obtener una lista de valores de las columnas ordenada por posición
-                    $colValues = array_values($row);
-                    // El índice 13 (columna 14) parece ser el teléfono móvil en la tabla de ejemplo
-                    if (count($colValues) >= 14) {
-                        $telfMovilValue = $colValues[13];
-                        Log::info('Usando valor de columna por posición', ['posición' => 13, 'valor' => $telfMovilValue]);
-                    }
-                }
-                
                 // Mapeo utilizando los nombres descriptivos de columnas
                 $estudiante = [
                     'cod_ceta' => isset($row['Cod. CETA']) ? $row['Cod. CETA'] : '',
                     'ap_pat' => isset($row['Ap. Paterno']) ? $row['Ap. Paterno'] : '',
                     'ap_mat' => isset($row['Ap. Materno']) ? $row['Ap. Materno'] : '',
                     'nombres' => isset($row['Nombres']) ? $row['Nombres'] : '',
+                    'carrera' => isset($row['Carrera']) ? $row['Carrera'] : '',
+                    'pensum' => isset($row['Pensum']) ? $row['Pensum'] : '',
+                    'fecha_nacimiento' => isset($row['Fecha de Nacimiento']) ? $row['Fecha de Nacimiento'] : '',
+                    'lugar_nacimiento' => isset($row['Lugar de Nacimiento']) ? $row['Lugar de Nacimiento'] : '',
                     'ci' => isset($row['Cédula de Identidad']) ? $row['Cédula de Identidad'] : '',
                     'procedencia' => isset($row['Procedencia']) ? $row['Procedencia'] : '',
-                    'telf_movil' => $this->extractField($row, ['Celular', 'celular', 'CELULAR', 'Teléfono Celular', 'Teléfono Móvil', 'telf_movil', 'TELEFONO', 'Telefono', 'Tel.', 'Tel', 'Telf.', 'Telf', 'MOVIL', 'Movil', 'Móvil']),
+                    'nro_serie_titulo' => isset($row['N° Serie Titulo de Bachiller']) ? $row['N° Serie Titulo de Bachiller'] : '',
                     'raw' => $row
                 ];
-                
-                // Si existe una columna llamada "Celular", agregarla
-                if (isset($row['Celular'])) {
-                    $estudiante['telf_movil'] = $row['Celular'];
-                }
 
                 // Filtrar filas que tengan al menos cod_ceta o nombres
                 if (!empty($estudiante['cod_ceta']) || !empty($estudiante['nombres'])) {
@@ -702,80 +663,6 @@ class SocratesApiService
         }
 
         return $estudiantes;
-    }
-    
-    /**
-     * Busca agresivamente un campo de teléfono o celular en el array de datos
-     * @param array $row Fila de datos
-     * @return string|null Número de teléfono/celular encontrado o null
-     */
-    private function findPhoneField($row)
-    {
-        // Registrar todas las claves disponibles para depuración
-        Log::info('Buscando teléfono en columnas disponibles', ['keys' => array_keys($row)]);
-        
-        // Comprobar si existe la columna exacta 'telf_movil'
-        if (isset($row['telf_movil']) && !empty(trim($row['telf_movil']))) {
-            Log::info('Encontrado teléfono móvil directo', ['valor' => $row['telf_movil']]);
-            return trim($row['telf_movil']);
-        }
-        
-        // 1. Primero intentar la búsqueda normal por claves específicas de teléfono/celular
-        $telefonoKeys = ['Celular', 'CELULAR', 'celular', 'Teléfono Celular', 'Teléfono Móvil', 
-                       'telf_movil', 'TELEFONO', 'Telefono', 'Tel.', 'Tel', 'Telf.', 'Telf', 'MOVIL', 'Movil', 'Móvil'];
-        foreach ($telefonoKeys as $key) {
-            if (isset($row[$key]) && !empty(trim($row[$key]))) {
-                Log::info('Teléfono encontrado por clave exacta', ['key' => $key, 'value' => $row[$key]]);
-                return trim($row[$key]);
-            }
-        }
-        
-        // 2. Buscar por coincidencia parcial en las claves especificamente para teléfono/celular
-        foreach ($row as $key => $value) {
-            // Evitar claves que puedan tener similitud pero NO son teléfonos
-            if (stripos($key, 'cod') !== false || stripos($key, 'ceta') !== false) {
-                continue;
-            }
-            
-            foreach (['movil', 'cel', 'fono', 'telf', 'tel', 'móvil', 'phone'] as $partial) {
-                if (stripos($key, $partial) !== false && !empty(trim($value))) {
-                    Log::info('Teléfono encontrado por clave parcial', ['key' => $key, 'value' => $value]);
-                    return trim($value);
-                }
-            }
-        }
-        
-        // 3. Buscar números de teléfono en cualquier campo (patrón de 7-10 dígitos)
-        // IMPORTANTE: Excluir específicamente las columnas que sabemos que NO son teléfonos
-        foreach ($row as $key => $value) {
-            // Lista expandida de campos que NO son teléfonos
-            $nonPhoneFields = ['cod_ceta', 'codigo', 'cedula', 'ci', 'nombre', 'nombres', 'apellido', 'paterno', 
-                            'materno', 'email', 'correo', 'fecha', 'direccion', 'edad', 'colegio', 'anio'];
-            
-            $skipField = false;
-            foreach ($nonPhoneFields as $nonPhoneField) {
-                if (stripos($key, $nonPhoneField) !== false) {
-                    $skipField = true;
-                    break;
-                }
-            }
-            
-            if ($skipField) continue;
-            
-            // Verificar si el valor parece un número de teléfono (patrón más específico)
-            if (is_string($value) && preg_match('/\b[0-9]{7,10}\b/', $value, $matches)) {
-                Log::info('Posible teléfono detectado por patrón numérico', ['key' => $key, 'value' => $value, 'match' => $matches[0]]);
-                return $matches[0]; // Devolver solo los dígitos
-            }
-        }
-        
-        // 4. Último recurso: buscar en la columna específica que vemos en el ejemplo
-        if (isset($row['telf_movil'])) {
-            return trim($row['telf_movil']);
-        }
-        
-        Log::warning('No se pudo encontrar un número de teléfono');
-        return null;
     }
     
     /**
