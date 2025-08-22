@@ -176,7 +176,7 @@ select.form-select, .form-control {
   background: white;
   border: 2px solid #e9ecef;
   border-radius: 10px;
-  padding: 1.5rem;
+  padding: 1rem;
   cursor: pointer;
   transition: all 0.3s ease;
   height: 100%;
@@ -426,5 +426,23 @@ body.modal-open {
 
   .row > * {
     margin-bottom: 0.5rem;
+  }
+
+  .modal-content {
+    width: 390px;
+    height: 700px;
+    margin-left: 10px;
+  }
+  
+  .btn.btn-outline-secondary[_ngcontent-ng-c838841276]{
+      display: none;
+  }
+
+  .table {
+    width: 750px;
+
+    .btn[_ngcontent-ng-c838841276] {
+      padding: 0.5rem;
+    }
   }
 }
