@@ -12,6 +12,7 @@ $text-dark-blue: #052544;
 $text-light: #666;
 $shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 $border-radius: 12px;
+$transition: all 0.3s ease;
 
 // Estilos generales
 .postulantes-container {
@@ -362,8 +363,84 @@ $border-radius: 12px;
   }
 }
 
-.form-card, .table-card {
+.form-card, .table-card, .biographical-card, .modalidad-card, .docs-card {
   animation: fadeIn 0.5s ease-out;
+}
+
+// Estilos para datos biográficos
+.biographical-card {
+  background: #ffffffd2;
+  border-radius: $border-radius;
+  box-shadow: $shadow;
+  margin-bottom: 1.5rem;
+  backdrop-filter: blur(10px);
+  padding: 1rem;
+  overflow: hidden;
+  
+  .bio-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    border-bottom: #4C9DBD solid 2px;
+    
+    h3 {
+      margin: 0;
+      color: $text-dark-blue;
+      font-size: 1.3rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+    }
+    
+    .btn {
+      padding: 0.25rem 0.5rem;
+      background: transparent;
+      border: none;
+      
+      &:hover {
+        background: $light-gray;
+      }
+      
+      i {
+        font-size: 1.2rem;
+      }
+    }
+  }
+  
+  .bio-content {
+    padding: 0.5rem 0;
+  }
+  
+  .bio-row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+    gap: 1rem;
+    
+    @media (max-width: 768px) {
+      flex-direction: column;
+    }
+  }
+  
+  .bio-item {
+    flex: 1;
+    min-width: 200px;
+    
+    .bio-label {
+      font-weight: 500;
+      color: $text-light;
+      display: block;
+      font-size: 0.85rem;
+      margin-bottom: 0.25rem;
+    }
+    
+    .bio-value {
+      color: $text-dark-blue;
+      font-weight: 500;
+      font-size: 1rem;
+    }
+  }
 }
 
 // Estados de carga
@@ -392,3 +469,385 @@ $border-radius: 12px;
   }
 }
 
+// Contenedor de modalidad y documentos
+.modalidad-docs-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  
+  @media (max-width: 992px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// Tarjeta de modalidad
+.modalidad-card {
+  background: #ffffffd2;
+  border-radius: $border-radius;
+  box-shadow: $shadow;
+  backdrop-filter: blur(10px);
+  padding: 1rem;
+  
+  .card-title {
+    color: $text-dark-blue;
+    margin: 0 0 1.2rem 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    border-bottom: 2px solid $primary-color;
+    padding-bottom: 0.5rem;
+  }
+  
+  .modalidad-content {
+    padding: 0.5rem 0;
+  }
+  
+  .modalidad-text {
+    color: $text-light;
+    margin-bottom: 0.5rem;
+  }
+  
+  .modalidad-selected {
+    background: $light-gray;
+    border-radius: $border-radius;
+    padding: 1rem;
+    min-height: 100px;
+    
+    .no-selected {
+      color: $text-light;
+      font-style: italic;
+    }
+    
+    .selected-info {
+      h4 {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: $text-dark-blue;
+        margin: 0 0 0.5rem 0;
+        font-size: 1.2rem;
+        font-weight: 600;
+        
+        i {
+          font-size: 1.5rem;
+          color: $primary-color;
+        }
+      }
+      
+      p {
+        margin: 0 0 0.5rem 0;
+        color: $text-dark-blue;
+      }
+      
+      small {
+        color: $text-light;
+      }
+    }
+  }
+}
+
+// Tarjeta de documentos
+.docs-card {
+  background: #ffffffd2;
+  border-radius: $border-radius;
+  box-shadow: $shadow;
+  backdrop-filter: blur(10px);
+  padding: 1rem;
+  
+  .card-title {
+    color: $text-dark-blue;
+    margin: 0 0 1.2rem 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    border-bottom: 2px solid $primary-color;
+    padding-bottom: 0.5rem;
+  }
+  
+  .docs-content {
+    padding: 0.5rem 0;
+  }
+  
+  .doc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .doc-item {
+    border: 1px solid $border-color;
+    border-radius: $border-radius;
+    background: white;
+    transition: $transition;
+    
+    &.disabled {
+      opacity: 0.6;
+    }
+    
+    .doc-header {
+      padding: 0.75rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid $border-color;
+      background: $light-gray;
+      
+      .doc-title-container {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      
+      .doc-checkbox {
+        margin: 0;
+      }
+      
+      .doc-title {
+        font-weight: 500;
+        color: $text-dark-blue;
+      }
+      
+      .doc-status {
+        font-size: 1.1rem;
+        
+        &.uploaded {
+          color: $success-color;
+        }
+        
+        &.error {
+          color: $danger-color;
+        }
+      }
+    }
+    
+    .doc-content {
+      padding: 1rem;
+      
+      .doc-file-selector {
+        .file-input {
+          display: none;
+        }
+        
+        .file-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.5rem 1rem;
+          background: $light-gray;
+          color: $text-dark-blue;
+          border-radius: $border-radius;
+          cursor: pointer;
+          transition: $transition;
+          
+          &:hover {
+            background: darken($light-gray, 5%);
+          }
+        }
+        
+        .selected-file, .uploaded-file {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0.5rem;
+          background: $light-gray;
+          border-radius: $border-radius;
+          margin-top: 0.5rem;
+          
+          .file-name {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            max-width: 70%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+        }
+        
+        .uploaded-file {
+          background: rgba($success-color, 0.1);
+          border: 1px solid rgba($success-color, 0.3);
+        }
+        
+        .error-message {
+          color: $danger-color;
+          margin: 0.5rem 0 0;
+          font-size: 0.9rem;
+        }
+      }
+    }
+  }
+  
+  .docs-summary {
+    padding: 0.75rem 0;
+    border-top: 1px solid $border-color;
+    margin-top: 1rem;
+    
+    .status-text {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 500;
+    }
+  }
+  
+  .no-modalidad-message {
+    padding: 1.5rem;
+    text-align: center;
+    background: $light-gray;
+    border-radius: $border-radius;
+    
+    p {
+      color: $text-light;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+  }
+}
+
+// Modal de selección de modalidad
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  animation: fadeIn 0.3s ease-out;
+  
+  .modal-container {
+    width: 100%;
+    max-width: 800px;
+    background: white;
+    border-radius: $border-radius;
+    box-shadow: $shadow;
+    overflow: hidden;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .modal-header {
+    padding: 1rem 1.5rem;
+    background: $primary-color;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    .modal-title {
+      margin: 0;
+      font-size: 1.3rem;
+      font-weight: 600;
+    }
+    
+    .btn-close {
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      transition: $transition;
+      
+      &:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+    }
+  }
+  
+  .modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    
+    .modal-description {
+      margin-bottom: 1.5rem;
+      color: $text-dark-blue;
+    }
+    
+    .modalidades-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1.5rem;
+      
+      @media (max-width: 576px) {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .modalidad-card-item {
+      border: 2px solid $border-color;
+      border-radius: $border-radius;
+      padding: 1.5rem 1rem;
+      text-align: center;
+      transition: $transition;
+      cursor: pointer;
+      
+      &:hover {
+        border-color: $primary-color;
+        transform: translateY(-5px);
+        box-shadow: $shadow;
+      }
+      
+      .modalidad-icon {
+        font-size: 2rem;
+        color: $primary-color;
+        margin-bottom: 1rem;
+      }
+      
+      .modalidad-nombre {
+        color: $text-dark-blue;
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin: 0 0 0.5rem 0;
+      }
+      
+      .modalidad-descripcion {
+        color: $text-light;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+        height: 40px;
+        overflow: hidden;
+      }
+      
+      .modalidad-duracion {
+        display: block;
+        color: $text-light;
+        font-size: 0.8rem;
+        margin-bottom: 1rem;
+      }
+    }
+  }
+}
+
+// Animación de carga
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}

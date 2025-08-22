@@ -176,7 +176,6 @@
                 <th>Código CETA</th>
                 <th>Nombre completo</th>
                 <th>CI</th>
-                <th>Celular</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -185,7 +184,6 @@
                 <td>{{ est.cod_ceta }}</td>
                 <td>{{ est.ap_pat }} {{ est.ap_mat }} {{ est.nombres }}</td>
                 <td>{{ est.ci }} {{ est.procedencia }}</td>
-                <td>{{ est.telf_movil }}</td>
                 <td>
                   <button 
                     class="btn btn-sm btn-primary" 
@@ -247,15 +245,6 @@
                         CI
                       </label>
                       <div class="info-value">{{ estudiante.ci }} {{ estudiante.procedencia }}</div>
-                    </div>
-                  </div>
-                  <div class="col-md-4">
-                    <div class="info-item">
-                      <label class="form-label">
-                        <i class="bi bi-phone me-1"></i>
-                        Celular
-                      </label>
-                      <div class="info-value">{{ estudiante.telf_movil }}</div>
                     </div>
                   </div>
                 </div>

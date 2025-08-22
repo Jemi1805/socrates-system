@@ -8,12 +8,205 @@
   </app-header>
 
   <div class="content-wrapper">
-  <!-- Formulario Card -->
-    <div class="form-card">
+    
+    <!-- Datos biográficos del estudiante -->
+    <div class="biographical-card" *ngIf="estudiante">
+      <div class="bio-header">
+        <h3>
+          <i class="bi bi-person-vcard me-2"></i>
+          Datos del estudiante
+        </h3>
+        <button class="btn btn-sm" (click)="toggleBiographicalData()">
+          <i class="bi" [ngClass]="showBiographicalData ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+        </button>
+      </div>
+      
+      <div class="bio-content" *ngIf="showBiographicalData">
+        <div class="bio-row">
+          <div class="bio-item">
+            <span class="bio-label">Carrera:</span>
+            <span class="bio-value">{{estudiante.carrera}}</span>
+          </div>
+          <div class="bio-item">
+            <span class="bio-label">Pensum:</span>
+            <span class="bio-value">{{estudiante.pensum || 'N/A'}}</span>
+          </div>
+          <div class="bio-item">
+            <span class="bio-label">Código:</span>
+            <span class="bio-value">{{estudiante.cod_ceta}}</span>
+          </div>
+          <!-- <div class="bio-item">
+            <span class="bio-label">Registro:</span>
+            <span class="bio-value">{{estudiante.reg_ini_c || 'N/A'}} - {{estudiante.reg_con_c || 'N/A'}}</span>
+          </div> -->
+        </div>
+
+        <div class="bio-row">
+          <div class="bio-item">
+            <span class="bio-label">Nombres:</span>
+            <span class="bio-value">{{estudiante.nombres}}</span>
+          </div>
+          <div class="bio-item">
+            <span class="bio-label">Apellido Paterno:</span>
+            <span class="bio-value">{{estudiante.ap_pat}}</span>
+          </div>
+          <div class="bio-item">
+            <span class="bio-label">Apellido Materno:</span>
+            <span class="bio-value">{{estudiante.ap_mat}}</span>
+          </div>
+        </div>
+        
+
+        <div class="bio-row">
+          <div class="bio-item">
+            <span class="bio-label">CI:</span>
+            <span class="bio-value">{{estudiante.ci}}</span>
+          </div>
+          <div class="bio-item">
+            <span class="bio-label">Procedencia:</span>
+            <span class="bio-value">{{estudiante.procedencia || 'N/A'}}</span>
+          </div>
+          <div class="bio-item">
+            <span class="bio-label">Nro. Serie Título:</span>
+            <span class="bio-value">{{estudiante.nro_serie_titulo || 'N/A'}}</span>
+          </div>
+        </div>
+
+        <div class="bio-row">
+          <div class="bio-item">
+            <span class="bio-label">Fecha de Nacimiento:</span>
+            <span class="bio-value">{{estudiante.fecha_nacimiento || 'N/A'}}</span>
+          </div>
+          <div class="bio-item">
+            <span class="bio-label">Lugar de Nacimiento:</span>
+            <span class="bio-value">{{estudiante.lugar_nacimiento || 'N/A'}}</span>
+          </div>
+          <div class="bio-item">
+          </div>
+        </div>
+        
+      </div>
+    </div>
+    
+    <!-- Sección de Modalidad y Documentos -->
+    <div class="modalidad-docs-container">
+      <!-- Selección de modalidad -->
+      <div class="modalidad-card">
+        <h3 class="card-title">
+          <i class="bi bi-mortarboard me-2"></i>
+          Modalidad de Graduación
+        </h3>
+        
+        <div class="modalidad-content">
+          <p class="modalidad-text">Modalidad actual:</p>
+          <div class="modalidad-selected">
+            <span *ngIf="!modalidad" class="no-selected">Ninguna modalidad seleccionada</span>
+            <div *ngIf="modalidad" class="selected-info">
+              <h4>
+                <i class="bi" [ngClass]="modalidad.icono || 'bi-award'"></i>
+                {{modalidad.nombre}}
+              </h4>
+              <p>{{modalidad.descripcion}}</p>
+              <small>Duración: {{modalidad.duracion || 'No especificada'}}</small>
+            </div>
+          </div>
+          
+          <button class="btn btn-primary btn-sm mt-3" (click)="mostrarModal()">
+            <i class="bi bi-pencil-square me-1"></i>
+            {{ modalidad ? 'Cambiar Modalidad' : 'Seleccionar Modalidad' }}
+          </button>
+        </div>
+      </div>
+      
+      <!-- Carga de documentos -->
+      <div class="docs-card">
+        <h3 class="card-title">
+          <i class="bi bi-file-earmark-pdf me-2"></i>
+          Documentos Requeridos
+        </h3>
+        
+        <div class="docs-content" *ngIf="modalidad; else selectModalidadFirst">
+          <div class="doc-list">
+            <div *ngFor="let doc of documentTypes" class="doc-item" [class.disabled]="!doc.enabled">
+              <div class="doc-header">
+                <div class="doc-info">
+                  <input type="checkbox" [checked]="doc.enabled" (change)="toggleDocumentType(doc.id)" class="doc-checkbox">
+                  <span class="doc-title">{{doc.name}}</span>
+                </div>
+                <span class="doc-status" [ngClass]="{'uploaded': doc.uploaded, 'error': doc.error}">
+                  <i class="bi" [ngClass]="{
+                    'bi-check-circle-fill text-success': doc.uploaded,
+                    'bi-x-circle-fill text-danger': doc.error,
+                    'bi-circle text-muted': !doc.uploaded && !doc.error
+                  }"></i>
+                </span>
+              </div>
+              
+              <div class="doc-content" *ngIf="doc.enabled">
+                <div class="doc-file-selector">
+                  <input type="file" 
+                    [id]="'file-' + doc.id"
+                    (change)="onFileSelected($event, doc.id)"
+                    accept=".pdf"
+                    class="file-input"
+                    [disabled]="doc.uploading || doc.uploaded">
+                  
+                  <label [for]="'file-' + doc.id" class="file-label" *ngIf="!doc.file && !doc.uploaded">
+                    <i class="bi bi-upload me-1"></i>
+                    Seleccionar archivo PDF
+                  </label>
+                  
+                  <div class="selected-file" *ngIf="doc.file && !doc.uploaded">
+                    <span class="file-name">{{doc.file.name}}</span>
+                    <button class="btn btn-sm btn-outline-primary" (click)="uploadDocument(doc.id)" [disabled]="doc.uploading">
+                      <i class="bi" [ngClass]="doc.uploading ? 'bi-arrow-repeat spin' : 'bi-cloud-upload'"></i>
+                      {{doc.uploading ? 'Subiendo...' : 'Subir'}}
+                    </button>
+                  </div>
+                  
+                  <div class="uploaded-file" *ngIf="doc.uploaded">
+                    <span class="file-name">
+                      <i class="bi bi-file-earmark-pdf me-1"></i>
+                      {{doc.file ? doc.file.name : 'Documento cargado'}}
+                    </span>
+                    <button class="btn btn-sm btn-outline-danger" (click)="removeDocument(doc.id)">
+                      <i class="bi bi-trash"></i>
+                      Eliminar
+                    </button>
+                  </div>
+                  
+                  <p class="error-message" *ngIf="doc.error">{{doc.error}}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="docs-summary mt-3">
+            <span class="status-text" [ngClass]="todosDocumentosValidos() ? 'text-success' : 'text-danger'">
+              <i class="bi" [ngClass]="todosDocumentosValidos() ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
+              {{todosDocumentosValidos() ? 'Todos los documentos requeridos han sido cargados' : 'Faltan documentos requeridos por cargar'}}
+            </span>
+          </div>
+        </div>
+        
+        <ng-template #selectModalidadFirst>
+          <div class="no-modalidad-message">
+            <p><i class="bi bi-info-circle me-2"></i> Por favor seleccione una modalidad de graduación primero</p>
+            <button class="btn btn-outline-primary btn-sm" (click)="mostrarModal()">
+              <i class="bi bi-list-check me-1"></i>
+              Seleccionar Modalidad
+            </button>
+          </div>
+        </ng-template>
+      </div>
+    </div>
+    
+    <!-- Formulario Card -->
+    <!-- <div class="form-card">
       <h3 class="card-title">Registrar Postulante</h3>
       
       <form #postulanteForm="ngForm" (ngSubmit)="guardar()" class="postulante-form">
-    <input type="hidden" [(ngModel)]="postulanteActual.cod_ceta" name="cod_ceta">
+        <input type="hidden" [(ngModel)]="postulanteActual.cod_ceta" name="cod_ceta">
         
         <div class="form-row">
           <div class="form-group">
@@ -78,11 +271,11 @@
           </button>
         </div>
   </form>
-    </div>
+    </div> -->
   
 
     <!-- Tabla Card -->
-    <div class="table-card">
+    <!-- <div class="table-card">
       <h3 class="card-title">Lista de Postulantes</h3>
 
       <div class="table-container">
@@ -115,6 +308,33 @@
       </tr>
     </tbody>
   </table>
+      </div>
+    </div>
+  </div> -->
+  
+  <!-- Modal de selección de modalidad -->
+  <div class="modal-overlay" *ngIf="modalVisible">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 class="modal-title">Seleccionar Modalidad de Graduación</h3>
+        <button class="btn-close" (click)="ocultarModal()">
+          <i class="bi bi-x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-description">Seleccione la modalidad de graduación para el estudiante:</p>
+        
+        <div class="modalidades-grid">
+          <div *ngFor="let mod of modalidades" class="modalidad-card-item" (click)="seleccionarModalidad(mod)">
+            <div class="modalidad-icon">
+              <i class="bi" [ngClass]="mod.icono || 'bi-award'"></i>
+            </div>
+            <h4 class="modalidad-nombre">{{mod.nombre}}</h4>
+            <p class="modalidad-descripcion">{{mod.descripcion}}</p>
+            <small class="modalidad-duracion">Duración: {{mod.duracion}}</small>
+            <button class="btn btn-outline-primary btn-sm mt-2">Seleccionar</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>

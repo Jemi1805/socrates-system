@@ -8,9 +8,12 @@ export interface Estudiante {
   ap_pat: string;
   ap_mat: string;
   nombres: string;
+  fecha_nacimiento?: Date;  
+  lugar_nacimiento?: string;
   ci: string;
   procedencia: string;
   carrera: string;
+  pensum?: string;
 }
 
 export interface EstudianteResponse {
