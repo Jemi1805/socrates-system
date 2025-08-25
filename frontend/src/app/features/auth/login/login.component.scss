@@ -264,17 +264,16 @@ $light-blue: #4C9DBD; // Azul claro para triángulo superior izquierdo
   }
 
   .login-left {
-    padding: 20px;
+    padding: 40px;
     height: min-content;
     align-items: flex-start;
     flex: none;
 
     .login-left-content {
-      max-width: 380px;
-    
+      max-width: 320px;
 
       .system-name {
-        font-size: 1.5rem;
+        font-size: 1.2rem;
         margin-bottom: 8px;
       }
       .system-description {
@@ -292,15 +291,15 @@ $light-blue: #4C9DBD; // Azul claro para triángulo superior izquierdo
   }
   
   .login-right {
-    padding: 30px;
+    padding: 20px;
 
     .login-title {
-      font-size: 1.5rem;
+      font-size: 1.2rem;
       margin-bottom: 50px;
     }
 
     .form-label, .btn-login {
-      font-size: 1.2rem;
+      font-size: 1rem;
     }
 
     .form-input {
