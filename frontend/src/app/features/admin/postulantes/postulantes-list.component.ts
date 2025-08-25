@@ -71,7 +71,7 @@ export class PostulantesListComponent implements OnInit {
   
   // Control del modal
   modalVisible = false;
-  showBiographicalData = false;
+  showBiographicalData = true;
   
   // Aranceles
   aranceles: Arancel[] = [];

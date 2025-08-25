@@ -1,87 +1,208 @@
 @use "sass:color";
 
 // Variables
-$primary-color: #052544;
-$secondary-color: #757575;
-$success-color: #4CAF50;
+$left-background: #3a5273; // Azul medio para el lado izquierdo, como en la imagen
+$dark-blue: #052544;// Color de acento para botones, como en la imagen
+$input-background: #D9D9D9; // Fondo para inputs
 $danger-color: #F44336;
-$light-gray: #f5f5f5;
-$border-color: #e0e0e0;
 $text-dark: #333;
-$text-light: #666;
-$shadow: 0 4px 20px rgba(0,0,0,0.15);
-$border-radius: 8px;
+$text-light: #f5f5f5;
+$border-radius: 12px;
+$light-blue: #4C9DBD; // Azul claro para triángulo superior izquierdo
 
 // Contenedor principal
 .login-container {
   min-height: 100vh;
   display: flex;
+  width: 100%;
+}
+
+// Sección izquierda
+.login-left {
+  flex: 1;
+  background-color: $left-background;
+  display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, $primary-color, $secondary-color);
-  padding: 20px;
+  padding: 40px;
+  position: relative;
+  overflow: hidden;
 }
 
-// Tarjeta de login
-.login-card {
-  background: white;
-  border-radius: $border-radius;
-  box-shadow: $shadow;
+// Triangulo azul claro en esquina superior izquierda
+.login-left::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: 100%;
+  height: 100%;
+  background-color: #5a7191;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  z-index: -1;
+}
+
+// Triangulo azul medio en esquina inferior derecha
+.login-left::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 60%;
+  height: 60%;
+  background-color: #2a3e5a;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  z-index: -1;
+}
+
+// Efecto triangular adicional en la esquina superior derecha
+.login-left-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 70%;
+  height: 70%;
+  background-color: #496182;
+  clip-path: polygon(100% 0, 100% 100%, 0 0);
+  z-index: -2;
+}
+
+// Triangulo para esquina inferior izquierda
+.login-left-content::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 50%;
+  height: 50%;
+  background-color: #2d4058;
+  clip-path: polygon(0 100%, 100% 100%, 0 0);
+  z-index: -2;
+}
+
+.login-left-content {
+  max-width: 1000px;
+  z-index: 1;
+
+  text-align: start;
+}
+
+.system-name {
+  color: white;
+  font-size: 3rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+  letter-spacing: 2px;
+  width: 700px;
+}
+
+.system-description {
+  color: rgba(255,255,255,0.85);
+  font-size: 1.7rem;
+  line-height: 1.6;
+  margin-bottom: 80px;
+
+}
+
+.logo-container {
+  margin-top: 200px;
+  text-align: center;
+
+}
+
+.logo-ceta {
+  width: 180px;
+  height: auto;
+}
+
+
+// Sección derecha
+.login-right {
+  flex: 1;
+  background: linear-gradient(135deg, #496182 20%, #052544 70%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 40px;
+}
+
+.login-right-content {
   width: 100%;
   max-width: 400px;
-  text-align: center;
 }
 
-// Header del login
-.login-header {
-  margin-bottom: 30px;
-  
-  .login-title {
-    color: $primary-color;
-    font-size: 2rem;
-    font-weight: 600;
-    margin: 0 0 10px 0;
-  }
-  
-  .login-subtitle {
-    color: $text-light;
-    font-size: 1rem;
-    margin: 0;
-  }
+.login-title {
+  color: white;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 40px;
+  text-align: center;
+  letter-spacing: 1px;
 }
 
 // Formulario
 .login-form {
   .form-group {
-    margin-bottom: 20px;
-    text-align: left;
+    margin-bottom: 24px;
   }
   
   .form-label {
     display: block;
     margin-bottom: 8px;
-    color: $text-dark;
+    color: white !important;
     font-weight: 500;
-    font-size: 0.9rem;
+    font-size: 1.5rem;
   }
   
   .form-input {
     width: 100%;
-    padding: 12px 16px;
-    border: 2px solid $border-color;
+    padding: 14px 16px;
+    border: none;
     border-radius: $border-radius;
-    font-size: 1rem;
-    transition: border-color 0.3s ease;
+    font-size: 1.2rem;
+    background-color: $input-background;
+    color: $dark-blue;
     
     &:focus {
       outline: none;
-      border-color: $primary-color;
-      box-shadow: 0 0 0 3px rgba(5, 37, 68, 0.1);
+      box-shadow: 0 0 0 2pxr gba(92, 185, 204, 0.5);
     }
     
     &::placeholder {
-      color: $text-light;
+      color: #aaa;
+    }
+  }
+}
+
+// Wrapper para input de contraseña
+.password-input-wrapper {
+  position: relative;
+  
+  .password-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    
+    &:focus {
+      outline: none;
+    }
+    
+    i {
+      font-size: 1.2rem;
+    }
+
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+    color: $light-blue;
     }
   }
 }
@@ -90,21 +211,22 @@ $border-radius: 8px;
 .btn-login {
   width: 100%;
   padding: 14px;
-  font-size: 1rem;
-  font-weight: 500;
+  font-size: 1.2rem;
+  font-weight: 600;
   border: none;
   border-radius: $border-radius;
-  background: $primary-color;
+  background: $light-blue;
   color: white;
   cursor: pointer;
   transition: background-color 0.3s ease;
+  margin-top: 10px;
   
   &:hover:not(:disabled) {
-    background: color.adjust($primary-color, $lightness: -10%);
+    background: color.adjust($light-blue, $lightness: -10%);
   }
   
   &:disabled {
-    background: $text-light;
+    background: rgba(255,255,255,0.3);
     cursor: not-allowed;
   }
   
@@ -115,8 +237,8 @@ $border-radius: 8px;
 
 // Mensaje de error
 .error-message {
-  background: #ffebee;
-  color: $danger-color;
+  background: rgba(244, 67, 54, 0.1);
+  color: #ff9a94;
   padding: 12px;
   border-radius: $border-radius;
   margin-bottom: 20px;
@@ -130,21 +252,60 @@ $border-radius: 8px;
   }
 }
 
-// Footer
-.login-footer {
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px solid $border-color;
-  
-  .text-muted {
-    color: $text-light;
-    font-size: 0.8rem;
-    margin: 0;
-  }
-}
-
 // Animación de spin
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
-} 
+}
+
+@media (max-width: 768px) {
+  .login-container {
+    flex-direction: column;
+  }
+
+  .login-left {
+    padding: 20px;
+    height: min-content;
+    align-items: flex-start;
+    flex: none;
+
+    .login-left-content {
+      max-width: 380px;
+    
+
+      .system-name {
+        font-size: 1.5rem;
+        margin-bottom: 8px;
+      }
+      .system-description {
+        font-size: 1rem;
+        margin-bottom: 10px;
+      }
+      .logo-container {
+        text-align: end;
+        margin-top: 0px;
+        .logo-ceta {
+          width: 70px;
+        }
+      }
+    }
+  }
+  
+  .login-right {
+    padding: 30px;
+
+    .login-title {
+      font-size: 1.5rem;
+      margin-bottom: 50px;
+    }
+
+    .form-label, .btn-login {
+      font-size: 1.2rem;
+    }
+
+    .form-input {
+      font-size: 1rem;
+      padding: 12px;
+    }
+  }
+}

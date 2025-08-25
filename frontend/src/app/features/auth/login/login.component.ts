@@ -19,6 +19,7 @@ export class LoginComponent {
   
   loading = false;
   error = '';
+  passwordVisible = false;
 
   constructor(
     private authService: AuthService,
@@ -41,4 +42,8 @@ export class LoginComponent {
       }
     });
   }
-} 
+  
+  togglePasswordVisibility() {
+    this.passwordVisible = !this.passwordVisible;
+  }
+}
