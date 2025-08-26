@@ -8,6 +8,22 @@ use App\Http\Controllers\Api\RolController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SgaController;
+use App\Http\Controllers\Api\ArancelesEstController;
+use App\Http\Controllers\Api\ModalidadController;
+use App\Http\Controllers\Api\PractIndController;
+use App\Http\Controllers\Api\ProyectoController;
+use App\Http\Controllers\Api\InscripModalidadController;
+use App\Http\Controllers\Api\DocumentosRequeridosController;
+use App\Http\Controllers\Api\DocumentosAdjuntosController;
+use App\Http\Controllers\Api\DiplomaBachillerController;
+use App\Http\Controllers\Api\RaHomolExController;
+use App\Http\Controllers\Api\GradoHomolController;
+use App\Http\Controllers\Api\TransitabilidadEduRegController;
+use App\Http\Controllers\Api\TransitabilidadInstTecController;
+use App\Http\Controllers\Api\TraspasosInstitutoController;
+use App\Http\Controllers\Api\ResHomolCpController;
+use App\Http\Controllers\Api\GradosHomolCpController;
+use App\Http\Controllers\Api\GradosTraspController;
 
 // 🔐 RUTAS DE AUTENTICACIÓN (Sin middleware)
 Route::prefix('auth')->group(function () {
@@ -52,6 +68,24 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{id}/permisos', [RolController::class, 'asignarPermisos'])->middleware('permission:roles.actualizar');
         Route::get('/{id}/usuarios', [RolController::class, 'usuarios'])->middleware('permission:roles.leer');
     });
+
+    // 📚 CRUD API RESOURCES (protegidos)
+    Route::apiResource('aranceles_est', ArancelesEstController::class);
+    Route::apiResource('modalidad', ModalidadController::class);
+    Route::apiResource('pract_ind', PractIndController::class);
+    Route::apiResource('proyecto', ProyectoController::class);
+    Route::apiResource('inscrip_modalidad', InscripModalidadController::class);
+    Route::apiResource('documentos_requeridos', DocumentosRequeridosController::class);
+    Route::apiResource('documentos_adjuntos', DocumentosAdjuntosController::class);
+    Route::apiResource('diploma_bachiller', DiplomaBachillerController::class);
+    Route::apiResource('ra_homol_ex', RaHomolExController::class);
+    Route::apiResource('grado_homol', GradoHomolController::class);
+    Route::apiResource('transitabilidad_edu_reg', TransitabilidadEduRegController::class);
+    Route::apiResource('transitabilidad_inst_tec', TransitabilidadInstTecController::class);
+    Route::apiResource('traspasos_instituto', TraspasosInstitutoController::class);
+    Route::apiResource('res_homol_cp', ResHomolCpController::class);
+    Route::apiResource('grados_homol_cp', GradosHomolCpController::class);
+    Route::apiResource('grados_trasp', GradosTraspController::class);
 });
 
 // 📦 RUTAS DE PRODUCTOS (Mantener existentes)
