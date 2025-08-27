@@ -109,13 +109,47 @@ export class PostulantesListComponent implements OnInit {
     grados_gestiones: []
   };
 
-  opciones = {
+  opciones: Record<'educacionRegular' | 'tecnicoMedio' | 'traspasoInstituto' | 'homologacionCambioPlan', boolean> = {
     educacionRegular: false,
     tecnicoMedio: false,
     traspasoInstituto: false,
     homologacionCambioPlan: false
   };
-  
+
+  // Opción seleccionada de forma exclusiva
+  selectedOpcion: 'educacionRegular' | 'tecnicoMedio' | 'traspasoInstituto' | 'homologacionCambioPlan' | null = null;
+
+  // Formularios por opción seleccionada
+  eduRegularData: { serie_titulo_tm: string; numero_titulo_tm: string; fecha_emision: string } = {
+    serie_titulo_tm: '',
+    numero_titulo_tm: '',
+    fecha_emision: ''
+  };
+
+  tecnicoMedioData: { serie_titulo_tm: string; numero_titulo_tm: string; fecha_emision: string } = {
+    serie_titulo_tm: '',
+    numero_titulo_tm: '',
+    fecha_emision: ''
+  };
+
+  traspasoData: {
+    instituto_origen: string;
+    grados_gestiones: Array<{ grado: string; gestion: string }>;
+  } = {
+    instituto_origen: '',
+    grados_gestiones: []
+  };
+
+  homoCambioPlanData: {
+    nro_resolucion_rectoral: string;
+    fecha_emision: string;
+    grados_gestiones: Array<{ grado: string; gestion: string }>;
+  } = {
+    nro_resolucion_rectoral: '',
+    fecha_emision: '',
+    grados_gestiones: []
+  };
+
   // Gestión de documentos
   documentTypes: {
     id: string;
@@ -466,14 +500,62 @@ export class PostulantesListComponent implements OnInit {
     // Reglas de habilitado para opciones
     if (tipo === 'extranjero') {
       this.opciones.educacionRegular = false; // Se deshabilita para extranjero
+      if (this.selectedOpcion === 'educacionRegular') {
+        this.selectedOpcion = null;
+      }
     }
   }
 
   isOpcionDisabled(opcion: 'educacionRegular' | 'tecnicoMedio' | 'traspasoInstituto' | 'homologacionCambioPlan'): boolean {
+    // Regla por tipo de bachiller
     if (opcion === 'educacionRegular' && this.tipoBachiller === 'extranjero') {
       return true;
     }
+    // Si hay una opción seleccionada, deshabilitar las demás
+    if (this.selectedOpcion && this.selectedOpcion !== opcion) {
+      return true;
+    }
     return false;
+  }
+
+  // --- Opciones: selección exclusiva y helpers ---
+  onOpcionToggle(opcion: 'educacionRegular' | 'tecnicoMedio' | 'traspasoInstituto' | 'homologacionCambioPlan', checked: boolean) {
+    const isChecked = checked;
+    if (isChecked) {
+      this.selectedOpcion = opcion;
+      // Desmarcar las demás
+      (Object.keys(this.opciones) as ('educacionRegular' | 'tecnicoMedio' | 'traspasoInstituto' | 'homologacionCambioPlan')[]).forEach((k) => {
+        if (k !== opcion) this.opciones[k] = false;
+      });
+    } else {
+      this.selectedOpcion = null;
+    }
+  }
+
+  clearOpcion() {
+    // Quita la selección actual para permitir elegir otra opción
+    this.selectedOpcion = null;
+    (Object.keys(this.opciones) as ('educacionRegular' | 'tecnicoMedio' | 'traspasoInstituto' | 'homologacionCambioPlan')[]).forEach((k) => {
+      this.opciones[k] = false;
+    });
+  }
+
+  // --- Traspaso: ABM de grados/gestiones ---
+  agregarGradoGestionTraspaso() {
+    this.traspasoData.grados_gestiones.push({ grado: '', gestion: '' });
+  }
+
+  eliminarGradoGestionTraspaso(index: number) {
+    this.traspasoData.grados_gestiones.splice(index, 1);
+  }
+
+  // --- Homologación por cambio de plan: ABM de grados/gestiones ---
+  agregarGradoGestionCambioPlan() {
+    this.homoCambioPlanData.grados_gestiones.push({ grado: '', gestion: '' });
+  }
+
+  eliminarGradoGestionCambioPlan(index: number) {
+    this.homoCambioPlanData.grados_gestiones.splice(index, 1);
   }
 
   agregarGradoGestion() {

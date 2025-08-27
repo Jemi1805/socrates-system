@@ -180,26 +180,138 @@
           <div class="row g-2">
             <div class="col-md-6">
               <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="optEduReg" [(ngModel)]="opciones.educacionRegular" [disabled]="isOpcionDisabled('educacionRegular')" />
+                <input class="form-check-input" type="radio" name="transitabilidad" id="optEduReg" [(ngModel)]="selectedOpcion" value="educacionRegular" (change)="onOpcionToggle('educacionRegular', true)" [disabled]="isOpcionDisabled('educacionRegular')" />
                 <label class="form-check-label" for="optEduReg">Transitabilidad de Educación Regular</label>
               </div>
             </div>
             <div class="col-md-6">
               <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="optTecMed" [(ngModel)]="opciones.tecnicoMedio" />
+                <input class="form-check-input" type="radio" name="transitabilidad" id="optTecMed" [(ngModel)]="selectedOpcion" value="tecnicoMedio" (change)="onOpcionToggle('tecnicoMedio', true)" [disabled]="isOpcionDisabled('tecnicoMedio')" />
                 <label class="form-check-label" for="optTecMed">Transitabilidad de nivel técnico medio</label>
               </div>
             </div>
             <div class="col-md-6">
               <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="optTraspaso" [(ngModel)]="opciones.traspasoInstituto" />
+                <input class="form-check-input" type="radio" name="transitabilidad" id="optTraspaso" [(ngModel)]="selectedOpcion" value="traspasoInstituto" (change)="onOpcionToggle('traspasoInstituto', true)" [disabled]="isOpcionDisabled('traspasoInstituto')" />
                 <label class="form-check-label" for="optTraspaso">Traspaso de instituto</label>
               </div>
             </div>
             <div class="col-md-6">
               <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="optHomoPlan" [(ngModel)]="opciones.homologacionCambioPlan" />
+                <input class="form-check-input" type="radio" name="transitabilidad" id="optHomoPlan" [(ngModel)]="selectedOpcion" value="homologacionCambioPlan" (change)="onOpcionToggle('homologacionCambioPlan', true)" [disabled]="isOpcionDisabled('homologacionCambioPlan')" />
                 <label class="form-check-label" for="optHomoPlan">Homologación/convalidación por cambio de plan de estudios</label>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearOpcion()" [disabled]="!selectedOpcion">
+            Quitar selección
+          </button>
+        </div>
+
+        <!-- Formularios por opción seleccionada -->
+        <!-- Transitabilidad de Educación Regular -->
+        <div class="mt-3" *ngIf="selectedOpcion === 'educacionRegular'">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Serie título Profesional - Técnico Medio</label>
+              <input type="text" class="form-control" [(ngModel)]="eduRegularData.serie_titulo_tm" placeholder="Ej. SERIE-001" />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">N° de Título Profesional - Técnico Medio</label>
+              <input type="text" class="form-control" [(ngModel)]="eduRegularData.numero_titulo_tm" placeholder="Ej. 123456" />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Fecha de emisión</label>
+              <input type="date" class="form-control" [(ngModel)]="eduRegularData.fecha_emision" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Transitabilidad de nivel técnico medio -->
+        <div class="mt-3" *ngIf="selectedOpcion === 'tecnicoMedio'">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Serie título Profesional - Técnico Medio</label>
+              <input type="text" class="form-control" [(ngModel)]="tecnicoMedioData.serie_titulo_tm" placeholder="Ej. SERIE-001" />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">N° de Título Profesional - Técnico Medio</label>
+              <input type="text" class="form-control" [(ngModel)]="tecnicoMedioData.numero_titulo_tm" placeholder="Ej. 123456" />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Fecha de emisión</label>
+              <input type="date" class="form-control" [(ngModel)]="tecnicoMedioData.fecha_emision" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Traspaso de Instituto -->
+        <div class="mt-3" *ngIf="selectedOpcion === 'traspasoInstituto'">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Instituto de origen</label>
+              <input type="text" class="form-control" [(ngModel)]="traspasoData.instituto_origen" placeholder="Nombre del Instituto" />
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="form-label">Grados y gestiones cursadas</label>
+            <div class="d-flex flex-column gap-2">
+              <div class="row g-2 align-items-end" *ngFor="let gg of traspasoData.grados_gestiones; let i = index">
+                <div class="col-md-5">
+                  <input type="text" class="form-control" [(ngModel)]="gg.grado" placeholder="Grado (p. ej., 1ro, 2do)" />
+                </div>
+                <div class="col-md-5">
+                  <input type="text" class="form-control" [(ngModel)]="gg.gestion" placeholder="Gestión (p. ej., 2018)" />
+                </div>
+                <div class="col-md-2">
+                  <button class="btn btn-outline-danger w-100" (click)="eliminarGradoGestionTraspaso(i)">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+              <div>
+                <button class="btn btn-outline-primary btn-sm" (click)="agregarGradoGestionTraspaso()">
+                  <i class="bi bi-plus-lg me-1"></i>
+                  Agregar grado/gestión
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Homologación/convalidación por cambio de plan de estudios -->
+        <div class="mt-3" *ngIf="selectedOpcion === 'homologacionCambioPlan'">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">N° de Resolución Rectoral</label>
+              <input type="text" class="form-control" [(ngModel)]="homoCambioPlanData.nro_resolucion_rectoral" placeholder="Ej. RES-2025-001" />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Fecha de emisión</label>
+              <input type="date" class="form-control" [(ngModel)]="homoCambioPlanData.fecha_emision" />
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="form-label">Grados y gestiones cursadas</label>
+            <div class="d-flex flex-column gap-2">
+              <div class="row g-2 align-items-end" *ngFor="let gg of homoCambioPlanData.grados_gestiones; let i = index">
+                <div class="col-md-5">
+                  <input type="text" class="form-control" [(ngModel)]="gg.grado" placeholder="Grado (p. ej., 1ro, 2do)" />
+                </div>
+                <div class="col-md-5">
+                  <input type="text" class="form-control" [(ngModel)]="gg.gestion" placeholder="Gestión (p. ej., 2018)" />
+                </div>
+                <div class="col-md-2">
+                  <button class="btn btn-outline-danger w-100" (click)="eliminarGradoGestionCambioPlan(i)">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+              <div>
+                <button class="btn btn-outline-primary btn-sm" (click)="agregarGradoGestionCambioPlan()">
+                  <i class="bi bi-plus-lg me-1"></i>
+                  Agregar grado/gestión
+                </button>
               </div>
             </div>
           </div>

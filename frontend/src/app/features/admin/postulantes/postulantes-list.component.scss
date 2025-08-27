@@ -238,6 +238,10 @@ $transition: all 0.3s ease;
   input, label {
     color: $text-dark-blue;
   }
+
+  .mt-3 > .btn-outline-secondary {
+    margin-top: 0.5rem;
+  }
 }
 
 // Tabla
