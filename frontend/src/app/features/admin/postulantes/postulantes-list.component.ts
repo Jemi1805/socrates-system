@@ -72,6 +72,7 @@ export class PostulantesListComponent implements OnInit {
   // Control del modal
   modalVisible = false;
   showBiographicalData = true;
+  showBachilleratoData = true;
   
   // Aranceles
   aranceles: Arancel[] = [];
@@ -80,6 +81,40 @@ export class PostulantesListComponent implements OnInit {
   // Estados de carga
   loadingModalidades = false;
   loadingAranceles = false;
+  
+  // Bachillerato
+  tipoBachiller: 'nacional' | 'extranjero' | null = null;
+
+  diplomaNacional: {
+    nro_serie: string;
+    emision: string;
+    fecha_emision: string;
+    observacion: string;
+    gestion_bachillerato: string;
+  } = {
+    nro_serie: '',
+    emision: '',
+    fecha_emision: '',
+    observacion: '',
+    gestion_bachillerato: ''
+  };
+
+  homologacionExtranjero: {
+    nro_resolucion: string;
+    fecha_emision: string;
+    grados_gestiones: Array<{ grado: string; gestion: string }>;
+  } = {
+    nro_resolucion: '',
+    fecha_emision: '',
+    grados_gestiones: []
+  };
+
+  opciones = {
+    educacionRegular: false,
+    tecnicoMedio: false,
+    traspasoInstituto: false,
+    homologacionCambioPlan: false
+  };
   
   // Gestión de documentos
   documentTypes: {
@@ -127,6 +162,7 @@ export class PostulantesListComponent implements OnInit {
           apellidos_est: `${this.estudiante.ap_pat} ${this.estudiante.ap_mat}`,
           ci_completo: `${this.estudiante.ci} ${this.estudiante.procedencia}`,
           carrera: this.estudiante.carrera,
+          nro_serie_titulo: this.estudiante.nro_serie_titulo || '',
         };
       }
     }
@@ -405,5 +441,46 @@ export class PostulantesListComponent implements OnInit {
   
   toggleBiographicalData() {
     this.showBiographicalData = !this.showBiographicalData;
+  }
+
+  toggleBachilleratoData() {
+    this.showBachilleratoData = !this.showBachilleratoData;
+  }
+  
+  // --- Bachillerato: lógica de UI ---
+  onTipoBachillerChange(tipo: 'nacional' | 'extranjero') {
+    this.tipoBachiller = tipo;
+    // Reset de formularios específicos
+    this.diplomaNacional = {
+      nro_serie: '',
+      emision: '',
+      fecha_emision: '',
+      observacion: '',
+      gestion_bachillerato: ''
+    };
+    this.homologacionExtranjero = {
+      nro_resolucion: '',
+      fecha_emision: '',
+      grados_gestiones: []
+    };
+    // Reglas de habilitado para opciones
+    if (tipo === 'extranjero') {
+      this.opciones.educacionRegular = false; // Se deshabilita para extranjero
+    }
+  }
+
+  isOpcionDisabled(opcion: 'educacionRegular' | 'tecnicoMedio' | 'traspasoInstituto' | 'homologacionCambioPlan'): boolean {
+    if (opcion === 'educacionRegular' && this.tipoBachiller === 'extranjero') {
+      return true;
+    }
+    return false;
+  }
+
+  agregarGradoGestion() {
+    this.homologacionExtranjero.grados_gestiones.push({ grado: '', gestion: '' });
+  }
+
+  eliminarGradoGestion(index: number) {
+    this.homologacionExtranjero.grados_gestiones.splice(index, 1);
   }
 }

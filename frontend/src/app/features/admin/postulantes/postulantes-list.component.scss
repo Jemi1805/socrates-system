@@ -368,7 +368,7 @@ $transition: all 0.3s ease;
 }
 
 // Estilos para datos biográficos
-.biographical-card {
+.biographical-card, .bachiller-card {
   background: #ffffffd2;
   border-radius: $border-radius;
   box-shadow: $shadow;
@@ -429,15 +429,15 @@ $transition: all 0.3s ease;
     
     .bio-label {
       font-weight: 500;
-      color: $text-light;
+      color: $text-dark-blue;
       display: block;
-      font-size: 0.85rem;
+      font-weight: 500;
+      font-size: 1.1rem;
       margin-bottom: 0.25rem;
     }
     
     .bio-value {
       color: $text-dark-blue;
-      font-weight: 500;
       font-size: 1rem;
     }
   }

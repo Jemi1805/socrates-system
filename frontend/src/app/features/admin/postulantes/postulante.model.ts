@@ -12,4 +12,5 @@ export interface Postulante {
   reg_con_c: string;
   gestion_fin: string;
   incrip_uni: boolean;
+  nro_serie_titulo: string;
 }
