@@ -222,28 +222,6 @@ $transition: all 0.3s ease;
       }
     }
   }
-  
-  &.btn-edit {
-    background: $secondary-color;
-    color: white;
-    padding: 8px 12px;
-    font-size: 0.9rem;
-    
-    &:hover {
-      background: color.adjust($secondary-color, $lightness: -10%);
-    }
-  }
-  
-  &.btn-delete {
-    background: $danger-color;
-    color: white;
-    padding: 8px 12px;
-    font-size: 0.9rem;
-    
-    &:hover {
-      background: color.adjust($danger-color, $lightness: -10%);
-    }
-  }
 }
 
 // Iconos de Bootstrap
@@ -253,6 +231,13 @@ $transition: all 0.3s ease;
     vertical-align: -0.125em;
     -webkit-font-smoothing: antialiased;
     color: #4C9DBD;   
+}
+
+// Bachillerato
+.bachiller-card {
+  input, label {
+    color: $text-dark-blue;
+  }
 }
 
 // Tabla
@@ -326,46 +311,6 @@ $transition: all 0.3s ease;
   }
 }
 
-// Responsive
-@media (max-width: 768px) {
-  .header {
-    .main-title {
-      font-size: 2rem;
-    }
-    
-    .section-title {
-      font-size: 1.3rem;
-    }
-  }
-  
-  .form-card, .table-card {
-    padding: 20px;
-  }
-  
-  .data-table {
-    font-size: 0.9rem;
-    
-    thead th, tbody td {
-      padding: 10px 8px;
-    }
-  }
-}
-
-// Animaciones
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.form-card, .table-card, .biographical-card, .modalidad-card, .docs-card {
-  animation: fadeIn 0.5s ease-out;
-}
 
 // Estilos para datos biográficos
 .biographical-card, .bachiller-card {
@@ -449,26 +394,6 @@ $transition: all 0.3s ease;
   pointer-events: none;
 }
 
-// Mensajes de estado
-.status-message {
-  padding: 12px 16px;
-  border-radius: $border-radius;
-  margin: 15px 0;
-  font-weight: 500;
-  
-  &.success {
-    background: rgba(76, 175, 80, 0.1);
-    color: $success-color;
-    border: 1px solid rgba(76, 175, 80, 0.3);
-  }
-  
-  &.error {
-    background: rgba(244, 67, 54, 0.1);
-    color: $danger-color;
-    border: 1px solid rgba(244, 67, 54, 0.3);
-  }
-}
-
 // Contenedor de modalidad y documentos
 .modalidad-docs-container {
   display: grid;
@@ -505,7 +430,7 @@ $transition: all 0.3s ease;
   }
   
   .modalidad-text {
-    color: $text-light;
+    color: $text-dark-blue;
     margin-bottom: 0.5rem;
   }
   
@@ -544,169 +469,6 @@ $transition: all 0.3s ease;
       small {
         color: $text-light;
       }
-    }
-  }
-}
-
-// Tarjeta de documentos
-.docs-card {
-  background: #ffffffd2;
-  border-radius: $border-radius;
-  box-shadow: $shadow;
-  backdrop-filter: blur(10px);
-  padding: 1rem;
-  
-  .card-title {
-    color: $text-dark-blue;
-    margin: 0 0 1.2rem 0;
-    font-size: 1.3rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    border-bottom: 2px solid $primary-color;
-    padding-bottom: 0.5rem;
-  }
-  
-  .docs-content {
-    padding: 0.5rem 0;
-  }
-  
-  .doc-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-  
-  .doc-item {
-    border: 1px solid $border-color;
-    border-radius: $border-radius;
-    background: white;
-    transition: $transition;
-    
-    &.disabled {
-      opacity: 0.6;
-    }
-    
-    .doc-header {
-      padding: 0.75rem 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid $border-color;
-      background: $light-gray;
-      
-      .doc-title-container {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-      }
-      
-      .doc-checkbox {
-        margin: 0;
-      }
-      
-      .doc-title {
-        font-weight: 500;
-        color: $text-dark-blue;
-      }
-      
-      .doc-status {
-        font-size: 1.1rem;
-        
-        &.uploaded {
-          color: $success-color;
-        }
-        
-        &.error {
-          color: $danger-color;
-        }
-      }
-    }
-    
-    .doc-content {
-      padding: 1rem;
-      
-      .doc-file-selector {
-        .file-input {
-          display: none;
-        }
-        
-        .file-label {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.5rem 1rem;
-          background: $light-gray;
-          color: $text-dark-blue;
-          border-radius: $border-radius;
-          cursor: pointer;
-          transition: $transition;
-          
-          &:hover {
-            background: darken($light-gray, 5%);
-          }
-        }
-        
-        .selected-file, .uploaded-file {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 0.5rem;
-          background: $light-gray;
-          border-radius: $border-radius;
-          margin-top: 0.5rem;
-          
-          .file-name {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            max-width: 70%;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-        }
-        
-        .uploaded-file {
-          background: rgba($success-color, 0.1);
-          border: 1px solid rgba($success-color, 0.3);
-        }
-        
-        .error-message {
-          color: $danger-color;
-          margin: 0.5rem 0 0;
-          font-size: 0.9rem;
-        }
-      }
-    }
-  }
-  
-  .docs-summary {
-    padding: 0.75rem 0;
-    border-top: 1px solid $border-color;
-    margin-top: 1rem;
-    
-    .status-text {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-weight: 500;
-    }
-  }
-  
-  .no-modalidad-message {
-    padding: 1.5rem;
-    text-align: center;
-    background: $light-gray;
-    border-radius: $border-radius;
-    
-    p {
-      color: $text-light;
-      margin-bottom: 1rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
     }
   }
 }
@@ -770,6 +532,10 @@ $transition: all 0.3s ease;
       
       &:hover {
         background: rgba(255, 255, 255, 0.2);
+      }
+
+      .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+        color: white !important;
       }
     }
   }
@@ -836,6 +602,47 @@ $transition: all 0.3s ease;
       }
     }
   }
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .header {
+    .main-title {
+      font-size: 2rem;
+    }
+    
+    .section-title {
+      font-size: 1.3rem;
+    }
+  }
+  
+  .form-card, .table-card {
+    padding: 20px;
+  }
+  
+  .data-table {
+    font-size: 0.9rem;
+    
+    thead th, tbody td {
+      padding: 10px 8px;
+    }
+  }
+}
+
+// Animaciones
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form-card, .table-card, .biographical-card, .modalidad-card, .docs-card {
+  animation: fadeIn 0.5s ease-out;
 }
 
 // Animación de carga
