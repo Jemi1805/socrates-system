@@ -17,8 +17,7 @@ interface Estudiante {
   fecha_nacimiento: string;
   lugar_nacimiento: string;
   ci: string;
-  procedencia: string;
-  expedido?: string;
+  procedencia?: string;
   nro_serie_titulo?: string;
   reg_ini_c?: string;
   gestion_ini?: string;
@@ -193,9 +192,14 @@ export class PostulantesListComponent implements OnInit {
         this.postulanteActual = {
           cod_ceta: parseInt(this.estudiante.cod_ceta),
           nombres_est: this.estudiante.nombres,
-          apellidos_est: `${this.estudiante.ap_pat} ${this.estudiante.ap_mat}`,
-          ci_completo: `${this.estudiante.ci} ${this.estudiante.procedencia}`,
+          ap_pat: this.estudiante.ap_pat,
+          ap_mat: this.estudiante.ap_mat,
+          ci: this.estudiante.ci,
+          procedencia: this.estudiante.procedencia,
+          fecha_nacimiento: this.estudiante.fecha_nacimiento,
+          lugar_nacimiento: this.estudiante.lugar_nacimiento,
           carrera: this.estudiante.carrera,
+          pensum: this.estudiante.pensum,
           nro_serie_titulo: this.estudiante.nro_serie_titulo || '',
         };
       }

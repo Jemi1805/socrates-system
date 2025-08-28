@@ -25,15 +25,15 @@
         <div class="bio-row">
           <div class="bio-item">
             <span class="bio-label">Carrera:</span>
-            <span class="bio-value">{{estudiante.carrera}}</span>
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.carrera" name="carrera" placeholder="Ingrese carrera" required />
           </div>
           <div class="bio-item">
             <span class="bio-label">Pensum:</span>
-            <span class="bio-value">{{estudiante.pensum || 'N/A'}}</span>
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.pensum" name="pensum" placeholder="Ingrese pensum" required />
           </div>
           <div class="bio-item">
-            <span class="bio-label">Código:</span>
-            <span class="bio-value">{{estudiante.cod_ceta}}</span>
+            <span class="bio-label">Código CETA:</span>
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.cod_ceta" name="cod_ceta" placeholder="Ingrese Código CETA" required />
           </div>
           <!-- <div class="bio-item">
             <span class="bio-label">Registro:</span>
@@ -44,41 +44,34 @@
         <div class="bio-row">
           <div class="bio-item">
             <span class="bio-label">Nombres:</span>
-            <span class="bio-value">{{estudiante.nombres}}</span>
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.nombres_est" name="nombres" placeholder="Ingrese Nombres" required />
           </div>
           <div class="bio-item">
             <span class="bio-label">Apellido Paterno:</span>
-            <span class="bio-value">{{estudiante.ap_pat}}</span>
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_pat" name="ap_pat" placeholder="Ingrese Apellido Paterno" required />
           </div>
           <div class="bio-item">
             <span class="bio-label">Apellido Materno:</span>
-            <span class="bio-value">{{estudiante.ap_mat}}</span>
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_mat" name="ap_mat" placeholder="Ingrese Apellido Materno" required />
           </div>
         </div>
         
         <div class="bio-row">
           <div class="bio-item">
             <span class="bio-label">Fecha de Nacimiento:</span>
-            <span class="bio-value">{{estudiante.fecha_nacimiento || 'N/A'}}</span>
+            <input type="date" class="form-control" [(ngModel)]="postulanteActual.fecha_nacimiento" name="fecha_nacimiento" placeholder="Ingrese Fecha de Nacimiento" required />
           </div>
           <div class="bio-item">
             <span class="bio-label">Lugar de Nacimiento:</span>
-            <span class="bio-value">{{estudiante.lugar_nacimiento || 'N/A'}}</span>
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.lugar_nacimiento" name="lugar_nacimiento" placeholder="Ingrese Fecha de Nacimiento" required />
           </div>
-          <div class="bio-item">
-          </div>
-        </div>
-
-        <div class="bio-row">
           <div class="bio-item">
             <span class="bio-label">CI:</span>
-            <span class="bio-value">{{estudiante.ci}}</span>
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ci" name="ci" placeholder="Ingrese Documento de Identidad" required />
           </div>
           <div class="bio-item">
             <span class="bio-label">Procedencia:</span>
-            <span class="bio-value">{{estudiante.procedencia || 'N/A'}}</span>
-          </div>
-          <div class="bio-item">
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.procedencia" name="procedencia" placeholder="Ingrese Procedencia" required />
           </div>
         </div>
       </div>
@@ -139,7 +132,7 @@
         <!-- Formulario: Bachiller Extranjero -->
         <div class="mt-3" *ngIf="tipoBachiller === 'extranjero'">
           <div class="row g-3">
-            <div class="col-md-4">
+            <div class="col-md-3">
               <label class="form-label">Nro. Resolución Administrativa</label>
               <input type="text" class="form-control" [(ngModel)]="homologacionExtranjero.nro_resolucion" placeholder="Ej. RES-2023-001" />
             </div>
@@ -152,10 +145,10 @@
             <label class="form-label">Grados y Gestiones homologadas</label>
             <div class="d-flex flex-column gap-2">
               <div class="row g-2 align-items-end" *ngFor="let gg of homologacionExtranjero.grados_gestiones; let i = index">
-                <div class="col-md-5">
+                <div class="col-md-3">
                   <input type="text" class="form-control" [(ngModel)]="gg.grado" placeholder="Grado (p. ej., 1ro, 2do)" />
                 </div>
-                <div class="col-md-5">
+                <div class="col-md-3">
                   <input type="text" class="form-control" [(ngModel)]="gg.gestion" placeholder="Gestión (p. ej., 2018)" />
                 </div>
                 <div class="col-md-2">
@@ -257,10 +250,10 @@
             <label class="form-label">Grados y gestiones cursadas</label>
             <div class="d-flex flex-column gap-2">
               <div class="row g-2 align-items-end" *ngFor="let gg of traspasoData.grados_gestiones; let i = index">
-                <div class="col-md-5">
+                <div class="col-md-3">
                   <input type="text" class="form-control" [(ngModel)]="gg.grado" placeholder="Grado (p. ej., 1ro, 2do)" />
                 </div>
-                <div class="col-md-5">
+                <div class="col-md-3">
                   <input type="text" class="form-control" [(ngModel)]="gg.gestion" placeholder="Gestión (p. ej., 2018)" />
                 </div>
                 <div class="col-md-2">
@@ -295,10 +288,10 @@
             <label class="form-label">Grados y gestiones cursadas</label>
             <div class="d-flex flex-column gap-2">
               <div class="row g-2 align-items-end" *ngFor="let gg of homoCambioPlanData.grados_gestiones; let i = index">
-                <div class="col-md-5">
+                <div class="col-md-3">
                   <input type="text" class="form-control" [(ngModel)]="gg.grado" placeholder="Grado (p. ej., 1ro, 2do)" />
                 </div>
-                <div class="col-md-5">
+                <div class="col-md-3">
                   <input type="text" class="form-control" [(ngModel)]="gg.gestion" placeholder="Gestión (p. ej., 2018)" />
                 </div>
                 <div class="col-md-2">

@@ -132,7 +132,7 @@ $transition: all 0.3s ease;
       color: $text-dark-blue;
       font-weight: 500;
       font-size: 0.9rem;
-}
+    }
 
     .form-input {
       width: 100%;
@@ -233,12 +233,12 @@ $transition: all 0.3s ease;
     color: #4C9DBD;   
 }
 
+input {
+  color:$text-dark-blue;
+}
+
 // Bachillerato
 .bachiller-card {
-  input, label {
-    color: $text-dark-blue;
-  }
-
   .mt-3 > .btn-outline-secondary {
     margin-top: 0.5rem;
   }
@@ -380,8 +380,7 @@ $transition: all 0.3s ease;
       font-weight: 500;
       color: $text-dark-blue;
       display: block;
-      font-weight: 500;
-      font-size: 1.1rem;
+      font-size: 1rem;
       margin-bottom: 0.25rem;
     }
     
@@ -389,6 +388,15 @@ $transition: all 0.3s ease;
       color: $text-dark-blue;
       font-size: 1rem;
     }
+  }
+
+  .form-label {
+    color:$text-dark-blue;
+    font-weight: 500;
+  }
+
+  .form-check-label, .form-check-input, .form-select {
+    color:$text-dark-blue;
   }
 }
 
