@@ -72,7 +72,7 @@ export class PostulantesListComponent implements OnInit {
   modalVisible = false;
   showBiographicalData = true;
   showBachilleratoData = true;
-  
+
   // Aranceles
   aranceles: Arancel[] = [];
   arancelesGraduacion: Arancel[] = [];
@@ -149,21 +149,21 @@ export class PostulantesListComponent implements OnInit {
     grados_gestiones: []
   };
 
-  // Gestión de documentos
-  documentTypes: {
-    id: string;
-    name: string;
-    enabled: boolean;
-    file: File | null;
-    uploaded: boolean;
-    uploading: boolean;
-    error?: string;
-  }[] = [
-    { id: 'resolucion', name: 'Resolución', enabled: false, file: null, uploaded: false, uploading: false },
-    { id: 'homologacion', name: 'Homologación', enabled: false, file: null, uploaded: false, uploading: false },
-    { id: 'practicas', name: 'Prácticas Industriales', enabled: false, file: null, uploaded: false, uploading: false },
-    { id: 'certificado', name: 'Certificado de Calificaciones', enabled: false, file: null, uploaded: false, uploading: false }
-  ];
+  datosInicioCarrera: {
+    reg_ini_c: string;
+    gestion_ini: string;
+  } = {
+    reg_ini_c: '',
+    gestion_ini: ''
+  };
+
+  datosConclusionCarrera: {
+    reg_con_c: string;
+    gestion_fin: string;
+  } = {
+    reg_con_c: '',
+    gestion_fin: ''
+  };
 
   constructor(private postulanteService: PostulanteService) {
     // Inicializar modalidades para prueba
@@ -230,59 +230,6 @@ export class PostulantesListComponent implements OnInit {
     }
   }
 
-  editar(postulante: Postulante) {
-    this.postulanteActual = { ...postulante };
-    
-    // Cargar documentos existentes y modalidad del postulante
-    this.cargarDocumentosPostulante(postulante.cod_ceta);
-    this.cargarModalidadPostulante(postulante.cod_ceta);
-  }
-  
-  cargarDocumentosPostulante(postulanteId: number) {
-    // Resetear estado de documentos
-    this.documentTypes.forEach(doc => {
-      doc.uploaded = false;
-      doc.uploading = false;
-      doc.file = null;
-      doc.error = undefined;
-    });
-    
-    this.postulanteService.getDocumentosByPostulante(postulanteId).subscribe({
-      next: (documentos: DocumentoPostulante[]) => {
-        // Marcar documentos existentes como cargados
-        documentos.forEach(documento => {
-          const docType = this.documentTypes.find(dt => dt.id === documento.tipo_documento);
-          if (docType) {
-            docType.uploaded = true;
-          }
-        });
-      },
-      error: (err) => {
-        console.error('Error al cargar documentos del postulante:', err);
-      }
-    });
-  }
-  
-  cargarModalidadPostulante(postulanteId: number) {
-    this.postulanteService.getModalidadPostulante(postulanteId).subscribe({
-      next: (modalidadPostulante: ModalidadPostulante) => {
-        if (modalidadPostulante && modalidadPostulante.modalidad_id) {
-          // Buscar la modalidad en la lista de modalidades
-          const modalidadEncontrada = this.modalidades.find(m => m.id === modalidadPostulante.modalidad_id);
-          if (modalidadEncontrada) {
-            this.modalidad = modalidadEncontrada;
-            this.actualizarDocumentosRequeridos(modalidadEncontrada.id);
-          }
-        }
-      },
-      error: (err) => {
-        console.error('Error al cargar modalidad del postulante:', err);
-        // Si no tiene modalidad asignada, dejar como null
-        this.modalidad = null;
-      }
-    });
-  }
-
   eliminar(id: number) {
     if (confirm('¿Seguro que deseas eliminar este postulante?')) {
       this.postulanteService.delete(id).subscribe(() => this.cargarPostulantes());
@@ -294,15 +241,6 @@ export class PostulantesListComponent implements OnInit {
     
     // Resetear estado de modalidad
     this.modalidad = null;
-    
-    // Resetear estado de documentos
-    this.documentTypes.forEach(doc => {
-      doc.uploaded = false;
-      doc.uploading = false;
-      doc.enabled = false;
-      doc.file = null;
-      doc.error = undefined;
-    });
   }
   
   // Métodos para gestión de modalidades
@@ -318,9 +256,6 @@ export class PostulantesListComponent implements OnInit {
     this.modalidad = modalidad;
     this.ocultarModal();
     
-    // Actualizar documentos requeridos según modalidad
-    this.actualizarDocumentosRequeridos(modalidad.id);
-    
     // Si hay un postulante seleccionado, actualizar la modalidad en el backend
     if (this.postulanteActual.cod_ceta) {
       this.postulanteService.asignarModalidad(this.postulanteActual.cod_ceta, modalidad.id).subscribe({
@@ -334,147 +269,10 @@ export class PostulantesListComponent implements OnInit {
       });
     }
   }
-  
-  actualizarDocumentosRequeridos(modalidadId: number) {
-    // Por defecto, desactivar todos
-    this.documentTypes.forEach(doc => doc.enabled = false);
-    
-    // Habilitar según modalidad seleccionada
-    switch(modalidadId) {
-      case 1: // Proyecto de Grado
-        this.documentTypes.find(doc => doc.id === 'resolucion')!.enabled = true;
-        this.documentTypes.find(doc => doc.id === 'certificado')!.enabled = true;
-        break;
-      case 2: // Excelencia Académica
-        this.documentTypes.find(doc => doc.id === 'certificado')!.enabled = true;
-        break;
-      case 3: // Prácticas Industriales
-        this.documentTypes.find(doc => doc.id === 'practicas')!.enabled = true;
-        this.documentTypes.find(doc => doc.id === 'certificado')!.enabled = true;
-        break;
-      case 4: // Trabajo Dirigido
-        this.documentTypes.find(doc => doc.id === 'homologacion')!.enabled = true;
-        this.documentTypes.find(doc => doc.id === 'certificado')!.enabled = true;
-        break;
-    }
-  }
+
   
   getModalidadNombre(): string {
     return this.modalidad ? this.modalidad.nombre : 'Seleccionar modalidad';
-  }
-  
-  // Métodos para gestión de documentos
-  onFileSelected(event: Event, documentTypeId: string) {
-    const target = event.target as HTMLInputElement;
-    if (target.files && target.files.length > 0) {
-      const file = target.files[0];
-      const docTypeObj = this.documentTypes.find(doc => doc.id === documentTypeId)!;
-      
-      // Validar tipo de archivo (solo PDF)
-      if (file.type !== 'application/pdf') {
-        docTypeObj.error = 'Solo se permiten archivos PDF';
-        docTypeObj.file = null;
-        return;
-      }
-      
-      // Validar tamaño (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        docTypeObj.error = 'El archivo no debe exceder 5MB';
-        docTypeObj.file = null;
-        return;
-      }
-      
-      // Asignar archivo
-      docTypeObj.file = file;
-      docTypeObj.error = undefined;
-    }
-  }
-  
-  uploadDocument(documentType: string) {
-    if (!this.documentTypes.find(doc => doc.id === documentType)?.file || !this.postulanteActual.cod_ceta) {
-      return;
-    }
-
-    const file = this.documentTypes.find(doc => doc.id === documentType)?.file;
-    const docTypeObj = this.documentTypes.find(doc => doc.id === documentType)!;
-    docTypeObj.uploading = true;
-
-    this.postulanteService.uploadDocumento(this.postulanteActual.cod_ceta, documentType, file!)
-      .subscribe({
-        next: (event: any) => {
-          if (event.type === HttpEventType.UploadProgress) {
-            // Opcional: Mostrar progreso de carga
-            const percentDone = Math.round(100 * event.loaded / event.total);
-            console.log(`Progreso: ${percentDone}%`);
-          } else if (event instanceof HttpResponse) {
-            docTypeObj.uploaded = true;
-            docTypeObj.uploading = false;
-            // Después de cargar, ya no necesitamos mantener el archivo en memoria
-            docTypeObj.file = null;
-          }
-        },
-        error: (err) => {
-          docTypeObj.uploading = false;
-          docTypeObj.error = 'Error al cargar el documento';
-          console.error(`Error al cargar documento ${documentType}:`, err);
-        }
-      });
-  }
-  
-  removeDocument(documentTypeId: string) {
-    const docTypeObj = this.documentTypes.find(doc => doc.id === documentTypeId)!;
-    docTypeObj.file = null;
-    docTypeObj.uploaded = false;
-    docTypeObj.error = undefined;
-    
-    if (this.postulanteActual.cod_ceta) {
-      this.postulanteService.deleteDocumento(this.postulanteActual.cod_ceta, documentTypeId).subscribe({
-        next: () => {
-          console.log(`Documento ${documentTypeId} eliminado correctamente`);
-        },
-        error: (err) => {
-          console.error(`Error al eliminar documento ${documentTypeId}:`, err);
-          // Opcionalmente mostrar mensaje de error
-        }
-      });
-    }
-  }
-  
-  toggleDocumentType(documentTypeId: string) {
-    const docTypeObj = this.documentTypes.find(doc => doc.id === documentTypeId)!;
-    docTypeObj.enabled = !docTypeObj.enabled;
-    
-    // Si hay un postulante seleccionado, actualizar en el backend
-    if (this.postulanteActual.cod_ceta) {
-      this.postulanteService.updateDocumentoRequerido(
-        this.postulanteActual.cod_ceta, 
-        documentTypeId, 
-        docTypeObj.enabled
-      ).subscribe({
-        next: () => {
-          console.log(`Documento ${documentTypeId} actualizado: ${docTypeObj.enabled ? 'requerido' : 'no requerido'}`);
-        },
-        error: (err) => {
-          // Revertir cambio si hay error
-          docTypeObj.enabled = !docTypeObj.enabled;
-          console.error('Error al actualizar estado de documento:', err);
-        }
-      });
-    }
-    
-    // Limpiar archivo si se deshabilita el documento
-    if (!docTypeObj.enabled) {
-      docTypeObj.file = null;
-      docTypeObj.uploaded = false;
-    }
-  }
-  
-  todosDocumentosValidos(): boolean {
-    // Verificar si todos los documentos habilitados están cargados
-    const documentosRequeridos = this.documentTypes.filter(doc => doc.enabled);
-    if (documentosRequeridos.length === 0) return false;
-    
-    return documentosRequeridos.every(doc => doc.uploaded);
   }
   
   toggleBiographicalData() {
@@ -484,7 +282,7 @@ export class PostulantesListComponent implements OnInit {
   toggleBachilleratoData() {
     this.showBachilleratoData = !this.showBachilleratoData;
   }
-  
+
   // --- Bachillerato: lógica de UI ---
   onTipoBachillerChange(tipo: 'nacional' | 'extranjero') {
     this.tipoBachiller = tipo;

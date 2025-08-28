@@ -82,7 +82,7 @@
       <div class="bio-header">
         <h3>
           <i class="bi bi-journal-check me-2"></i>
-          Bachillerato
+          Datos del Bachillerato
         </h3>
         <button class="btn btn-sm" (click)="toggleBachilleratoData()">
           <i class="bi" [ngClass]="showBachilleratoData ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
@@ -312,6 +312,51 @@
       </div>
     </div>
 
+    <!-- Datos de Inicio y Conclusión de Carrera -->
+    <div class="datos-carrera-container">
+      <!-- Selección de modalidad -->
+      <div class="inicio-card">
+        <h3 class="card-title">
+          <i class="bi bi-mortarboard me-2"></i>
+          Datos de Inicio de Carrera
+        </h3>
+        <div class="row g-3">
+          <div class="col-md-7">
+            <label class="form-label">Tipo de Regimen</label>
+            <select class="form-select" [(ngModel)]="tipoBachiller" (ngModelChange)="onTipoBachillerChange($event)">
+              <option [ngValue]="null" disabled>Seleccione tipo de Regimen</option>
+              <option [ngValue]="'semestral'">Semestral</option>
+              <option [ngValue]="'anual'">Anual</option>
+            </select>
+          </div>
+          <div class="col-md-5">
+              <label class="form-label">Gestión de Inicio</label>
+              <input type="text" class="form-control" [(ngModel)]="datosInicioCarrera.gestion_ini" placeholder="Ej. 1/2012" />
+            </div>
+        </div>
+      </div>
+      <div class="inicio-card">
+        <h3 class="card-title">
+          <i class="bi bi-mortarboard me-2"></i>
+          Datos de Conclusión de Carrera
+        </h3>
+        <div class="row g-3">
+          <div class="col-md-7">
+            <label class="form-label">Tipo de Regimen</label>
+            <select class="form-select" [(ngModel)]="tipoBachiller" (ngModelChange)="onTipoBachillerChange($event)">
+              <option [ngValue]="null" disabled>Seleccione tipo de Regimen</option>
+              <option [ngValue]="'semestral'">Semestral</option>
+              <option [ngValue]="'anual'">Anual</option>
+            </select>
+          </div>
+          <div class="col-md-5">
+              <label class="form-label">Gestión de Conclusión</label>
+              <input type="text" class="form-control" [(ngModel)]="datosConclusionCarrera.gestion_fin" placeholder="Ej. 1/2012" />
+            </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Sección de Modalidad y Documentos -->
     <div class="modalidad-docs-container">
       <!-- Selección de modalidad -->
@@ -322,7 +367,7 @@
         </h3>
         
         <div class="modalidad-content">
-          <p class="modalidad-text">Modalidad actual:</p>
+          <p class="form-label">Modalidad actual:</p>
           <div class="modalidad-selected">
             <span *ngIf="!modalidad" class="no-selected">Ninguna modalidad seleccionada</span>
             <div *ngIf="modalidad" class="selected-info">
@@ -341,77 +386,6 @@
           </button>
         </div>
       </div>
-      
-      <!-- Carga de documentos -->
-      <!-- <div class="docs-card">
-        <h3 class="card-title">
-          <i class="bi bi-file-earmark-pdf me-2"></i>
-          Documentos Requeridos
-        </h3>
-        
-        <div class="docs-content" *ngIf="modalidad; else selectModalidadFirst">
-          <div class="doc-list">
-            <div *ngFor="let doc of documentTypes" class="doc-item" [class.disabled]="!doc.enabled">
-              <div class="doc-header">
-                <div class="doc-info">
-                  <input type="checkbox" [checked]="doc.enabled" (change)="toggleDocumentType(doc.id)" class="doc-checkbox">
-                  <span class="doc-title">{{doc.name}}</span>
-                </div>
-                <span class="doc-status" [ngClass]="{'uploaded': doc.uploaded, 'error': doc.error}">
-                  <i class="bi" [ngClass]="{
-                    'bi-check-circle-fill text-success': doc.uploaded,
-                    'bi-x-circle-fill text-danger': doc.error,
-                    'bi-circle text-muted': !doc.uploaded && !doc.error
-                  }"></i>
-                </span>
-              </div>
-              
-              <div class="doc-content" *ngIf="doc.enabled">
-                <div class="doc-file-selector">
-                  <input type="file" 
-                    [id]="'file-' + doc.id"
-                    (change)="onFileSelected($event, doc.id)"
-                    accept=".pdf"
-                    class="file-input"
-                    [disabled]="doc.uploading || doc.uploaded">
-                  
-                  <label [for]="'file-' + doc.id" class="file-label" *ngIf="!doc.file && !doc.uploaded">
-                    <i class="bi bi-upload me-1"></i>
-                    Seleccionar archivo PDF
-                  </label>
-                  
-                  <div class="selected-file" *ngIf="doc.file && !doc.uploaded">
-                    <span class="file-name">{{doc.file.name}}</span>
-                    <button class="btn btn-sm btn-outline-primary" (click)="uploadDocument(doc.id)" [disabled]="doc.uploading">
-                      <i class="bi" [ngClass]="doc.uploading ? 'bi-arrow-repeat spin' : 'bi-cloud-upload'"></i>
-                      {{doc.uploading ? 'Subiendo...' : 'Subir'}}
-                    </button>
-                  </div>
-                  
-                  <div class="uploaded-file" *ngIf="doc.uploaded">
-                    <span class="file-name">
-                      <i class="bi bi-file-earmark-pdf me-1"></i>
-                      {{doc.file ? doc.file.name : 'Documento cargado'}}
-                    </span>
-                    <button class="btn btn-sm btn-outline-danger" (click)="removeDocument(doc.id)">
-                      <i class="bi bi-trash"></i>
-                      Eliminar
-                    </button>
-                  </div>
-                  
-                  <p class="error-message" *ngIf="doc.error">{{doc.error}}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div class="docs-summary mt-3">
-            <span class="status-text" [ngClass]="todosDocumentosValidos() ? 'text-success' : 'text-danger'">
-              <i class="bi" [ngClass]="todosDocumentosValidos() ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
-              {{todosDocumentosValidos() ? 'Todos los documentos requeridos han sido cargados' : 'Faltan documentos requeridos por cargar'}}
-            </span>
-          </div>
-        </div> -->
         
         <ng-template #selectModalidadFirst>
           <div class="no-modalidad-message">
@@ -423,7 +397,6 @@
           </div>
         </ng-template>
       </div>
-    </div>
   
   <!-- Modal de selección de modalidad -->
   <div class="modal-overlay" *ngIf="modalVisible">

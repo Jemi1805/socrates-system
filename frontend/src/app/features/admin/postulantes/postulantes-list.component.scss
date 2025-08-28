@@ -407,7 +407,7 @@ input {
 }
 
 // Contenedor de modalidad y documentos
-.modalidad-docs-container {
+.modalidad-docs-container, .datos-carrera-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
@@ -419,7 +419,7 @@ input {
 }
 
 // Tarjeta de modalidad
-.modalidad-card {
+.modalidad-card, .inicio-card {
   background: #ffffffd2;
   border-radius: $border-radius;
   box-shadow: $shadow;
@@ -482,6 +482,11 @@ input {
         color: $text-light;
       }
     }
+  }
+
+  .form-label {
+    color:$text-dark-blue;
+    font-weight: 500;
   }
 }
 
