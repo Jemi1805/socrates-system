@@ -159,7 +159,10 @@ class SocratesApiService
     {
         try {
             // Verificar que tenemos una URL configurada
-            $carrera = array_search($this->currentUrl, $this->baseUrls) ?: 'unknown';
+            $carrera = array_search($this->currentUrl, $this->baseUrls);
+            if ($carrera === false || $carrera === null) {
+                $carrera = 'unknown';
+            }
             Log::info('URL actual para buscar estudiante por código', [
                 'carrera' => $carrera,
                 'url' => $this->currentUrl
@@ -676,5 +679,382 @@ class SocratesApiService
             }
         }
         return null;
+    }
+
+    /**
+     * Obtener pagos de Material Extra por código CETA
+     * @param string $codCeta
+     * @param string|null $carrera
+     * @return array
+     */
+    public function getPagosMaterialExtra($codCeta, $carrera = null)
+    {
+        if ($carrera) {
+            $this->setCarrera($carrera);
+        }
+        return $this->buscarPagosMaterialExtraPorCodigo($codCeta);
+    }
+
+    /**
+     * Llama a los endpoints del SGA para obtener los pagos de Material Extra de un estudiante
+     * intentando múltiples rutas conocidas y parseando el HTML resultante.
+     * @param string $codigo
+     * @param string|null $gestion
+     * @return array
+     */
+    private function buscarPagosMaterialExtraPorCodigo($codigo)
+    {
+        try {
+            $carrera = array_search($this->currentUrl, $this->baseUrls);
+            if ($carrera === false || $carrera === null) {
+                $carrera = 'unknown';
+            }
+            Log::info('Buscando Pagos de Material Extra', [
+                'carrera' => $carrera,
+                'url' => $this->currentUrl,
+                'codigo' => $codigo,
+            ]);
+            
+            $params = [
+                'cod_ceta' => $codigo,
+                'codigo' => $codigo,
+                'cod_estudiante' => $codigo,
+                'estudiante' => $codigo
+            ];
+            
+            // Posibles endpoints en el SGA (se probarán en orden)
+            // 1) Soporte .env con placeholder {cod_ceta}
+            $envEndpoint = env('SGA_MATERIAL_EXTRA_ENDPOINT'); // ej: 'index.php/titulacion/serviciostitulacion/material_extra/{cod_ceta}'
+            
+            // 2) Rutas correctas según CodeIgniter RestServer (GET con segmento)
+            $candidateEndpoints = array_filter([
+                $envEndpoint,
+                'index.php/titulacion/serviciostitulacion/material_extra/{cod_ceta}',
+                'titulacion/serviciostitulacion/material_extra/{cod_ceta}', // si hay rewrite
+                // Fallbacks legacy:
+                'index.php/titulacion/serviciostitulacion/material_extra',
+                'titulacion/serviciostitulacion/material_extra',
+                'index.php/titulacion/serviciostitulacion/material_extra_get',
+                'titulacion/serviciostitulacion/material_extra_get',
+                'index.php/main/material_extra_get',
+                'main/material_extra_get',
+            ]);
+            
+            foreach ($candidateEndpoints as $endpoint) {
+                // 1) Si el endpoint trae placeholder {cod_ceta} -> GET directo
+                if (strpos($endpoint, '{cod_ceta}') !== false) {
+                    $requestUrl = $this->currentUrl . str_replace('{cod_ceta}', urlencode($codigo), $endpoint);
+                    Log::info('Intentando endpoint Material Extra (GET con placeholder)', [
+                        'url' => $requestUrl
+                    ]);
+
+                    $ch = curl_init($requestUrl);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+                    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                        'Accept: text/html,application/xhtml+xml'
+                    ]);
+                    curl_setopt($ch, CURLOPT_ENCODING, '');
+                    $rawResponse = curl_exec($ch);
+                    $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    $error = curl_error($ch);
+                    curl_close($ch);
+
+                    $bodyPreview = $rawResponse ? substr($rawResponse, 0, 500) : '';
+                    Log::debug('Respuesta raw Material Extra (cURL GET):', [
+                        'status' => $statusCode,
+                        'error' => $error,
+                        'body_preview' => $bodyPreview
+                    ]);
+
+                    if ($statusCode >= 200 && $statusCode < 300 && !empty($rawResponse)) {
+                        if (strpos($rawResponse, 'PHP Error') !== false || strpos($rawResponse, 'Fatal error') !== false) {
+                            Log::warning('SGA devolvió errores PHP en Material Extra (GET)', [
+                                'endpoint' => $endpoint,
+                                'codigo' => $codigo,
+                                'errors' => substr($rawResponse, 0, 1000)
+                            ]);
+                            continue;
+                        }
+
+                        $pagos = $this->parseMaterialExtraHtml($rawResponse);
+                        if (!empty($pagos)) {
+                            return [
+                                'success' => true,
+                                'data' => $pagos,
+                                'total' => count($pagos),
+                                'carrera' => $carrera,
+                                'codigo' => $codigo,
+                                'endpoint' => $endpoint,
+                                'method' => 'GET'
+                            ];
+                        }
+                    }
+                    // Si no funcionó, continuar con el siguiente endpoint
+                    continue;
+                }
+
+                // 2) Intento GET agregando el segmento /{cod_ceta}
+                $requestUrlGet = $this->currentUrl . rtrim($endpoint, '/') . '/' . urlencode($codigo);
+                if ($gestion !== null && $gestion !== '') {
+                    $requestUrlGet .= (strpos($requestUrlGet, '?') !== false ? '&' : '?') . 'gestion=' . urlencode($gestion);
+                }
+                Log::info('Intentando endpoint Material Extra (GET con segmento)', [
+                    'url' => $requestUrlGet
+                ]);
+
+                $ch = curl_init($requestUrlGet);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'Accept: text/html,application/xhtml+xml'
+                ]);
+                curl_setopt($ch, CURLOPT_ENCODING, '');
+                $rawResponse = curl_exec($ch);
+                $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $error = curl_error($ch);
+                curl_close($ch);
+
+                $bodyPreview = $rawResponse ? substr($rawResponse, 0, 500) : '';
+                Log::debug('Respuesta raw Material Extra (cURL GET):', [
+                    'status' => $statusCode,
+                    'error' => $error,
+                    'body_preview' => $bodyPreview
+                ]);
+
+                if ($statusCode >= 200 && $statusCode < 300 && !empty($rawResponse)) {
+                    if (strpos($rawResponse, 'PHP Error') !== false || strpos($rawResponse, 'Fatal error') !== false) {
+                        Log::warning('SGA devolvió errores PHP en Material Extra (GET con segmento)', [
+                            'endpoint' => $endpoint,
+                            'codigo' => $codigo,
+                            'errors' => substr($rawResponse, 0, 1000)
+                        ]);
+                    } else {
+                        $pagos = $this->parseMaterialExtraHtml($rawResponse);
+                        if (!empty($pagos)) {
+                            return [
+                                'success' => true,
+                                'data' => $pagos,
+                                'total' => count($pagos),
+                                'carrera' => $carrera,
+                                'codigo' => $codigo,
+                                'endpoint' => $endpoint,
+                                'method' => 'GET'
+                            ];
+                        }
+                    }
+                }
+
+                // 3) Fallback: intentar POST con form-data (algunos ambientes lo usan)
+                $requestUrlPost = $this->currentUrl . $endpoint;
+                Log::info('Intentando endpoint Material Extra (POST form-data)', [
+                    'url' => $requestUrlPost,
+                    'params' => $params
+                ]);
+
+                $ch = curl_init($requestUrlPost);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $params);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'Accept: text/html,application/xhtml+xml'
+                ]);
+                curl_setopt($ch, CURLOPT_ENCODING, '');
+                $rawResponse = curl_exec($ch);
+                $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $error = curl_error($ch);
+                curl_close($ch);
+
+                $bodyPreview = $rawResponse ? substr($rawResponse, 0, 500) : '';
+                Log::debug('Respuesta raw Material Extra (cURL POST):', [
+                    'status' => $statusCode,
+                    'error' => $error,
+                    'body_preview' => $bodyPreview
+                ]);
+
+                if ($statusCode >= 200 && $statusCode < 300 && !empty($rawResponse)) {
+                    if (strpos($rawResponse, 'PHP Error') !== false || strpos($rawResponse, 'Fatal error') !== false) {
+                        Log::warning('SGA devolvió errores PHP en Material Extra (POST)', [
+                            'endpoint' => $endpoint,
+                            'codigo' => $codigo,
+                            'errors' => substr($rawResponse, 0, 1000)
+                        ]);
+                        continue;
+                    }
+                    $pagos = $this->parseMaterialExtraHtml($rawResponse);
+                    if (!empty($pagos)) {
+                        return [
+                            'success' => true,
+                            'data' => $pagos,
+                            'total' => count($pagos),
+                            'carrera' => $carrera,
+                            'codigo' => $codigo,
+                            'endpoint' => $endpoint,
+                            'method' => 'POST'
+                        ];
+                    }
+                }
+            }
+            
+            Log::warning('No se pudo obtener Material Extra del SGA', [
+                'codigo' => $codigo,
+                'url' => $this->currentUrl
+            ]);
+            
+            return [
+                'success' => false,
+                'message' => 'No se encontraron pagos de material extra o el endpoint no respondió.'
+            ];
+        } catch (\Exception $e) {
+            Log::error('Error en buscarPagosMaterialExtraPorCodigo', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTrace(),
+                'codigo' => $codigo
+            ]);
+            
+            return [
+                'success' => false,
+                'message' => 'Error de conexión: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Parsear el HTML del SGA para extraer pagos de Material Extra
+     * Retorna un array de elementos: concepto, monto, num_factura, num_comprobante, fecha, razon, nit
+     */
+    private function parseMaterialExtraHtml($html)
+    {
+        $pagos = [];
+        if (trim($html) === '') { return $pagos; }
+        
+        libxml_use_internal_errors(true);
+        $dom = new \DOMDocument();
+        $dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'), LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $xpath = new \DOMXPath($dom);
+        
+        // Intentar localizar una tabla específica por ID o por encabezados
+        $tableNodes = $xpath->query("//table[@id='dataTables-pagos_material_extra'] | //table");
+        
+        foreach ($tableNodes as $table) {
+            $rows = $xpath->query('.//tr', $table);
+            if ($rows->length < 2) { continue; }
+            
+            // Determinar si esta es la tabla objetivo por ID
+            $isTargetTable = false;
+            if ($table instanceof \DOMElement) {
+                $tableId = strtolower($table->getAttribute('id'));
+                $isTargetTable = ($tableId === 'datatables-pagos_material_extra' || $tableId === 'dataTables-pagos_material_extra');
+            }
+
+            // Encontrar la fila de encabezados REAL (con columnas como Concepto/Monto)
+            $headerRowIndex = -1;
+            $headers = [];
+            $headerRowsFound = [];
+            for ($r = 0; $r < $rows->length; $r++) {
+                $ths = $xpath->query('.//th', $rows->item($r));
+                if ($ths->length > 0) {
+                    $currentHeaders = [];
+                    foreach ($ths as $th) {
+                        $currentHeaders[] = trim($th->textContent);
+                    }
+                    $headerTextCandidate = strtolower(implode(' ', $currentHeaders));
+                    if (strpos($headerTextCandidate, 'concepto') !== false || strpos($headerTextCandidate, 'monto') !== false) {
+                        $headers = $currentHeaders;
+                        $headerRowIndex = $r;
+                        break;
+                    }
+                    $headerRowsFound[] = ['index' => $r, 'headers' => $currentHeaders];
+                }
+            }
+            if ($headerRowIndex === -1 && !empty($headerRowsFound)) {
+                // Fallback: usar la última fila con ths (típicamente la 2da fila del thead)
+                $last = end($headerRowsFound);
+                $headerRowIndex = $last['index'];
+                $headers = $last['headers'];
+            }
+
+            // Validación: tabla correcta si es la de ID conocido o si headers contienen columnas esperadas
+            $headerText = strtolower(implode(' ', $headers));
+            $looksLikeMaterialExtra = $isTargetTable || (strpos($headerText, 'concepto') !== false && strpos($headerText, 'monto') !== false);
+            if (!$looksLikeMaterialExtra && $headerRowIndex > 0) {
+                // Heurística adicional: filas previas con texto 'Material Extra'
+                for ($r = max(0, $headerRowIndex - 2); $r < $headerRowIndex; $r++) {
+                    $txt = strtolower(trim($rows->item($r)->textContent));
+                    if (strpos($txt, 'material extra') !== false) {
+                        $looksLikeMaterialExtra = true;
+                        break;
+                    }
+                }
+            }
+            if (!$looksLikeMaterialExtra) { continue; }
+            
+            $startRow = ($headerRowIndex > -1) ? $headerRowIndex + 1 : 1;
+            for ($i = $startRow; $i < $rows->length; $i++) {
+                $cells = $xpath->query('.//td', $rows->item($i));
+                if ($cells->length < 6) { continue; }
+                
+                // Mapeo por posición (ignorar la primera columna 'Nº' si existe en headers)
+                $hasNumero = false;
+                foreach ($headers as $h) {
+                    $hLower = strtolower($h);
+                    if (strpos($hLower, 'nº') !== false || strpos($hLower, 'n°') !== false || strpos($hLower, 'nro') !== false || $hLower === 'n' || $hLower === 'no') {
+                        $hasNumero = true; break;
+                    }
+                }
+                $offset = $hasNumero ? 1 : 0;
+                
+                // Evitar filas de totales u otras
+                $cell0 = $cells->item($offset + 0);
+                $cell1 = $cells->item($offset + 1);
+                $cell2 = $cells->item($offset + 2);
+                $cell3 = $cells->item($offset + 3);
+                $cell4 = $cells->item($offset + 4);
+                $cell5 = $cells->item($offset + 5);
+                $cell6 = $cells->item($offset + 6);
+                $gestion = trim($cell0 ? $cell0->textContent : '');
+                $fecha = trim($cell1 ? $cell1->textContent : '');
+                $concepto = trim($cell2 ? $cell2->textContent : '');
+                $monto = trim($cell3 ? $cell3->textContent : '');
+                $numFactura = trim($cell4 ? $cell4->textContent : '');
+                $numComprobante = trim($cell5 ? $cell5->textContent : '');
+                $razonNit = trim($cell6 ? $cell6->textContent : '');
+                
+                if ($concepto === '' && $monto === '' && $fecha === '') { continue; }
+                
+                $razon = '';
+                $nit = '';
+                if (strpos($razonNit, '/') !== false) {
+                    $parts = array_map('trim', explode('/', $razonNit, 2));
+                    $razon = isset($parts[0]) ? $parts[0] : '';
+                    $nit = isset($parts[1]) ? $parts[1] : '';
+                } else {
+                    // Si viene en una sola columna, intentar separar por espacios si parece NIT al final
+                    $razon = $razonNit;
+                }
+                
+                $pagos[] = [
+                    'gestion' => $gestion,
+                    'fecha' => $fecha,
+                    'concepto' => $concepto,
+                    'monto' => $monto,
+                    'num_factura' => $numFactura,
+                    'num_comprobante' => $numComprobante,
+                    'razon' => $razon,
+                    'nit' => $nit,
+                ];
+            }
+            
+            if (!empty($pagos)) { break; }
+        }
+        
+        return $pagos;
     }
 }

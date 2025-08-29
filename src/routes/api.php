@@ -115,6 +115,8 @@ Route::prefix('sga')->group(function () {
     Route::get('estudiantes', [SgaController::class, 'getEstudiantes']);
     Route::get('estudiantes/{codCeta}', [SgaController::class, 'getEstudianteByCodigo']);
     Route::post('buscar-estudiantes', [SgaController::class, 'buscarEstudiantes']);
+    // Pagos de Material Extra por estudiante
+    Route::get('estudiantes/{codCeta}/pagos/material-extra', [SgaController::class, 'getPagosMaterialExtra']);
     
     // Rutas de datos generales
     Route::get('carreras', [SgaController::class, 'getCarreras']);

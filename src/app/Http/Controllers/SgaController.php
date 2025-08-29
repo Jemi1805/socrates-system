@@ -24,10 +24,19 @@ class SgaController extends Controller
         $carrera = $request->get('carrera');
         $isConnected = $this->sgaService->checkConnection($carrera);
         
+        $message = 'Error de conexión al SGA';
+        if ($isConnected) {
+            $message = 'Conexión exitosa al SGA';
+        }
+        $carreraOut = 'default';
+        if (!empty($carrera)) {
+            $carreraOut = $carrera;
+        }
+        
         return response()->json([
             'success' => $isConnected,
-            'message' => $isConnected ? 'Conexión exitosa al SGA' : 'Error de conexión al SGA',
-            'carrera' => $carrera ?: 'default'
+            'message' => $message,
+            'carrera' => $carreraOut
         ]);
     }
     
@@ -110,10 +119,14 @@ class SgaController extends Controller
         $result = $this->sgaService->getEstudianteByCodigo($codCeta, $carrera);
 
         if ($result && !empty($result['data'])) {
+            $carreraOut = 'default';
+            if (!empty($carrera)) {
+                $carreraOut = $carrera;
+            }
             return response()->json([
                 'success' => true,
                 'data' => isset($result['data'][0]) ? $result['data'][0] : null,
-                'carrera' => $carrera ?: 'default'
+                'carrera' => $carreraOut
             ]);
         }
 
@@ -236,6 +249,55 @@ class SgaController extends Controller
             'success' => false,
             'message' => 'Error al obtener inscripciones'
         ], 500);
+    }
+
+    /**
+     * Obtener pagos de Material Extra de un estudiante por código CETA
+     */
+    public function getPagosMaterialExtra(Request $request, $codCeta)
+    {
+        $carrera = $request->get('carrera');
+        $gestion = $request->get('gestion');
+        $result = $this->sgaService->getPagosMaterialExtra($codCeta, $carrera, $gestion);
+
+        if ($result && isset($result['success']) && $result['success']) {
+            $data = array();
+            if (isset($result['data'])) {
+                $data = $result['data'];
+            }
+
+            $total = 0;
+            if (isset($result['total'])) {
+                $total = $result['total'];
+            } else {
+                if (isset($result['data'])) {
+                    $total = count($result['data']);
+                }
+            }
+
+            $carreraOut = 'default';
+            if (!empty($carrera)) {
+                $carreraOut = $carrera;
+            }
+
+            return response()->json(array(
+                'success' => true,
+                'data' => $data,
+                'total' => $total,
+                'carrera' => $carreraOut,
+                'gestion' => $gestion
+            ));
+        }
+
+        $message = 'Error al obtener pagos de material extra';
+        if (is_array($result) && isset($result['message'])) {
+            $message = $result['message'];
+        }
+
+        return response()->json(array(
+            'success' => false,
+            'message' => $message
+        ), 500);
     }
 
     /**
