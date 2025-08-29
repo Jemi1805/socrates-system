@@ -699,7 +699,6 @@ class SocratesApiService
      * Llama a los endpoints del SGA para obtener los pagos de Material Extra de un estudiante
      * intentando múltiples rutas conocidas y parseando el HTML resultante.
      * @param string $codigo
-     * @param string|null $gestion
      * @return array
      */
     private function buscarPagosMaterialExtraPorCodigo($codigo)

@@ -285,7 +285,6 @@ class SgaController extends Controller
                 'data' => $data,
                 'total' => $total,
                 'carrera' => $carreraOut,
-                'gestion' => $gestion
             ));
         }
 
