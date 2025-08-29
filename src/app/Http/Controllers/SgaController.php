@@ -257,8 +257,7 @@ class SgaController extends Controller
     public function getPagosMaterialExtra(Request $request, $codCeta)
     {
         $carrera = $request->get('carrera');
-        $gestion = $request->get('gestion');
-        $result = $this->sgaService->getPagosMaterialExtra($codCeta, $carrera, $gestion);
+        $result = $this->sgaService->getPagosMaterialExtra($codCeta, $carrera);
 
         if ($result && isset($result['success']) && $result['success']) {
             $data = array();

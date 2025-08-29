@@ -357,6 +357,68 @@
       </div>
     </div>
 
+    <!-- Aranceles (Material Extra) -->
+    <div class="aranceles-card">
+      <h3 class="card-title">
+        <i class="bi bi-receipt me-2"></i>
+        Aranceles (Material Extra)
+        <small class="text-muted" *ngIf="!loadingAranceles">Total: {{ totalAranceles }}</small>
+      </h3>
+
+      <div class="row g-2 align-items-end mb-2">
+        <div class="col-md-12">
+          <button class="btn btn-outline-primary" (click)="cargarArancelesMaterialExtra()">
+            <i class="bi bi-arrow-repeat me-1"></i>
+            Actualizar
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="loadingAranceles" class="text-center my-3">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Cargando...</span>
+        </div>
+      </div>
+
+      <div *ngIf="!loadingAranceles && aranceles.length === 0" class="alert alert-info">
+        No se encontraron aranceles de material extra.
+      </div>
+
+      <div class="table-responsive" *ngIf="!loadingAranceles && aranceles.length > 0">
+        <table class="table table-sm table-striped align-middle">
+          <thead class="table-dark">
+            <tr>
+              <th>N°</th>
+              <th>Gestión</th>
+              <th>Fecha</th>
+              <th>Concepto</th>
+              <th class="text-end">Monto</th>
+              <th>Factura</th>
+              <th>Recibo</th>
+              <th>Razón Social/NIT</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let a of aranceles; let i = index">
+              <td>{{ i + 1 }}</td>
+              <td>{{ a.gestion || '-' }}</td>
+              <td>{{ a.fecha || '-' }}</td>
+              <td>{{ a.concepto || '-' }}</td>
+              <td class="text-end">{{ a.monto || '-' }}</td>
+              <td>{{ a.num_factura || '-' }}</td>
+              <td>{{ a.num_comprobante || '-' }}</td>
+              <td>
+                <ng-container *ngIf="a.razon || a.nit; else razonNitVacio">
+                  {{ a.razon || '' }}<ng-container *ngIf="a.nit"> / {{ a.nit }}</ng-container>
+                </ng-container>
+                <ng-template #razonNitVacio>-</ng-template>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Sección de Modalidad y Documentos -->
     <div class="modalidad-docs-container">
       <!-- Selección de modalidad -->

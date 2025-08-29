@@ -74,8 +74,9 @@ export class PostulantesListComponent implements OnInit {
   showBachilleratoData = true;
 
   // Aranceles
-  aranceles: Arancel[] = [];
-  arancelesGraduacion: Arancel[] = [];
+  aranceles: any[] = [];
+  arancelesGraduacion: any[] = [];
+  totalAranceles = 0;
   
   // Estados de carga
   loadingModalidades = false;
@@ -202,6 +203,9 @@ export class PostulantesListComponent implements OnInit {
           pensum: this.estudiante.pensum,
           nro_serie_titulo: this.estudiante.nro_serie_titulo || '',
         };
+      }
+      if (this.estudiante?.cod_ceta) {
+        this.cargarArancelesMaterialExtra();
       }
     }
   }
@@ -366,5 +370,45 @@ export class PostulantesListComponent implements OnInit {
 
   eliminarGradoGestion(index: number) {
     this.homologacionExtranjero.grados_gestiones.splice(index, 1);
+  }
+
+  // --- Aranceles (Material Extra) ---
+  cargarArancelesMaterialExtra() {
+    const codCeta = this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta;
+    if (!codCeta) {
+      this.aranceles = [];
+      this.totalAranceles = 0;
+      return;
+    }
+    this.loadingAranceles = true;
+    const carreraRaw = this.estudiante?.carrera || this.postulanteActual.carrera;
+    const carrera = this.normalizarCarrera(carreraRaw || null) || undefined;
+    this.postulanteService.getArancelesMaterialExtra(codCeta as number | string, carrera).subscribe({
+      next: (res) => {
+        this.aranceles = res?.data || [];
+        this.totalAranceles = res?.total ?? this.aranceles.length;
+        this.loadingAranceles = false;
+      },
+      error: (err) => {
+        console.error('Error al cargar aranceles:', err);
+        this.aranceles = [];
+        this.totalAranceles = 0;
+        this.loadingAranceles = false;
+      }
+    });
+  }
+
+  private normalizarCarrera(c: string | null | undefined): string | null {
+    if (!c) return null;
+    const s = c.toLowerCase();
+    // Si menciona electricidad/electrónica
+    if (s.includes('elect')) {
+      return 'electricidad';
+    }
+    // Si menciona mecánica o automotriz (y no electricidad)
+    if (s.includes('mec') || s.includes('automotriz')) {
+      return 'mecanica';
+    }
+    return null; // dejar que el backend use default
   }
 }

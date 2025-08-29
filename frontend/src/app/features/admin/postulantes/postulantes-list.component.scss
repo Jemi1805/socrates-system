@@ -244,80 +244,8 @@ input {
   }
 }
 
-// Tabla
-.table-container {
-  overflow-x: auto;
-  border-radius: $border-radius;
-  border: 1px solid $border-color;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: white;
-  
-  thead {
-    background: linear-gradient(135deg, $primary-color, color.adjust($primary-color, $lightness: -10%));
-    color: white;
-    
-    th {
-      padding: 15px 12px;
-      text-align: left;
-      font-weight: 600;
-      font-size: 0.95rem;
-      border: none;
-      
-      &:first-child {
-        border-top-left-radius: $border-radius;
-}
-
-      &:last-child {
-        border-top-right-radius: $border-radius;
-      }
-    }
-  }
-  
-  tbody {
-    .table-row {
-      transition: background-color 0.3s ease;
-      
-      &:hover {
-        background: $light-gray;
-      }
-      
-      &:nth-child(even) {
-        background: #fafafa;
-        
-        &:hover {
-          background: $light-gray;
-        }
-      }
-      
-      td {
-        padding: 12px;
-        border-bottom: 1px solid $border-color;
-        color: $text-dark-blue;
-        font-size: 0.95rem;
-        
-        &.code-cell {
-          font-weight: 600;
-          color: $primary-color;
-}
-
-        &.actions-cell {
-          display: flex;
-          gap: 8px;
-          justify-content: flex-start;
-          align-items: center;
-        }
-      }
-    }
-  }
-}
-
-
 // Estilos para datos biográficos
-.biographical-card, .bachiller-card {
+.biographical-card, .bachiller-card, .aranceles-card {
   background: #ffffffd2;
   border-radius: $border-radius;
   box-shadow: $shadow;
@@ -397,6 +325,47 @@ input {
 
   .form-check-label, .form-check-input, .form-select {
     color:$text-dark-blue;
+  }
+}
+
+// Estilos de tabla para Aranceles (basados en Modalidad de Graduación)
+.aranceles-card {
+  .card-title {
+    color: $text-dark-blue;
+    margin: 0 0 20px 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+    border-bottom: 2px solid $primary-color;
+    padding-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .table-responsive {
+    width: 100%;
+    border-collapse: collapse;
+    border-radius: $border-radius;
+    background-color: #ffffffd2;
+
+    td {
+      color: $text-dark-blue;
+    }
+
+    thead.table-dark {
+      --bs-table-bg: #4C9DBD !important;
+      --bs-table-border-color: #4C9DBD !important;
+      color: white !important;
+    }
+  }
+
+  // Alertas informativas al estilo Modalidad de Graduación
+  .alert.alert-info {
+    background: rgba(23, 162, 184, 0.1);
+    color: #0c5460;
+    border-left: 4px solid #17a2b8;
+    border-radius: 8px;
+    border: none;
   }
 }
 
@@ -658,7 +627,7 @@ input {
   }
 }
 
-.form-card, .table-card, .biographical-card, .modalidad-card, .docs-card {
+.form-card, .aranceles-card, .biographical-card, .modalidad-card, .docs-card {
   animation: fadeIn 0.5s ease-out;
 }
 

@@ -28,6 +28,7 @@ export class PostulanteService {
   private apiUrl = 'http://192.168.0.78:8080/api/postulantes'; // Ajusta la URL según tu backend
   private apiUrlDocumentos = 'http://192.168.0.78:8080/api/documentos-postulantes'; // Ajusta la URL según tu backend
   private apiUrlModalidades = 'http://192.168.0.78:8080/api/modalidades-postulantes'; // Ajusta la URL según tu backend
+  private sgaUrl = 'http://192.168.0.78:8080/api/sga'; // Base para endpoints SGA
 
   constructor(private http: HttpClient) {}
 
@@ -87,5 +88,15 @@ export class PostulanteService {
       tipo_documento: tipoDocumento,
       requerido: requerido
     });
+  }
+
+  // --- SGA: Pagos de Material Extra (Aranceles) ---
+  getArancelesMaterialExtra(codCeta: number | string, carrera?: string): Observable<{ success: boolean; data: any[]; total: number; carrera?: string; }> {
+    const params: any = {};
+    if (carrera) params.carrera = carrera;
+    return this.http.get<{ success: boolean; data: any[]; total: number; carrera?: string; }>(
+      `${this.sgaUrl}/estudiantes/${codCeta}/pagos/material-extra`,
+      { params }
+    );
   }
 }

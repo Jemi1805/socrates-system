@@ -797,9 +797,6 @@ class SocratesApiService
 
                 // 2) Intento GET agregando el segmento /{cod_ceta}
                 $requestUrlGet = $this->currentUrl . rtrim($endpoint, '/') . '/' . urlencode($codigo);
-                if ($gestion !== null && $gestion !== '') {
-                    $requestUrlGet .= (strpos($requestUrlGet, '?') !== false ? '&' : '?') . 'gestion=' . urlencode($gestion);
-                }
                 Log::info('Intentando endpoint Material Extra (GET con segmento)', [
                     'url' => $requestUrlGet
                 ]);
@@ -927,7 +924,7 @@ class SocratesApiService
 
     /**
      * Parsear el HTML del SGA para extraer pagos de Material Extra
-     * Retorna un array de elementos: concepto, monto, num_factura, num_comprobante, fecha, razon, nit
+     * Retorna un array de elementos: concepto, monto, num_factura, num_comprobante, fecha, razon, nit, gestion
      */
     private function parseMaterialExtraHtml($html)
     {
@@ -1038,7 +1035,7 @@ class SocratesApiService
                     // Si viene en una sola columna, intentar separar por espacios si parece NIT al final
                     $razon = $razonNit;
                 }
-                
+
                 $pagos[] = [
                     'gestion' => $gestion,
                     'fecha' => $fecha,
