@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\Permission;
-use App\Models\Role;
-use App\Models\User;
+use App\Models\Permiso;
+use App\Models\Rol;
+use App\Models\Usuario;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -34,45 +34,42 @@ class RolePermissionSeeder extends Seeder
     private function createPermissions()
     {
         $modules = [
-            'users' => 'Usuarios',
+            'usuarios' => 'Usuarios',
             'roles' => 'Roles',
-            'permissions' => 'Permisos',
+            'permisos' => 'Permisos',
             'dashboard' => 'Dashboard',
-            'reports' => 'Reportes',
-            'settings' => 'Configuración',
+            'reportes' => 'Reportes',
+            'configuracion' => 'Configuración',
         ];
 
         foreach ($modules as $module => $displayModule) {
-            Permission::createCrudPermissions($module, $displayModule);
+            Permiso::crearPermisosCrud($module, $displayModule);
         }
 
-        // Permisos especiales
-        $specialPermissions = [
+        // Permisos especiales (códigos basados en módulo.acción)
+        $permisosEspeciales = [
             [
-                'name' => 'system.admin',
-                'display_name' => 'Administrador del Sistema',
-                'description' => 'Acceso completo al sistema',
-                'module' => 'system',
-                'action' => 'admin',
+                'codigo' => 'system.admin',
+                'nombre' => 'Administrador del Sistema',
+                'descripcion' => 'Acceso completo al sistema',
             ],
             [
-                'name' => 'users.change_password',
-                'display_name' => 'Cambiar Contraseña de Usuarios',
-                'description' => 'Permite cambiar la contraseña de otros usuarios',
-                'module' => 'users',
-                'action' => 'change_password',
+                'codigo' => 'usuarios.cambiar_contrasena',
+                'nombre' => 'Cambiar Contraseña de Usuarios',
+                'descripcion' => 'Permite cambiar la contraseña de otros usuarios',
             ],
             [
-                'name' => 'users.activate_deactivate',
-                'display_name' => 'Activar/Desactivar Usuarios',
-                'description' => 'Permite activar o desactivar usuarios',
-                'module' => 'users',
-                'action' => 'activate_deactivate',
+                'codigo' => 'usuarios.activar_desactivar',
+                'nombre' => 'Activar/Desactivar Usuarios',
+                'descripcion' => 'Permite activar o desactivar usuarios',
             ],
         ];
 
-        foreach ($specialPermissions as $permission) {
-            Permission::create($permission);
+        foreach ($permisosEspeciales as $permiso) {
+            // Evitar duplicados si ya existen
+            if (!Permiso::existeCodigo($permiso['codigo'])) {
+                Permiso::create($permiso);
+            }
         }
     }
 
@@ -83,39 +80,39 @@ class RolePermissionSeeder extends Seeder
     {
         $roles = [
             [
-                'name' => 'super_admin',
-                'display_name' => 'Super Administrador',
-                'description' => 'Acceso completo al sistema con todos los permisos',
-                'is_active' => true,
+                'nombre' => 'super_admin',
+                'descripcion' => 'Acceso completo al sistema con todos los permisos',
+                'nivel_acceso' => 5,
+                'activo' => true,
             ],
             [
-                'name' => 'admin',
-                'display_name' => 'Administrador',
-                'description' => 'Administrador con permisos de gestión',
-                'is_active' => true,
+                'nombre' => 'admin',
+                'descripcion' => 'Administrador con permisos de gestión',
+                'nivel_acceso' => 4,
+                'activo' => true,
             ],
             [
-                'name' => 'manager',
-                'display_name' => 'Gerente',
-                'description' => 'Gerente con permisos de supervisión',
-                'is_active' => true,
+                'nombre' => 'manager',
+                'descripcion' => 'Gerente con permisos de supervisión',
+                'nivel_acceso' => 3,
+                'activo' => true,
             ],
             [
-                'name' => 'user',
-                'display_name' => 'Usuario',
-                'description' => 'Usuario básico del sistema',
-                'is_active' => true,
+                'nombre' => 'user',
+                'descripcion' => 'Usuario básico del sistema',
+                'nivel_acceso' => 2,
+                'activo' => true,
             ],
             [
-                'name' => 'guest',
-                'display_name' => 'Invitado',
-                'description' => 'Usuario invitado con permisos limitados',
-                'is_active' => true,
+                'nombre' => 'guest',
+                'descripcion' => 'Usuario invitado con permisos limitados',
+                'nivel_acceso' => 1,
+                'activo' => true,
             ],
         ];
 
         foreach ($roles as $role) {
-            Role::create($role);
+            Rol::firstOrCreate(['nombre' => $role['nombre']], $role);
         }
     }
 
@@ -125,44 +122,49 @@ class RolePermissionSeeder extends Seeder
     private function assignPermissionsToRoles()
     {
         // Super Admin - Todos los permisos
-        $superAdmin = Role::where('name', 'super_admin')->first();
-        $allPermissions = Permission::active()->pluck('id')->toArray();
-        $superAdmin->assignPermissions($allPermissions);
+        $superAdmin = Rol::where('nombre', 'super_admin')->first();
+        if ($superAdmin) {
+            $allPermissions = Permiso::pluck('id')->toArray();
+            $superAdmin->asignarPermisos($allPermissions);
+        }
 
-        // Admin - Permisos de administración
-        $admin = Role::where('name', 'admin')->first();
-        $adminPermissions = Permission::active()
-            ->whereIn('module', ['users', 'roles', 'permissions', 'dashboard', 'reports'])
-            ->pluck('id')
-            ->toArray();
-        $admin->assignPermissions($adminPermissions);
+        // Admin - Permisos de administración (usuarios, roles, permisos, dashboard, reportes)
+        $admin = Rol::where('nombre', 'admin')->first();
+        if ($admin) {
+            $adminPermissions = Permiso::where(function ($q) {
+                $q->where('codigo', 'like', 'usuarios.%')
+                  ->orWhere('codigo', 'like', 'roles.%')
+                  ->orWhere('codigo', 'like', 'permisos.%')
+                  ->orWhere('codigo', 'like', 'dashboard.%')
+                  ->orWhere('codigo', 'like', 'reportes.%');
+            })->pluck('id')->toArray();
+            $admin->asignarPermisos($adminPermissions);
+        }
 
-        // Manager - Permisos de gestión
-        $manager = Role::where('name', 'manager')->first();
-        $managerPermissions = Permission::active()
-            ->whereIn('module', ['users', 'dashboard', 'reports'])
-            ->whereIn('action', ['read', 'create', 'update'])
-            ->pluck('id')
-            ->toArray();
-        $manager->assignPermissions($managerPermissions);
+        // Manager - leer/crear/actualizar en usuarios, dashboard y reportes
+        $manager = Rol::where('nombre', 'manager')->first();
+        if ($manager) {
+            $managerPermissions = Permiso::whereIn('codigo', [
+                'usuarios.leer', 'usuarios.crear', 'usuarios.actualizar',
+                'dashboard.leer', 'dashboard.crear', 'dashboard.actualizar',
+                'reportes.leer', 'reportes.crear', 'reportes.actualizar',
+            ])->pluck('id')->toArray();
+            $manager->asignarPermisos($managerPermissions);
+        }
 
-        // User - Permisos básicos
-        $user = Role::where('name', 'user')->first();
-        $userPermissions = Permission::active()
-            ->whereIn('module', ['dashboard'])
-            ->where('action', 'read')
-            ->pluck('id')
-            ->toArray();
-        $user->assignPermissions($userPermissions);
+        // User - Solo lectura del dashboard
+        $user = Rol::where('nombre', 'user')->first();
+        if ($user) {
+            $userPermissions = Permiso::whereIn('codigo', ['dashboard.leer'])->pluck('id')->toArray();
+            $user->asignarPermisos($userPermissions);
+        }
 
         // Guest - Solo lectura del dashboard
-        $guest = Role::where('name', 'guest')->first();
-        $guestPermissions = Permission::active()
-            ->where('module', 'dashboard')
-            ->where('action', 'read')
-            ->pluck('id')
-            ->toArray();
-        $guest->assignPermissions($guestPermissions);
+        $guest = Rol::where('nombre', 'guest')->first();
+        if ($guest) {
+            $guestPermissions = Permiso::whereIn('codigo', ['dashboard.leer'])->pluck('id')->toArray();
+            $guest->asignarPermisos($guestPermissions);
+        }
     }
 
     /**
@@ -170,31 +172,45 @@ class RolePermissionSeeder extends Seeder
      */
     private function createAdminUser()
     {
-        $superAdminRole = Role::where('name', 'super_admin')->first();
+        $superAdminRole = Rol::where('nombre', 'super_admin')->first();
+        $userRole = Rol::where('nombre', 'user')->first();
 
-        User::create([
-            'name' => 'Super Administrador',
-            'first_name' => 'Super',
-            'last_name' => 'Administrador',
-            'email' => 'admin@socrates.com',
-            'password' => 'admin123',
-            'role_id' => $superAdminRole->id,
-            'is_active' => true,
-            'email_verified_at' => now(),
-        ]);
+        // Variables de entorno para credenciales
+        $adminUsername = env('ADMIN_USERNAME', 'admin');
+        $adminEmail = env('ADMIN_EMAIL', 'admin@socrates.com');
+        $adminPassword = env('ADMIN_PASSWORD', 'admin123');
 
-        // Usuario de prueba
-        $userRole = Role::where('name', 'user')->first();
+        $defaultUserUsername = env('DEFAULT_USER_USERNAME', 'user');
+        $defaultUserEmail = env('DEFAULT_USER_EMAIL', 'user@socrates.com');
+        $defaultUserPassword = env('DEFAULT_USER_PASSWORD', 'user123');
 
-        User::create([
-            'name' => 'Usuario de Prueba',
-            'first_name' => 'Usuario',
-            'last_name' => 'Prueba',
-            'email' => 'user@socrates.com',
-            'password' => 'user123',
-            'role_id' => $userRole->id,
-            'is_active' => true,
-            'email_verified_at' => now(),
-        ]);
+        if ($superAdminRole) {
+            Usuario::firstOrCreate(
+                ['email' => $adminEmail],
+                [
+                    'nombre_usuario' => $adminUsername,
+                    'email' => $adminEmail,
+                    'contrasena' => $adminPassword, // Se encripta por mutator
+                    'rol_id' => $superAdminRole->id,
+                    'activo' => true,
+                    'fecha_creacion' => now(),
+                ]
+            );
+        }
+
+        if ($userRole) {
+            Usuario::firstOrCreate(
+                ['email' => $defaultUserEmail],
+                [
+                    'nombre_usuario' => $defaultUserUsername,
+                    'email' => $defaultUserEmail,
+                    'contrasena' => $defaultUserPassword, // Se encripta por mutator
+                    'rol_id' => $userRole->id,
+                    'activo' => true,
+                    'fecha_creacion' => now(),
+                ]
+            );
+        }
     }
 }
+
