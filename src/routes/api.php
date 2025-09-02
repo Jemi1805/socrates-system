@@ -24,6 +24,8 @@ use App\Http\Controllers\Api\TraspasosInstitutoController;
 use App\Http\Controllers\Api\ResHomolCpController;
 use App\Http\Controllers\Api\GradosHomolCpController;
 use App\Http\Controllers\Api\GradosTraspController;
+use App\Http\Controllers\Api\CarreraController;
+use App\Http\Controllers\Api\PensumController;
 
 // 🔐 RUTAS DE AUTENTICACIÓN (Sin middleware)
 Route::prefix('auth')->group(function () {
@@ -72,6 +74,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // 📚 CRUD API RESOURCES (protegidos)
     Route::apiResource('aranceles_est', ArancelesEstController::class);
     Route::apiResource('modalidad', ModalidadController::class);
+    Route::apiResource('carrera', CarreraController::class);
+    Route::apiResource('pensum', PensumController::class);
     Route::apiResource('pract_ind', PractIndController::class);
     Route::apiResource('proyecto', ProyectoController::class);
     Route::apiResource('inscrip_modalidad', InscripModalidadController::class);

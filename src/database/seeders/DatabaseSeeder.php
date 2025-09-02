@@ -17,6 +17,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolePermissionSeeder::class,
             ModalidadSeeder::class,
+            CarreraSeeder::class,
+            PensumSeeder::class,
         ]);
 
         // Crear usuarios adicionales de prueba si es necesario
