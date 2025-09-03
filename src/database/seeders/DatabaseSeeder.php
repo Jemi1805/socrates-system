@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolePermissionSeeder::class,
             ModalidadSeeder::class,
+            // Semillas base para carreras y pensums
             CarreraSeeder::class,
             PensumSeeder::class,
         ]);

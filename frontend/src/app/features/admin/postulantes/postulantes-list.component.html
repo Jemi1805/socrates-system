@@ -25,11 +25,18 @@
         <div class="bio-row">
           <div class="bio-item">
             <span class="bio-label">Carrera:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.carrera" name="carrera" placeholder="Ingrese carrera" required />
+            <select class="form-select" [(ngModel)]="carreraNormalizada" name="carrera" disabled>
+              <option [ngValue]="null">Seleccione carrera</option>
+              <option [ngValue]="'mecanica'">Mecánica Automotriz</option>
+              <option [ngValue]="'electricidad'">Electricidad y Electrónica Automotriz</option>
+            </select>
           </div>
           <div class="bio-item">
             <span class="bio-label">Pensum:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.pensum" name="pensum" placeholder="Ingrese pensum" required />
+            <select class="form-select" [(ngModel)]="postulanteActual.pensum" name="pensum" disabled>
+              <option [ngValue]="null" disabled>Seleccione pensum</option>
+              <option *ngFor="let p of pensums" [ngValue]="p">{{ p }}</option>
+            </select>
           </div>
           <div class="bio-item">
             <span class="bio-label">Código CETA:</span>

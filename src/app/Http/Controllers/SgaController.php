@@ -6,6 +6,8 @@ use App\Services\SocratesApiService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class SgaController extends Controller
 {
@@ -296,6 +298,131 @@ class SgaController extends Controller
             'success' => false,
             'message' => $message
         ), 500);
+    }
+    
+    /**
+     * Obtener lista de cod_pensum por carrera desde la base de datos.
+     * Acepta 'cod_carrera' (MEA/EEA) o 'carrera' (mecanica/electricidad) y hace el mapeo.
+     */
+    public function getPensums(Request $request)
+    {
+        $codCarrera = $request->get('cod_carrera');
+        $carreraRaw = $request->get('carrera');
+        $carreraNorm = $this->normalizeCarrera($carreraRaw);
+        if (empty($codCarrera)) {
+            // Primero intentar resolver desde la tabla carrera por nombre
+            $codCarrera = $this->findCodCarreraByNombre($carreraNorm) ?? $this->carreraToCodCarrera($carreraNorm);
+        }
+
+        $pensums = [];
+        if (Schema::hasTable('pensum')) {
+            if (!empty($codCarrera)) {
+                $pensums = DB::table('pensum')
+                    ->where('cod_carrera', $codCarrera)
+                    ->orderBy('orden')
+                    ->orderBy('cod_pensum')
+                    ->pluck('cod_pensum')
+                    ->toArray();
+            }
+
+            // Reintento considerando diferencias de tipo (numérico vs string como 'MEA'/'EEA')
+            if (empty($pensums) && !empty($carreraNorm)) {
+                $dbCodCarrera = $this->findCodCarreraByNombre($carreraNorm);
+                $stringCodCarrera = $this->carreraToCodCarrera($carreraNorm);
+                $candidates = array_values(array_unique(array_filter([$codCarrera, $dbCodCarrera, $stringCodCarrera])));
+                if (!empty($candidates)) {
+                    $pensums = DB::table('pensum')
+                        ->whereIn('cod_carrera', $candidates)
+                        ->orderBy('orden')
+                        ->orderBy('cod_pensum')
+                        ->pluck('cod_pensum')
+                        ->toArray();
+                    if (!empty($pensums)) {
+                        if (!empty($dbCodCarrera)) {
+                            $codCarrera = $dbCodCarrera;
+                        } elseif (!empty($stringCodCarrera)) {
+                            $codCarrera = $stringCodCarrera;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback a config si no hay registros en BD
+        if (empty($pensums)) {
+            $config = config('sga_pensums');
+            if (is_array($config)) {
+                if (!empty($carreraNorm) && isset($config[$carreraNorm]) && is_array($config[$carreraNorm])) {
+                    $pensums = $config[$carreraNorm];
+                } elseif (isset($config['default']) && is_array($config['default'])) {
+                    $pensums = $config['default'];
+                }
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $pensums,
+            'carrera' => $carreraNorm ?: 'default',
+            'cod_carrera' => $codCarrera,
+        ]);
+    }
+    
+    /**
+     * Normaliza el nombre de la carrera a un código soportado por el backend
+     */
+    private function normalizeCarrera($carrera)
+    {
+        if (empty($carrera)) {
+            return null;
+        }
+        $s = strtolower($carrera);
+        // Detectar códigos directos
+        if (strpos($s, 'mea') !== false) {
+            return 'mecanica';
+        }
+        if (strpos($s, 'eea') !== false) {
+            return 'electricidad';
+        }
+        if (strpos($s, 'elect') !== false) {
+            return 'electricidad';
+        }
+        if (strpos($s, 'mec') !== false || strpos($s, 'automotriz') !== false) {
+            return 'mecanica';
+        }
+        return null; // dejar que use default
+    }
+
+    /**
+     * Mapea carrera normalizada a código de carrera en BD.
+     */
+    private function carreraToCodCarrera($carreraNorm)
+    {
+        if (empty($carreraNorm)) return null;
+        if ($carreraNorm === 'mecanica') return 'MEA';
+        if ($carreraNorm === 'electricidad') return 'EEA';
+        return null;
+    }
+
+    /**
+     * Intenta resolver el cod_carrera consultando la tabla 'carrera' por el nombre.
+     * Soporta esquemas donde cod_carrera puede ser string (MEA/EEA) o numérico.
+     */
+    private function findCodCarreraByNombre($carreraNorm)
+    {
+        if (empty($carreraNorm)) {
+            return null;
+        }
+        $query = DB::table('carrera')->select('cod_carrera');
+        if ($carreraNorm === 'electricidad') {
+            $query->whereRaw('LOWER(nombre_carrera) LIKE ?', ['%elect%']);
+        } elseif ($carreraNorm === 'mecanica') {
+            $query->whereRaw('LOWER(nombre_carrera) LIKE ?', ['%mec%'])
+                  ->whereRaw('LOWER(nombre_carrera) NOT LIKE ?', ['%elect%']);
+        } else {
+            return null;
+        }
+        return $query->value('cod_carrera');
     }
 
     /**

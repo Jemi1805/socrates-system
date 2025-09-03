@@ -6,6 +6,7 @@ import { HttpEventType, HttpResponse } from '@angular/common/http';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { SgaService } from '../../../shared/services/sga.service';
 
 interface Estudiante {
   cod_ceta: string;
@@ -81,6 +82,10 @@ export class PostulantesListComponent implements OnInit {
   // Estados de carga
   loadingModalidades = false;
   loadingAranceles = false;
+  
+  // Pensums
+  pensums: string[] = [];
+  carreraNormalizada: string | null = null;
   
   // Bachillerato
   tipoBachiller: 'nacional' | 'extranjero' | null = null;
@@ -166,7 +171,7 @@ export class PostulantesListComponent implements OnInit {
     gestion_fin: ''
   };
 
-  constructor(private postulanteService: PostulanteService) {
+  constructor(private postulanteService: PostulanteService, private sgaService: SgaService) {
     // Inicializar modalidades para prueba
     this.modalidades = [
       { id: 1, nombre: 'Proyecto de Grado', descripcion: 'Trabajo de investigación y desarrollo', icono: 'bi-book', duracion: '6 meses' },
@@ -179,6 +184,8 @@ export class PostulantesListComponent implements OnInit {
   ngOnInit() {
     this.cargarDatosPostulacion();
     this.cargarPostulantes();
+    // Asegurar carga de pensums aún si no hay datos en sessionStorage
+    this.cargarPensums();
   }
 
   cargarDatosPostulacion() {
@@ -208,6 +215,42 @@ export class PostulantesListComponent implements OnInit {
         this.cargarArancelesMaterialExtra();
       }
     }
+    // Nota: la carga de pensums se realiza en ngOnInit()
+  }
+
+  // --- Pensums ---
+  cargarPensums() {
+    const carreraRaw = this.estudiante?.carrera || this.postulanteActual.carrera;
+    this.carreraNormalizada = this.normalizarCarrera(carreraRaw || null);
+    this.sgaService.getPensums(this.carreraNormalizada || undefined).subscribe({
+      next: (res) => {
+        this.pensums = (res && (res as any).data) ? (res as any).data : [];
+        const pensumRaw = (this.postulanteActual.pensum ?? '').toString();
+        const normalizedTarget = this.normalizePensumCode(pensumRaw);
+        console.log('[Pensums] carrera=', this.carreraNormalizada, 'lista=', this.pensums, 'targetRaw=', pensumRaw, 'targetNorm=', normalizedTarget);
+        if (this.pensums.length > 0) {
+          if (normalizedTarget) {
+            const idx = this.pensums.findIndex(p => this.normalizePensumCode(p) === normalizedTarget);
+            if (idx >= 0) {
+              this.postulanteActual.pensum = this.pensums[idx];
+              console.log('[Pensums] Match encontrado. Seleccionado:', this.postulanteActual.pensum);
+            } else if (!pensumRaw) {
+              this.postulanteActual.pensum = this.pensums[0];
+              console.log('[Pensums] Sin pensum previo. Auto-seleccionado:', this.postulanteActual.pensum);
+            } else {
+              console.warn('[Pensums] No hay match exacto para', pensumRaw, 'en', this.pensums);
+            }
+          } else {
+            this.postulanteActual.pensum = this.pensums[0];
+            console.log('[Pensums] Sin pensum previo. Auto-seleccionado:', this.postulanteActual.pensum);
+          }
+        }
+      },
+      error: (err) => {
+        console.error('Error al cargar pensums:', err);
+        this.pensums = [];
+      }
+    });
   }
 
   cargarPostulantes() {
@@ -401,14 +444,25 @@ export class PostulantesListComponent implements OnInit {
   private normalizarCarrera(c: string | null | undefined): string | null {
     if (!c) return null;
     const s = c.toLowerCase();
+    // Códigos exactos o parciales
+    if (s.includes('mea')) return 'mecanica';
+    if (s.includes('eea')) return 'electricidad';
     // Si menciona electricidad/electrónica
-    if (s.includes('elect')) {
-      return 'electricidad';
-    }
+    if (s.includes('elect')) return 'electricidad';
     // Si menciona mecánica o automotriz (y no electricidad)
-    if (s.includes('mec') || s.includes('automotriz')) {
-      return 'mecanica';
-    }
+    if (s.includes('mec') || (s.includes('automotriz') && !s.includes('elect'))) return 'mecanica';
     return null; // dejar que el backend use default
+  }
+
+  private normalizePensumCode(p: string | null | undefined): string {
+    if (!p) return '';
+    return p
+      .toString()
+      .toUpperCase()
+      .replace(/\s+/g, '') // quitar espacios
+      .replace(/[–—−]/g, '-') // normalizar guiones largos a '-'
+      .replace(/[^A-Z0-9-]+/g, '-') // cualquier separador a '-'
+      .replace(/-+/g, '-') // colapsar múltiples '-'
+      .replace(/^-|-$/g, ''); // recortar '-' extremos
   }
 }

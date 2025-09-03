@@ -74,8 +74,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // 📚 CRUD API RESOURCES (protegidos)
     Route::apiResource('aranceles_est', ArancelesEstController::class);
     Route::apiResource('modalidad', ModalidadController::class);
-    Route::apiResource('carrera', CarreraController::class);
-    Route::apiResource('pensum', PensumController::class);
     Route::apiResource('pract_ind', PractIndController::class);
     Route::apiResource('proyecto', ProyectoController::class);
     Route::apiResource('inscrip_modalidad', InscripModalidadController::class);
@@ -90,6 +88,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('res_homol_cp', ResHomolCpController::class);
     Route::apiResource('grados_homol_cp', GradosHomolCpController::class);
     Route::apiResource('grados_trasp', GradosTraspController::class);
+    // Catálogos base
+    Route::apiResource('carrera', CarreraController::class);
+    Route::apiResource('pensum', PensumController::class);
 });
 
 // 📦 RUTAS DE PRODUCTOS (Mantener existentes)
@@ -125,6 +126,7 @@ Route::prefix('sga')->group(function () {
     // Rutas de datos generales
     Route::get('carreras', [SgaController::class, 'getCarreras']);
     Route::get('gestiones', [SgaController::class, 'getGestiones']);
+    Route::get('pensums', [SgaController::class, 'getPensums']);
     Route::get('inscripciones/{codCeta}', [SgaController::class, 'getInscripciones']);
     
     Route::post('sync-estudiante', [SgaController::class, 'syncEstudiante']);

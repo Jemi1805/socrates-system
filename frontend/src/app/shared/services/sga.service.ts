@@ -189,6 +189,16 @@ export class SgaService {
       .pipe(catchError(this.handleError));
   }
 
+  // --- PENSUMS ---
+  getPensums(carrera?: string): Observable<ApiResponse<string[]>> {
+    let params = new HttpParams();
+    if (carrera) {
+      params = params.set('carrera', carrera);
+    }
+    return this.http.get<ApiResponse<string[]>>(`${this.baseUrl}/pensums`, { params })
+      .pipe(catchError(this.handleError));
+  }
+
   // --- ARANCELES ESTUDIANTE ---
   getArancelesEst(cod_ceta_est: number): Observable<ApiResponse<ArancelEst[]>> {
     return this.http.get<ApiResponse<ArancelEst[]>>(`${this.baseUrl}/postulantes/${cod_ceta_est}/aranceles`)
