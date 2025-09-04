@@ -253,7 +253,19 @@
 
             <!-- Selección de modalidad -->
             <div class="modalidad-card">              
-              <div class="row">
+              <!-- Estados de carga/ vacío de modalidades -->
+              <div class="mb-2" *ngIf="loadingModalidades">
+                <small class="text-muted">
+                  <i class="bi bi-arrow-clockwise spin me-1"></i>
+                  Cargando modalidades...
+                </small>
+              </div>
+
+              <div class="alert alert-warning" *ngIf="!loadingModalidades && modalidades.length === 0">
+                No hay modalidades disponibles por el momento.
+              </div>
+
+              <div class="row" *ngIf="!loadingModalidades && modalidades.length > 0">
                 <div 
                   *ngFor="let modalidad of modalidades" 
                   class="col-md-6 mb-3">
@@ -276,13 +288,6 @@
                         </div>
                         
                         <p class="modalidad-desc text-muted mb-2">{{ modalidad.descripcion }}</p>
-                        
-                        <div class="modalidad-features">
-                          <small class="text-muted d-block" *ngFor="let feature of getModalidadFeatures(modalidad.id)">
-                            <i class="bi bi-check2 me-1"></i>
-                            {{ feature }}
-                          </small>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -301,7 +306,11 @@
                     <strong>Duración:</strong><br>
                     <small class="text-muted">{{ getModalidadDuration(modalidadSeleccionada.id) }}</small>
                   </div>
-                  <div class="col-md-8">
+                  <div class="col-md-4">
+                    <strong>Arancel:</strong><br>
+                    <small class="text-muted">{{ modalidadSeleccionada.monto_arancel || 'No especificado' }}</small>
+                  </div>
+                  <div class="col-md-4">
                     <strong>Requisitos:</strong><br>
                     <small class="text-muted">{{ getModalidadRequirements(modalidadSeleccionada.id) }}</small>
                   </div>

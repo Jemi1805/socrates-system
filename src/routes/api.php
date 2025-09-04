@@ -102,6 +102,8 @@ Route::delete('/productos/{id}', [ProductosController::class, 'destroy']);
 
 // 👨‍🎓 RUTAS PARA POSTULANTES (Mantener existentes)
 Route::apiResource('postulantes', PostulanteController::class);
+Route::get('postulantes/{cod_ceta}/modalidad', [PostulanteController::class, 'getModalidad']);
+Route::post('postulantes/{cod_ceta}/modalidad', [PostulanteController::class, 'setModalidad']);
 
 // 🎓 RUTAS PARA SGA (Mantener existentes)
 Route::prefix('sga')->group(function () {

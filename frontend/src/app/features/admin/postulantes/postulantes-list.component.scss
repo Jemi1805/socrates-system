@@ -527,7 +527,7 @@ input {
   }
   
   .modal-body {
-    padding: 1.5rem;
+    padding: 1rem;
     overflow-y: auto;
     
     .modal-description {
@@ -548,7 +548,7 @@ input {
     .modalidad-card-item {
       border: 2px solid $border-color;
       border-radius: $border-radius;
-      padding: 1.5rem 1rem;
+      padding: 1rem;
       text-align: center;
       transition: $transition;
       cursor: pointer;
@@ -568,23 +568,8 @@ input {
       .modalidad-nombre {
         color: $text-dark-blue;
         font-weight: 600;
-        font-size: 1.1rem;
-        margin: 0 0 0.5rem 0;
-      }
-      
-      .modalidad-descripcion {
-        color: $text-light;
         font-size: 0.9rem;
-        margin-bottom: 0.5rem;
-        height: 40px;
-        overflow: hidden;
-      }
-      
-      .modalidad-duracion {
-        display: block;
-        color: $text-light;
-        font-size: 0.8rem;
-        margin-bottom: 1rem;
+        margin: 0 0 0.5rem 0;
       }
     }
   }

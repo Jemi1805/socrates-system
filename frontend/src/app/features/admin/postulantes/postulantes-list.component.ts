@@ -32,7 +32,7 @@ interface ModalidadGraduacion {
   nombre: string;
   descripcion: string;
   icono?: string;
-  duracion?: string;
+  monto_arancel?: string;
 }
 
 interface InscripcionModalidad {
@@ -173,21 +173,15 @@ export class PostulantesListComponent implements OnInit {
     gestion_fin: ''
   };
 
-  constructor(private postulanteService: PostulanteService, private sgaService: SgaService) {
-    // Inicializar modalidades para prueba
-    this.modalidades = [
-      { id: 1, nombre: 'Proyecto de Grado', descripcion: 'Trabajo de investigación y desarrollo', icono: 'bi-book', duracion: '6 meses' },
-      { id: 2, nombre: 'Excelencia Académica', descripcion: 'Promedio superior al 80%', icono: 'bi-award', duracion: '3 meses' },
-      { id: 3, nombre: 'Prácticas Industriales', descripcion: 'Prácticas en empresa del sector', icono: 'bi-building', duracion: '12 meses' },
-      { id: 4, nombre: 'Trabajo Dirigido', descripcion: 'Trabajo dirigido por un profesional', icono: 'bi-person-workspace', duracion: '9 meses' }
-    ];
-  }
+  constructor(private postulanteService: PostulanteService, private sgaService: SgaService) {}
 
   ngOnInit() {
     this.cargarDatosPostulacion();
     this.cargarPostulantes();
     // Asegurar carga de pensums aún si no hay datos en sessionStorage
     this.cargarPensums();
+    // Cargar modalidades desde el backend
+    this.cargarModalidades();
   }
 
   cargarDatosPostulacion() {
@@ -215,6 +209,10 @@ export class PostulantesListComponent implements OnInit {
       }
       if (this.estudiante?.cod_ceta) {
         this.cargarArancelesMaterialExtra();
+        // Si ya hay modalidad seleccionada desde la navegación, no sobreescribirla con backend
+        if (!this.modalidad) {
+          this.cargarModalidadActual();
+        }
       }
     }
     // Nota: la carga de pensums se realiza en ngOnInit()
@@ -310,6 +308,8 @@ export class PostulantesListComponent implements OnInit {
       this.postulanteService.asignarModalidad(this.postulanteActual.cod_ceta, modalidad.id).subscribe({
         next: (resultado) => {
           console.log('Modalidad asignada correctamente:', resultado);
+          // Refrescar modalidad actual desde el backend
+          this.cargarModalidadActual();
         },
         error: (err) => {
           console.error('Error al asignar modalidad:', err);
@@ -317,6 +317,85 @@ export class PostulantesListComponent implements OnInit {
         }
       });
     }
+  }
+
+  // --- Modalidades: carga y estado actual ---
+  cargarModalidades() {
+    this.loadingModalidades = true;
+    this.postulanteService.getModalidades().subscribe({
+      next: (res: any) => {
+        const lista = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
+        this.modalidades = (lista || []).map((m: any) => ({
+          id: m.id,
+          nombre: m.nombre,
+          descripcion: m.descripcion || '',
+          icono: this.getIconForModalidad(m?.nombre ?? m?.id),
+          monto_arancel: m.monto_arancel || undefined,
+        }));
+        this.loadingModalidades = false;
+        // Si no hay modalidad ya establecida (p. ej., desde sessionStorage), consultar al backend
+        if (!this.modalidad) {
+          this.cargarModalidadActual();
+        }
+      },
+      error: (err) => {
+        console.error('Error al cargar modalidades:', err);
+        this.modalidades = [];
+        this.loadingModalidades = false;
+      }
+    });
+  }
+
+  cargarModalidadActual() {
+    const codCeta = this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta;
+    if (!codCeta) return;
+    this.postulanteService.getModalidadPostulante(codCeta as number).subscribe({
+      next: (res: any) => {
+        const mod = res?.modalidad || null;
+        if (mod) {
+          // Usar la modalidad devuelta por el backend
+          this.modalidad = {
+            id: mod.id,
+            nombre: mod.nombre,
+            descripcion: mod.descripcion || '',
+            icono: this.getIconForModalidad(mod?.nombre ?? mod?.id),
+            monto_arancel: mod.monto_arancel || undefined,
+          };
+        } else {
+          const mid = res?.modalidad_id;
+          if (mid && this.modalidades?.length) {
+            this.modalidad = this.modalidades.find(m => m.id === mid) || null;
+          } else {
+            this.modalidad = null;
+          }
+        }
+      },
+      error: (err) => {
+        if (err && err.status === 404) {
+          this.modalidad = null;
+        } else {
+          console.error('Error al obtener modalidad del postulante:', err);
+        }
+      }
+    });
+  }
+
+  private getIconForModalidad(val: string | number | undefined): string {
+    if (typeof val === 'number') {
+      switch (val) {
+        case 1: return 'bi-book';
+        case 2: return 'bi-award';
+        case 3: return 'bi-building';
+        case 4: return 'bi-person-workspace';
+        default: return 'bi-mortarboard';
+      }
+    }
+    const s = (val || '').toString().toLowerCase();
+    if (s.includes('proyecto')) return 'bi-book';
+    if (s.includes('excelencia')) return 'bi-award';
+    if (s.includes('práct') || s.includes('pract')) return 'bi-building';
+    if (s.includes('trabajo')) return 'bi-person-workspace';
+    return 'bi-mortarboard';
   }
 
   

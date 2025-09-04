@@ -4,11 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
 import { Estudiante, EstudianteService } from '../../../core/services/estudiante.service';
+import { PostulanteService } from '../postulantes/postulante.service';
 
 interface ModalidadGraduacion {
   id: number;
   nombre: string;
   descripcion: string;
+  monto_arancel?: string;
 }
 
 @Component({
@@ -40,12 +42,7 @@ export class ModalidadGraduacionComponent implements OnInit {
   estudiantesEncontrados = false;
   
   // Modalidades de graduación
-  modalidades: ModalidadGraduacion[] = [
-    { id: 1, nombre: 'Tesis', descripcion: 'Investigación original con contribución académica significativa' },
-    { id: 2, nombre: 'Proyecto de Grado', descripcion: 'Desarrollo de solución tecnológica aplicada' },
-    { id: 3, nombre: 'Trabajo Dirigido', descripcion: 'Experiencia práctica en empresa o institución' },
-    { id: 4, nombre: 'Examen de Conocimientos', descripcion: 'Evaluación integral de competencias académicas' }
-  ];
+  modalidades: ModalidadGraduacion[] = [];
   
   modalidadSeleccionada: ModalidadGraduacion | null = null;
   
@@ -53,13 +50,38 @@ export class ModalidadGraduacionComponent implements OnInit {
   loading = false;
   error = '';
   modalVisible = false;
+  loadingModalidades = false;
 
   constructor(
     private estudianteService: EstudianteService,
-    private router: Router
+    private router: Router,
+    private postulanteService: PostulanteService
   ) {}
 
-  ngOnInit() {}
+  ngOnInit() {
+    this.cargarModalidades();
+  }
+ 
+  cargarModalidades() {
+    this.loadingModalidades = true;
+    this.postulanteService.getModalidades().subscribe({
+      next: (res: any) => {
+        const lista = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
+        this.modalidades = (lista || []).map((m: any) => ({
+          id: m.id,
+          nombre: m.nombre,
+          descripcion: m.descripcion || '',
+          monto_arancel: m.monto_arancel || ''
+        }));
+        this.loadingModalidades = false;
+      },
+      error: (err) => {
+        console.error('Error al cargar modalidades:', err);
+        this.modalidades = [];
+        this.loadingModalidades = false;
+      }
+    });
+  }
 
   cambiarTipoBusqueda(tipo: 'ceta' | 'nombre') {
     this.tiposBusqueda = tipo;
@@ -277,16 +299,6 @@ export class ModalidadGraduacionComponent implements OnInit {
       4: 'bi bi-clipboard-check'   // Examen de Conocimientos
     };
     return icons[modalidadId as keyof typeof icons] || 'bi bi-mortarboard';
-  }
-
-  getModalidadFeatures(modalidadId: number): string[] {
-    const features = {
-      1: ['Investigación original', 'Contribución académica', 'Defensa pública'],
-      2: ['Solución tecnológica', 'Aplicación práctica', 'Innovación'],
-      3: ['Experiencia laboral', 'Aplicación de conocimientos', 'Supervisión profesional'],
-      4: ['Evaluación integral', 'Conocimientos teóricos', 'Competencias prácticas']
-    };
-    return features[modalidadId as keyof typeof features] || [];
   }
 
   getModalidadDifficulty(modalidadId: number): number {

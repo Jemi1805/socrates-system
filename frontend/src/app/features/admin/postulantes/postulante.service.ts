@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpEvent, HttpRequest } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Postulante } from './postulante.model';
+import { environment } from '../../../environments/environment';
 
 export interface DocumentoPostulante {
   id?: number;
@@ -25,10 +26,10 @@ export interface ModalidadPostulante {
 
 @Injectable({ providedIn: 'root' })
 export class PostulanteService {
-  private apiUrl = 'http://192.168.0.78:8080/api/postulantes'; // Ajusta la URL según tu backend
-  private apiUrlDocumentos = 'http://192.168.0.78:8080/api/documentos-postulantes'; // Ajusta la URL según tu backend
-  private apiUrlModalidades = 'http://192.168.0.78:8080/api/modalidades-postulantes'; // Ajusta la URL según tu backend
-  private sgaUrl = 'http://192.168.0.78:8080/api/sga'; // Base para endpoints SGA
+  private baseUrl = environment.apiUrl;
+  private apiUrl = `${this.baseUrl}/postulantes`;
+  private sgaUrl = `${this.baseUrl}/sga`; // Base para endpoints SGA
+  private modalidadUrl = `${this.baseUrl}/modalidad`;
 
   constructor(private http: HttpClient) {}
 
@@ -81,6 +82,11 @@ export class PostulanteService {
 
   getModalidadPostulante(postulanteId: number): Observable<ModalidadPostulante> {
     return this.http.get<ModalidadPostulante>(`${this.apiUrl}/${postulanteId}/modalidad`);
+  }
+
+  // Listado de modalidades desde backend
+  getModalidades(): Observable<any[]> {
+    return this.http.get<any[]>(this.modalidadUrl);
   }
 
   updateDocumentoRequerido(postulanteId: number, tipoDocumento: string, requerido: boolean): Observable<any> {

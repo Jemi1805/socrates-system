@@ -14,6 +14,7 @@ class Modalidad extends Model
     protected $fillable = [
         'nombre',
         'descripcion',
+        'monto_arancel',
     ];
 
     public function proyectos()

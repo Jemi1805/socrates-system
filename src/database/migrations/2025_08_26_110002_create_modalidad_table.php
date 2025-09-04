@@ -15,6 +15,7 @@ class CreateModalidadTable extends Migration
             $table->id();
             $table->string('nombre', 255)->nullable();
             $table->text('descripcion')->nullable();
+            $table->string('monto_arancel', 100)->nullable();
             $table->timestamps();
         });
     }

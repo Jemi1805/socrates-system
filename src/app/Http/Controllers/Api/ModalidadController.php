@@ -13,6 +13,7 @@ class ModalidadController extends CrudController
         return [
             'nombre' => 'nullable|string|max:255',
             'descripcion' => 'nullable|string',
+            'monto_arancel' => 'nullable|string|max:100',
         ];
     }
 }

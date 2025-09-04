@@ -330,7 +330,7 @@
         <div class="row g-3">
           <div class="col-md-7">
             <label class="form-label">Tipo de Regimen</label>
-            <select class="form-select" [(ngModel)]="tipoBachiller" (ngModelChange)="onTipoBachillerChange($event)">
+            <select class="form-select">
               <option [ngValue]="null" disabled>Seleccione tipo de Regimen</option>
               <option [ngValue]="'semestral'">Semestral</option>
               <option [ngValue]="'anual'">Anual</option>
@@ -350,7 +350,7 @@
         <div class="row g-3">
           <div class="col-md-7">
             <label class="form-label">Tipo de Regimen</label>
-            <select class="form-select" [(ngModel)]="tipoBachiller" (ngModelChange)="onTipoBachillerChange($event)">
+            <select class="form-select">
               <option [ngValue]="null" disabled>Seleccione tipo de Regimen</option>
               <option [ngValue]="'semestral'">Semestral</option>
               <option [ngValue]="'anual'">Anual</option>
@@ -449,7 +449,12 @@
                 {{modalidad.nombre}}
               </h4>
               <p>{{modalidad.descripcion}}</p>
-              <small>Duración: {{modalidad.duracion || 'No especificada'}}</small>
+              <div class="text-muted mb-2" *ngIf="modalidad.monto_arancel">
+                <small>
+                  <i class="bi bi-cash-coin me-1"></i>
+                  Arancel: {{ modalidad.monto_arancel }}
+                </small>
+              </div>
             </div>
           </div>
           
@@ -529,8 +534,6 @@
               <i class="bi" [ngClass]="mod.icono || 'bi-award'"></i>
             </div>
             <h4 class="modalidad-nombre">{{mod.nombre}}</h4>
-            <p class="modalidad-descripcion">{{mod.descripcion}}</p>
-            <small class="modalidad-duracion">Duración: {{mod.duracion}}</small>
             <button class="btn btn-outline-primary btn-sm mt-2">Seleccionar</button>
           </div>
         </div>
