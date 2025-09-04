@@ -329,7 +329,7 @@ input {
 }
 
 // Estilos de tabla para Aranceles (basados en Modalidad de Graduación)
-.aranceles-card {
+.aranceles-card, .docs-card {
   .card-title {
     color: $text-dark-blue;
     margin: 0 0 20px 0;
@@ -388,7 +388,7 @@ input {
 }
 
 // Tarjeta de modalidad
-.modalidad-card, .inicio-card {
+.modalidad-card, .inicio-card, .docs-card {
   background: #ffffffd2;
   border-radius: $border-radius;
   box-shadow: $shadow;

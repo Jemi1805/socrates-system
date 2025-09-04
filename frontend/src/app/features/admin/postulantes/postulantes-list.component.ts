@@ -78,6 +78,8 @@ export class PostulantesListComponent implements OnInit {
   aranceles: any[] = [];
   arancelesGraduacion: any[] = [];
   totalAranceles = 0;
+  selectedAranceles: any[] = [];
+  totalArancelesSeleccionados = 0;
   
   // Estados de carga
   loadingModalidades = false;
@@ -424,6 +426,9 @@ export class PostulantesListComponent implements OnInit {
       return;
     }
     this.loadingAranceles = true;
+    // Limpiar selección previa al recargar
+    this.selectedAranceles = [];
+    this.totalArancelesSeleccionados = 0;
     const carreraRaw = this.estudiante?.carrera || this.postulanteActual.carrera;
     const carrera = this.normalizarCarrera(carreraRaw || null) || undefined;
     this.postulanteService.getArancelesMaterialExtra(codCeta as number | string, carrera).subscribe({
@@ -439,6 +444,33 @@ export class PostulantesListComponent implements OnInit {
         this.loadingAranceles = false;
       }
     });
+  }
+
+  // --- Selección de aranceles y total ---
+  isArancelSeleccionado(a: any): boolean {
+    return this.selectedAranceles.includes(a);
+  }
+
+  onArancelToggle(a: any, checked: boolean) {
+    if (checked) {
+      if (!this.isArancelSeleccionado(a)) {
+        this.selectedAranceles.push(a);
+      }
+    } else {
+      this.selectedAranceles = this.selectedAranceles.filter(x => x !== a);
+    }
+    this.recalcularTotalSeleccionados();
+  }
+
+  recalcularTotalSeleccionados() {
+    this.totalArancelesSeleccionados = this.selectedAranceles.reduce((sum, x) => sum + this.toNumber(x?.monto), 0);
+  }
+
+  private toNumber(val: any): number {
+    if (val === null || val === undefined) return 0;
+    if (typeof val === 'number') return isFinite(val) ? val : 0;
+    const parsed = parseFloat(val.toString().replace(/[^0-9,.-]/g, '').replace(',', '.'));
+    return isNaN(parsed) ? 0 : parsed;
   }
 
   private normalizarCarrera(c: string | null | undefined): string | null {

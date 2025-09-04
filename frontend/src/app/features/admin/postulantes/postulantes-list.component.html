@@ -403,6 +403,7 @@
               <th>Factura</th>
               <th>Recibo</th>
               <th>Razón Social/NIT</th>
+              <th class="text-center">Sel</th>
             </tr>
           </thead>
           <tbody>
@@ -419,6 +420,9 @@
                   {{ a.razon || '' }}<ng-container *ngIf="a.nit"> / {{ a.nit }}</ng-container>
                 </ng-container>
                 <ng-template #razonNitVacio>-</ng-template>
+              </td>
+              <td class="text-center">
+                <input type="checkbox" [checked]="isArancelSeleccionado(a)" (change)="onArancelToggle(a, $any($event.target).checked)" />
               </td>
             </tr>
           </tbody>
@@ -455,17 +459,57 @@
           </button>
         </div>
       </div>
+      
+      <!-- Aranceles seleccionados y total -->
+      <div class="docs-card">
+        <h3 class="card-title">
+          <i class="bi bi-bag-check me-2"></i>
+          Aranceles seleccionados
+          <small class="text-muted" *ngIf="selectedAranceles.length > 0">Total: {{ totalArancelesSeleccionados | number:'1.2-2' }}</small>
+        </h3>
         
-        <ng-template #selectModalidadFirst>
-          <div class="no-modalidad-message">
-            <p><i class="bi bi-info-circle me-2"></i> Por favor seleccione una modalidad de graduación primero</p>
-            <button class="btn btn-outline-primary btn-sm" (click)="mostrarModal()">
-              <i class="bi bi-list-check me-1"></i>
-              Seleccionar Modalidad
-            </button>
-          </div>
-        </ng-template>
+        <div *ngIf="selectedAranceles.length === 0" class="alert alert-info">
+          Selecciona aranceles en la tabla de la izquierda para verlos aquí.
+        </div>
+
+        <div class="table-responsive" *ngIf="selectedAranceles.length > 0">
+          <table class="table table-sm table-striped align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th>N°</th>
+                <th>Fecha</th>
+                <th>Concepto</th>
+                <th class="text-end">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let a of selectedAranceles; let i = index">
+                <td>{{ i + 1 }}</td>
+                <td>{{ a.fecha || '-' }}</td>
+                <td>{{ a.concepto || '-' }}</td>
+                <td class="text-end">{{ a.monto || '-' }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <th colspan="3" class="text-end">Total</th>
+                <th class="text-end">{{ totalArancelesSeleccionados | number:'1.2-2' }}</th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       </div>
+    
+      <ng-template #selectModalidadFirst>
+        <div class="no-modalidad-message">
+          <p><i class="bi bi-info-circle me-2"></i> Por favor seleccione una modalidad de graduación primero</p>
+          <button class="btn btn-outline-primary btn-sm" (click)="mostrarModal()">
+            <i class="bi bi-list-check me-1"></i>
+            Seleccionar Modalidad
+          </button>
+        </div>
+      </ng-template>
+    </div>
   
   <!-- Modal de selección de modalidad -->
   <div class="modal-overlay" *ngIf="modalVisible">
