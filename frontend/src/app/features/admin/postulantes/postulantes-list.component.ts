@@ -545,6 +545,17 @@ export class PostulantesListComponent implements OnInit {
     this.totalArancelesSeleccionados = this.selectedAranceles.reduce((sum, x) => sum + this.toNumber(x?.monto), 0);
   }
 
+  // Acciones de aranceles seleccionados
+  marcarPagoCompleto() {
+    // Placeholder: aquí podrías persistir estado de pago completo
+    console.log('[Aranceles] Pago completo confirmado. Total seleccionado:', this.totalArancelesSeleccionados, 'items:', this.selectedAranceles.length);
+  }
+
+  marcarConDeuda() {
+    // Placeholder: aquí podrías persistir estado de pago con deuda
+    console.log('[Aranceles] Marcado con deuda. Total seleccionado:', this.totalArancelesSeleccionados, 'items:', this.selectedAranceles.length);
+  }
+
   private toNumber(val: any): number {
     if (val === null || val === undefined) return 0;
     if (typeof val === 'number') return isFinite(val) ? val : 0;
