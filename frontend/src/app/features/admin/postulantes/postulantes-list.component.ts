@@ -73,6 +73,8 @@ export class PostulantesListComponent implements OnInit {
   modalVisible = false;
   showBiographicalData = true;
   showBachilleratoData = true;
+  // Nuevo registro: habilita selects de carrera y pensum
+  esNuevoPostulante = false;
 
   // Aranceles
   aranceles: any[] = [];
@@ -80,6 +82,27 @@ export class PostulantesListComponent implements OnInit {
   totalAranceles = 0;
   selectedAranceles: any[] = [];
   totalArancelesSeleccionados = 0;
+  // Registro manual de aranceles
+  nuevoArancel: {
+    gestion: string;
+    fecha: string;
+    concepto: string;
+    monto: string | number;
+    num_factura: string;
+    num_comprobante: string;
+    razon: string;
+    nit: string;
+  } = {
+    gestion: '',
+    fecha: '',
+    concepto: '',
+    monto: '',
+    num_factura: '',
+    num_comprobante: '',
+    razon: '',
+    nit: ''
+  };
+  arancelManualError: string | null = null;
   
   // Estados de carga
   loadingModalidades = false;
@@ -190,6 +213,7 @@ export class PostulantesListComponent implements OnInit {
       const datos = JSON.parse(datosPostulacion);
       this.estudiante = datos.estudiante;
       this.modalidad = datos.modalidad;
+      this.esNuevoPostulante = false;
       
       // Pre-llenar el formulario con los datos del estudiante
       if (this.estudiante) {
@@ -214,6 +238,9 @@ export class PostulantesListComponent implements OnInit {
           this.cargarModalidadActual();
         }
       }
+    } else {
+      // Si no hay datos en sessionStorage venimos de "Registrar postulante": habilitar selectores
+      this.esNuevoPostulante = true;
     }
     // Nota: la carga de pensums se realiza en ngOnInit()
   }
@@ -251,6 +278,17 @@ export class PostulantesListComponent implements OnInit {
         this.pensums = [];
       }
     });
+  }
+
+  // --- Cambio de carrera en nuevo registro ---
+  onCarreraChange(newCarrera: string | null) {
+    // Actualizar carrera seleccionada para nuevo postulante
+    this.carreraNormalizada = newCarrera;
+    this.postulanteActual.carrera = newCarrera || '';
+    // Limpiar pensum previo para recalcular
+    this.postulanteActual.pensum = undefined as any;
+    // Recargar lista de pensums según carrera seleccionada
+    this.cargarPensums();
   }
 
   cargarPostulantes() {
@@ -543,6 +581,46 @@ export class PostulantesListComponent implements OnInit {
 
   recalcularTotalSeleccionados() {
     this.totalArancelesSeleccionados = this.selectedAranceles.reduce((sum, x) => sum + this.toNumber(x?.monto), 0);
+  }
+
+  // --- Arancel manual: agregar a seleccionados ---
+  agregarArancelManual() {
+    this.arancelManualError = null;
+    if (!this.esNuevoPostulante) {
+      this.arancelManualError = 'El registro manual de arancel solo está disponible para nuevos postulantes.';
+      return;
+    }
+    const montoNum = this.toNumber(this.nuevoArancel.monto);
+    if (!this.nuevoArancel.concepto || montoNum <= 0) {
+      this.arancelManualError = 'Ingrese al menos Concepto y un Monto válido (> 0).';
+      return;
+    }
+    const item: any = {
+      gestion: (this.nuevoArancel.gestion || '').toString(),
+      fecha: this.nuevoArancel.fecha || '',
+      concepto: this.nuevoArancel.concepto,
+      monto: montoNum,
+      num_factura: (this.nuevoArancel.num_factura || '').toString(),
+      num_comprobante: (this.nuevoArancel.num_comprobante || '').toString(),
+      razon: this.nuevoArancel.razon || '',
+      nit: (this.nuevoArancel.nit || '').toString(),
+      origen: 'manual',
+      pagado: true,
+    };
+    // Añadir directamente a seleccionados para reflejar pago manual
+    this.selectedAranceles.push(item);
+    this.recalcularTotalSeleccionados();
+    // Limpiar formulario
+    this.nuevoArancel = {
+      gestion: '',
+      fecha: '',
+      concepto: '',
+      monto: '',
+      num_factura: '',
+      num_comprobante: '',
+      razon: '',
+      nit: ''
+    };
   }
 
   // Acciones de aranceles seleccionados

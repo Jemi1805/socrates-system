@@ -10,7 +10,7 @@
   <div class="content-wrapper">
     
     <!-- Datos biográficos del estudiante -->
-    <div class="biographical-card" *ngIf="estudiante">
+    <div class="biographical-card">
       <div class="bio-header">
         <h3>
           <i class="bi bi-person-vcard me-2"></i>
@@ -25,7 +25,7 @@
         <div class="bio-row">
           <div class="bio-item">
             <span class="bio-label">Carrera:</span>
-            <select class="form-select" [(ngModel)]="carreraNormalizada" name="carrera" disabled>
+            <select class="form-select" [(ngModel)]="carreraNormalizada" name="carrera" [disabled]="!esNuevoPostulante" (ngModelChange)="onCarreraChange($event)">
               <option [ngValue]="null">Seleccione carrera</option>
               <option [ngValue]="'mecanica'">Mecánica Automotriz</option>
               <option [ngValue]="'electricidad'">Electricidad y Electrónica Automotriz</option>
@@ -33,7 +33,7 @@
           </div>
           <div class="bio-item">
             <span class="bio-label">Pensum:</span>
-            <select class="form-select" [(ngModel)]="postulanteActual.pensum" name="pensum" disabled>
+            <select class="form-select" [(ngModel)]="postulanteActual.pensum" name="pensum" [disabled]="!esNuevoPostulante">
               <option [ngValue]="null" disabled>Seleccione pensum</option>
               <option *ngFor="let p of pensums" [ngValue]="p">{{ p }}</option>
             </select>
@@ -115,7 +115,7 @@
           <div class="row g-3">
             <div class="col-md-3">
               <label class="form-label">N° de Serie</label>
-              <input type="text" class="form-control" [(ngModel)]="diplomaNacional.nro_serie" placeholder="Ej. 123456" [(ngModel)]="postulanteActual.nro_serie_titulo" />
+              <input type="text" class="form-control" [(ngModel)]="postulanteActual.nro_serie_titulo" placeholder="Ej. 123456" />
             </div>
             <div class="col-md-4">
               <label class="form-label">Emisión</label>
@@ -378,6 +378,53 @@
             <i class="bi bi-arrow-repeat me-1"></i>
             Actualizar
           </button>
+        </div>
+      </div>
+
+      <!-- Registro manual de aranceles (solo para nuevo postulante) -->
+      <div class="manual-arancel my-3 p-3 border rounded" *ngIf="esNuevoPostulante">
+        <div class="row g-2">
+          <div class="col-md-2">
+            <label class="form-label">Gestión</label>
+            <input type="text" class="form-control" [(ngModel)]="nuevoArancel.gestion" placeholder="Ej. 1/2025" />
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Fecha</label>
+            <input type="date" class="form-control" [(ngModel)]="nuevoArancel.fecha" />
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Concepto</label>
+            <input type="text" class="form-control" [(ngModel)]="nuevoArancel.concepto" placeholder="Concepto del arancel" />
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Monto</label>
+            <input type="number" class="form-control" [(ngModel)]="nuevoArancel.monto" placeholder="0.00" />
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Razón Social</label>
+            <input type="text" class="form-control" [(ngModel)]="nuevoArancel.razon" placeholder="Nombre / Razón Social" />
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">NIT</label>
+            <input type="text" class="form-control" [(ngModel)]="nuevoArancel.nit" placeholder="NIT" />
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Factura</label>
+            <input type="text" class="form-control" [(ngModel)]="nuevoArancel.num_factura" placeholder="N° Factura" />
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Recibo</label>
+            <input type="text" class="form-control" [(ngModel)]="nuevoArancel.num_comprobante" placeholder="N° Recibo" />
+          </div>
+          <div class="col-12 d-flex align-items-center mt-1">
+            <div *ngIf="arancelManualError" class="alert alert-warning py-1 px-2 me-auto mb-0">
+              {{ arancelManualError }}
+            </div>
+            <button type="button" class="btn btn-success ms-auto" (click)="agregarArancelManual()">
+              <i class="bi bi-plus-lg me-1"></i>
+              Agregar arancel
+            </button>
+          </div>
         </div>
       </div>
 

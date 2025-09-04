@@ -132,13 +132,16 @@ export class ModalidadGraduacionComponent implements OnInit {
               this.estudiantes = [response.data];
             }
             
+            // Filtrar resultados vacíos/ inválidos para evitar filas sin datos
+            this.estudiantes = (this.estudiantes || []).filter(e => this.tieneDatosEstudiante(e));
+
             console.log('Estudiantes encontrados (CETA):', this.estudiantes.length, this.estudiantes);
             
             if (this.estudiantes.length > 0) {
               this.estudiantesEncontrados = true;
               this.intentoBusqueda = false;
             } else {
-              this.error = 'No se encontraron estudiantes con el código CETA proporcionado';
+              this.estudiantesEncontrados = false;
             }
           } catch (e) {
             console.error('Error al procesar datos (CETA):', e);
@@ -198,6 +201,9 @@ export class ModalidadGraduacionComponent implements OnInit {
                 this.estudiantes = [response.data];
               }
               
+              // Filtrar resultados vacíos/ inválidos
+              this.estudiantes = (this.estudiantes || []).filter(e => this.tieneDatosEstudiante(e));
+
               console.log('Estudiantes encontrados:', this.estudiantes.length, this.estudiantes);
               
               if (this.estudiantes.length > 0) {
@@ -209,6 +215,7 @@ export class ModalidadGraduacionComponent implements OnInit {
                 }
                 this.intentoBusqueda = false;
               } else {
+                this.estudiantesEncontrados = false;
                 this.error = 'No se encontraron estudiantes con los criterios proporcionados';
               }
             } else {
@@ -288,6 +295,29 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.modalidadSeleccionada = null;
     this.error = '';
     this.intentoBusqueda = false;
+  }
+
+  registrarNuevoPostulante() {
+    // Limpiar cualquier dato previo y navegar a la interfaz de Postulantes vacía
+    try {
+      sessionStorage.removeItem('datos_postulacion');
+    } catch (e) {
+      console.warn('No se pudo limpiar sessionStorage', e);
+    }
+    this.router.navigate(['/postulantes']);
+  }
+
+  tieneDatosEstudiante(e: any): boolean {
+    if (!e || typeof e !== 'object') {
+      return false;
+    }
+    const cod = ((e.cod_ceta ?? e.codCeta ?? e.codigo_ceta) ?? '').toString().trim();
+    const nombres = (e.nombres ?? '').toString().trim();
+    const apPat = (e.ap_pat ?? '').toString().trim();
+    const apMat = (e.ap_mat ?? '').toString().trim();
+    const ci = (e.ci ?? '').toString().trim();
+    // Consideramos válido si existe al menos un dato identificatorio
+    return !!(cod || ci || nombres || apPat || apMat);
   }
 
   // Métodos para mejorar la UI de modalidades

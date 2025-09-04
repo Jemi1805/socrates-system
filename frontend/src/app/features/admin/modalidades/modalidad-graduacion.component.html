@@ -158,11 +158,25 @@
           <i class="bi bi-exclamation-triangle me-2"></i>
           {{ error }}
         </div>
+
+        <!-- Acción cuando no se encuentran estudiantes -->
+        <div 
+          *ngIf="!loading && intentoBusqueda && estudiantes.length === 0" 
+          class="alert alert-info mt-3 d-flex justify-content-between align-items-center">
+          <div>
+            <i class="bi bi-info-circle me-2"></i>
+            No se encontraron estudiantes con los criterios proporcionados.
+          </div>
+          <button type="button" class="btn btn-success btn-sm" (click)="registrarNuevoPostulante()">
+            <i class="bi bi-person-plus me-1"></i>
+            Registrar postulante
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- Tabla de estudiantes encontrados -->
-    <div *ngIf="estudiantesEncontrados && estudiantes.length > 0" class="student-table-card">
+    <div *ngIf="!loading && estudiantes.length > 0" class="student-table-card">
       <div class="card-body">
         <h5 class="card-title mb-3">
           <i class="bi bi-table me-2"></i>
