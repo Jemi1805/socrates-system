@@ -21,6 +21,52 @@ $transition: all 0.3s ease;
   padding: 0;
 }
 
+// Dropdown de gestiones dentro de la tarjeta de Aranceles
+.aranceles-card {
+  position: relative;
+  z-index: 0; // mantener por debajo de los dropdowns de datos-carrera
+  overflow: visible; // evitar que recorte elementos superpuestos (dropdown de arriba)
+
+  .dropdown.w-100 { position: relative; z-index: 2001; }
+  .gestion-dropdown-menu {
+    position: absolute;
+    left: 0; right: 0; top: calc(100% + 4px);
+    min-width: 100%;
+    max-height: 200px; // ~5 ítems
+    overflow-y: auto;
+    z-index: 2000;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  }
+  .gestion-dropdown-menu .dropdown-item { color: $text-dark-blue; }
+  .gestion-dropdown-menu .dropdown-item.active,
+  .gestion-dropdown-menu .dropdown-item:active {
+    background-color: $primary-color;
+    color: #fff;
+  }
+}
+
+// Priorizar superposición de la tarjeta de Inicio sobre la de Conclusión
+.inicio-card {
+  position: relative;
+  z-index: 15; // asegurar prioridad sobre tarjetas siguientes
+}
+.conclusion-card {
+  position: relative;
+  z-index: 12;
+}
+
+// Ajustes responsivos para el dropdown (evitar desbordes en pantallas pequeñas)
+@media (max-width: 576px) {
+  .datos-carrera-container {
+    .gestion-dropdown-menu {
+      max-height: 240px;
+      width: 100%;
+      left: 0;
+      right: 0;
+    }
+  }
+}
+
 .content-wrapper {
   max-width: 1200px;
   margin: 0 auto;
@@ -388,7 +434,43 @@ input {
 }
 
 // Tarjeta de modalidad
-.modalidad-card, .inicio-card, .docs-card {
+.datos-carrera-container{
+  position: relative; // crear contexto para z-index de dropdown en inicio-card
+  z-index: 10; // por encima de aranceles-card y otras tarjetas debajo
+  isolation: isolate; // aísla stacking context para respetar z-index internos
+
+  // Menú de gestiones con altura limitada (~5 ítems) y scroll
+  .gestion-dropdown-menu {
+    max-height: 200px; // aprox. 5 elementos visibles
+    overflow-y: auto;
+    min-width: 100%;
+    z-index: 2000; // forzar por encima de otras cards y sombras
+    position: absolute; // asegurar superposición correcta
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px); // anclar justo debajo del botón
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  }
+  // Asegurar contexto de posicionamiento para el menú
+  .dropdown.w-100 {
+    position: relative;
+    z-index: 2001; // contenedor por encima también
+    .dropdown-toggle {
+      position: relative;
+      z-index: 2100; // asegurar que el texto/botón quede por encima de tarjetas que se solapen
+    }
+  }
+  .gestion-dropdown-menu .dropdown-item {
+    color: $text-dark-blue;
+  }
+  .gestion-dropdown-menu .dropdown-item.active,
+  .gestion-dropdown-menu .dropdown-item:active {
+    background-color: $primary-color;
+    color: #fff;
+  }
+}
+
+.modalidad-card, .inicio-card, .conclusion-card, .docs-card {
   background: #ffffffd2;
   border-radius: $border-radius;
   box-shadow: $shadow;

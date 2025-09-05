@@ -316,17 +316,20 @@
                 </h6>
                 
                 <div class="row">
-                  <div class="col-md-4">
-                    <strong>Duración:</strong><br>
-                    <small class="text-muted">{{ getModalidadDuration(modalidadSeleccionada.id) }}</small>
-                  </div>
-                  <div class="col-md-4">
+                  <div class="col-md-3">
                     <strong>Arancel:</strong><br>
                     <small class="text-muted">{{ modalidadSeleccionada.monto_arancel || 'No especificado' }}</small>
                   </div>
+                  <div class="col-md-5">
+                    <strong>Requisistos:</strong><br>
+                    <small class="text-muted d-block" *ngFor="let requirement of getModalidadRequirements(modalidadSeleccionada!.id).split(',')">                   
+                      <i class="bi bi-check2 me-1"></i>
+                      {{ requirement }}
+                    </small>
+                  </div>
                   <div class="col-md-4">
-                    <strong>Requisitos:</strong><br>
-                    <small class="text-muted">{{ getModalidadRequirements(modalidadSeleccionada.id) }}</small>
+                    <strong>Proceso:</strong><br>
+                    <small class="text-muted">{{ getModalidadProcess(modalidadSeleccionada.id) }}</small>
                   </div>
                 </div>
               </div>

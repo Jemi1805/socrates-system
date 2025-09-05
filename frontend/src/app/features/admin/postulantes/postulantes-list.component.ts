@@ -196,6 +196,145 @@ export class PostulantesListComponent implements OnInit {
     gestion_fin: ''
   };
 
+  // --- Gestiones (inicio/conclusión) ---
+  gestionesOpciones: string[] = [];
+  private readonly MIN_GESTIONES_DIF = 5; // conclusión debe ser al menos 5 gestiones después del inicio
+  // Opción 1: mostrar pocas opciones por defecto y permitir "ver todas"
+  mostrarTodasGestiones = false;
+  private readonly N_ULTIMAS = 20;
+
+  private generarGestiones(desdeYear: number = 2006) {
+    const ahora = new Date();
+    let yearActual = ahora.getFullYear();
+    const mes = ahora.getMonth() + 1; // 1-12
+    // Determinar gestión actual considerando el rango dado: 1 = Feb-Jun, 2 = Jul-Nov, tratar Dic como 2; Ene como 2 del año anterior
+    let semestreActual: 1 | 2;
+    if (mes >= 2 && mes <= 6) {
+      semestreActual = 1;
+    } else if (mes >= 7 && mes <= 12) {
+      semestreActual = 2;
+    } else {
+      // mes === 1 (enero): considerar como 2 del año anterior
+      semestreActual = 2;
+      yearActual = yearActual - 1;
+    }
+    const ultimaGestion = `${semestreActual}/${yearActual}`;
+
+    const opciones: string[] = [];
+    for (let y = desdeYear; y <= yearActual; y++) {
+      // 1er semestre siempre
+      opciones.push(`1/${y}`);
+      // 2do semestre solo si no sobrepasa la última gestión
+      if (!(y === yearActual && semestreActual === 1)) {
+        opciones.push(`2/${y}`);
+      }
+    }
+    // Asegurar que la última gestión calculada está incluida y quitar posibles extras
+    this.gestionesOpciones = opciones.filter(g => this.indiceGestion(g) <= this.indiceGestion(ultimaGestion));
+  }
+
+  private indiceGestion(gestion: string): number {
+    // Formato esperado: "1/AAAA" o "2/AAAA"
+    if (!gestion) return -1;
+    const m = gestion.toString().trim().match(/^(1|2)\/(\d{4})$/);
+    if (!m) return -1;
+    const sem = parseInt(m[1], 10); // 1 o 2
+    const year = parseInt(m[2], 10);
+    return year * 2 + (sem - 1);
+  }
+
+  get gestionesConclusionOpciones(): string[] {
+    const ini = this.datosInicioCarrera.gestion_ini;
+    if (!ini) return this.gestionesOpciones;
+    const minIdx = this.indiceGestion(ini) + this.MIN_GESTIONES_DIF;
+    return this.gestionesOpciones.filter(g => this.indiceGestion(g) >= minIdx);
+  }
+
+  // Listas para UI (limitadas) segun toggle
+  get gestionesOpcionesUI(): string[] {
+    if (this.mostrarTodasGestiones) return this.gestionesOpciones;
+    const arr = this.gestionesOpciones;
+    return arr.slice(Math.max(0, arr.length - this.N_ULTIMAS));
+  }
+
+  get gestionesConclusionOpcionesUI(): string[] {
+    const base = this.gestionesConclusionOpciones;
+    if (this.mostrarTodasGestiones) return base;
+    return base.slice(Math.max(0, base.length - this.N_ULTIMAS));
+  }
+
+  get gestionValida(): boolean {
+    const ini = this.datosInicioCarrera.gestion_ini;
+    const fin = this.datosConclusionCarrera.gestion_fin;
+    if (!ini || !fin) return true; // no validar hasta que ambos estén seleccionados
+    return this.indiceGestion(fin) >= this.indiceGestion(ini) + this.MIN_GESTIONES_DIF;
+  }
+
+  get gestionErrorMessage(): string | null {
+    const ini = this.datosInicioCarrera.gestion_ini;
+    const fin = this.datosConclusionCarrera.gestion_fin;
+    if (!ini || !fin) return null;
+    if (this.gestionValida) return null;
+    return `La gestión de conclusión debe ser mayor a la de inicio por al menos ${this.MIN_GESTIONES_DIF} gestiones.`;
+  }
+
+  // --- Handlers para dropdown custom ---
+  setGestionInicio(g: string) {
+    this.datosInicioCarrera.gestion_ini = g;
+    // Si la conclusión ya no es válida con el nuevo inicio, resetearla
+    if (!this.gestionValida && this.datosConclusionCarrera.gestion_fin) {
+      this.datosConclusionCarrera.gestion_fin = '';
+    }
+  }
+
+  setGestionFin(g: string) {
+    this.datosConclusionCarrera.gestion_fin = g;
+  }
+
+  get labelGestionInicio(): string {
+    return this.datosInicioCarrera.gestion_ini || 'Seleccione gestión';
+  }
+
+  get labelGestionFin(): string {
+    return this.datosConclusionCarrera.gestion_fin || 'Seleccione gestión';
+  }
+
+  // --- Regímenes (dropdown custom) ---
+  readonly regimenOptions: { value: 'semestral' | 'anual'; label: string }[] = [
+    { value: 'semestral', label: 'Semestral' },
+    { value: 'anual', label: 'Anual' },
+  ];
+
+  setRegimenInicio(v: 'semestral' | 'anual') {
+    this.datosInicioCarrera.reg_ini_c = v;
+  }
+
+  setRegimenFin(v: 'semestral' | 'anual') {
+    this.datosConclusionCarrera.reg_con_c = v;
+  }
+
+  get labelRegimenInicio(): string {
+    const v = this.datosInicioCarrera.reg_ini_c as 'semestral' | 'anual' | undefined;
+    const found = this.regimenOptions.find(o => o.value === v);
+    return found?.label || 'Seleccione tipo de Régimen';
+  }
+
+  get labelRegimenFin(): string {
+    const v = this.datosConclusionCarrera.reg_con_c as 'semestral' | 'anual' | undefined;
+    const found = this.regimenOptions.find(o => o.value === v);
+    return found?.label || 'Seleccione tipo de Régimen';
+  }
+
+  // --- Gestión para registro manual de aranceles ---
+  setNuevoArancelGestion(g: string) {
+    if (!this.nuevoArancel) return;
+    this.nuevoArancel.gestion = g;
+  }
+
+  get labelNuevoArancelGestion(): string {
+    return this.nuevoArancel?.gestion || 'Seleccione gestión';
+  }
+
   constructor(private postulanteService: PostulanteService, private sgaService: SgaService) {}
 
   ngOnInit() {
@@ -205,6 +344,8 @@ export class PostulantesListComponent implements OnInit {
     this.cargarPensums();
     // Cargar modalidades desde el backend
     this.cargarModalidades();
+    // Generar lista de gestiones dinámicamente
+    this.generarGestiones();
   }
 
   cargarDatosPostulacion() {

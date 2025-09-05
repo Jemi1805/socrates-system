@@ -324,49 +324,47 @@ export class ModalidadGraduacionComponent implements OnInit {
   getModalidadIcon(modalidadId: number): string {
     const icons = {
       1: 'bi bi-journal-text',     // Tesis
-      2: 'bi bi-gear-fill',        // Proyecto de Grado
-      3: 'bi bi-building',         // Trabajo Dirigido
-      4: 'bi bi-clipboard-check'   // Examen de Conocimientos
+      2: 'bi bi-gear-fill',        // Proyecto Sociocomunitario Productivo
+      3: 'bi bi-building',         // Proyecto de Emprendimiento Productivo
+      4: 'bi bi-clipboard-check',   // Trabajo Dirigido Externo
+      5: 'bi bi-award-fill',       // Graduacion por Experiencia Laboral
+      6: 'bi bi-lightning-fill'    // Graduación por Excelencia Académica
     };
     return icons[modalidadId as keyof typeof icons] || 'bi bi-mortarboard';
   }
 
-  getModalidadDifficulty(modalidadId: number): number {
-    const difficulty = {
-      1: 5, // Tesis - Más difícil
-      2: 4, // Proyecto de Grado
-      3: 3, // Trabajo Dirigido
-      4: 2  // Examen de Conocimientos - Menos difícil
-    };
-    return difficulty[modalidadId as keyof typeof difficulty] || 3;
-  }
-
   getModalidadDuration(modalidadId: number): string {
     const durations = {
-      1: '12-18 meses',
-      2: '8-12 meses',
-      3: '6-9 meses',
-      4: '3-6 meses'
+      1: '4 meses',
+      2: '4 meses',
+      3: '4 meses',
+      4: '4 meses',
+      5: 'Variable',
+      6: '4 meses'
     };
     return durations[modalidadId as keyof typeof durations] || 'Variable';
   }
 
   getModalidadRequirements(modalidadId: number): string {
     const requirements = {
-      1: 'Promedio mínimo 75, propuesta aprobada, tutor asignado',
-      2: 'Promedio mínimo 70, proyecto factible, recursos disponibles',
-      3: 'Promedio mínimo 65, convenio institucional, supervisor designado',
-      4: 'Promedio mínimo 60, materias aprobadas, inscripción vigente'
+      1: 'Definición de Tema o área de trabajo, Formulario 1 (FDMG-1), Tutor Asignado, Perfil de Proyecto de Grado, Informe de Suficiencia, Perfil de Proyecto de Grado Aprobado',
+      2: 'Equipo de 2-3 estudiantes (mismo instituto), Equipo 2-5 (diferentes institutos), Definición de Tema o área de trabajo, Formulario 1 (FDMG-1), Tutor Asignado, Perfil del Proyecto Sociocomunitario, Informe de Suficiencia, Perfil de Proyecto Sociocomunitario Aprobado',
+      3: 'Equipo de 1-3 estudiantes, Definición de Tema o área de trabajo, Formulario 1 (FDMG-1), Tutor Asignado, Perfil del Proyecto de Emprendimiento Productivo, Enriquecimiento del proyecto, Perfil del Proyecto de Emprendimiento Productivo Aprobado',
+      4: 'Definición de área de trabajo, Formulario 1 (FDMG-1), Tutor Asignado, Perfil de Trabajo Dirigido, Informe Técnico de Tutor y Supervisor de la Institución/Empresa/Emprendimiento, Perfil de Trabajo Dirigido Aprobado',
+      5: 'Promedio general >= 90, No haber reprobado ninguna materia, Solicitud con nota a Dirección Académica',
+      6: 'Definición Propuesta de Mejora Técnica/Tecnológica de Innoovación, Documentación de respaldo, Formulario 1 (FDMG-1), Tutor Asignado, Aprobación de la propuesta por inmediato superior, Informe de Tutor, Informe de Supervisor, Propuesta Aprobada'
     };
     return requirements[modalidadId as keyof typeof requirements] || 'Consultar reglamento';
   }
 
   getModalidadProcess(modalidadId: number): string {
     const processes = {
-      1: 'Propuesta → Perfil → Desarrollo → Defensa → Graduación',
-      2: 'Propuesta → Desarrollo → Implementación → Defensa → Graduación',
+      1: 'Desarrollo del Proyecto de Grado → Pre-Defensa → Defensa → Graduación',
+      2: 'Desarrollo del Proyecto Sociocomunitario → Pre-Defensa → Defensa → Graduación',
       3: 'Postulación → Asignación → Desarrollo → Informe → Graduación',
-      4: 'Inscripción → Preparación → Exámenes → Resultados → Graduación'
+      4: 'Desarrollo del Trabajo Dirigido Externo → Informes de Trabajo → Exposición de su trabajo en sus etapas teórico-prácticas → Graduación',
+      5: 'Nota de aceptación a la solicitud → Acta de Modalidad de Graduación por Excelencia Académica → Graduación',
+      6: 'Desarrollo de la Propuesta de Mejora Técnica/Tecnológica → Informe Final → Defensa de la Propuesta → Graduación'
     };
     return processes[modalidadId as keyof typeof processes] || 'Proceso estándar';
   }
