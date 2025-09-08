@@ -311,7 +311,10 @@ class SgaController extends Controller
         $carreraNorm = $this->normalizeCarrera($carreraRaw);
         if (empty($codCarrera)) {
             // Primero intentar resolver desde la tabla carrera por nombre
-            $codCarrera = $this->findCodCarreraByNombre($carreraNorm) ?? $this->carreraToCodCarrera($carreraNorm);
+            $codCarrera = $this->findCodCarreraByNombre($carreraNorm);
+            if ($codCarrera === null) {
+                $codCarrera = $this->carreraToCodCarrera($carreraNorm);
+            }
         }
 
         $pensums = [];

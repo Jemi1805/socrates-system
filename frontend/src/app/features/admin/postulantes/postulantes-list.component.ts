@@ -82,6 +82,10 @@ export class PostulantesListComponent implements OnInit {
   totalAranceles = 0;
   selectedAranceles: any[] = [];
   totalArancelesSeleccionados = 0;
+  // Estado de pago para los aranceles seleccionados (conmutador Pago completo / Con deuda)
+  pagoCompletoSeleccionados = false;
+  // Edición de arancel manual
+  editingArancelIndex: number | null = null;
   // Registro manual de aranceles
   nuevoArancel: {
     gestion: string;
@@ -198,7 +202,7 @@ export class PostulantesListComponent implements OnInit {
 
   // --- Gestiones (inicio/conclusión) ---
   gestionesOpciones: string[] = [];
-  private readonly MIN_GESTIONES_DIF = 5; // conclusión debe ser al menos 5 gestiones después del inicio
+  private readonly MIN_GESTIONES_DIF = 1; // conclusión debe ser al menos 5 gestiones después del inicio
   // Opción 1: mostrar pocas opciones por defecto y permitir "ver todas"
   mostrarTodasGestiones = false;
   private readonly N_ULTIMAS = 20;
@@ -748,10 +752,46 @@ export class PostulantesListComponent implements OnInit {
       origen: 'manual',
       pagado: true,
     };
-    // Añadir directamente a seleccionados para reflejar pago manual
-    this.selectedAranceles.push(item);
+    if (this.editingArancelIndex !== null && this.editingArancelIndex >= 0 && this.editingArancelIndex < this.selectedAranceles.length) {
+      // Guardar cambios sobre el ítem existente
+      this.selectedAranceles[this.editingArancelIndex] = { ...this.selectedAranceles[this.editingArancelIndex], ...item };
+      this.editingArancelIndex = null;
+    } else {
+      // Añadir directamente a seleccionados para reflejar pago manual
+      this.selectedAranceles.push(item);
+    }
     this.recalcularTotalSeleccionados();
     // Limpiar formulario
+    this.nuevoArancel = {
+      gestion: '',
+      fecha: '',
+      concepto: '',
+      monto: '',
+      num_factura: '',
+      num_comprobante: '',
+      razon: '',
+      nit: ''
+    };
+  }
+
+  editarArancelManual(item: any, index: number) {
+    if (!this.esNuevoPostulante) return;
+    // Prefill del formulario con los datos del ítem manual
+    this.nuevoArancel = {
+      gestion: (item?.gestion || '').toString(),
+      fecha: item?.fecha || '',
+      concepto: item?.concepto || '',
+      monto: this.toNumber(item?.monto),
+      num_factura: (item?.num_factura || '').toString(),
+      num_comprobante: (item?.num_comprobante || '').toString(),
+      razon: item?.razon || '',
+      nit: (item?.nit || '').toString(),
+    };
+    this.editingArancelIndex = index;
+  }
+
+  cancelarEdicionArancelManual() {
+    this.editingArancelIndex = null;
     this.nuevoArancel = {
       gestion: '',
       fecha: '',
@@ -773,6 +813,13 @@ export class PostulantesListComponent implements OnInit {
   marcarConDeuda() {
     // Placeholder: aquí podrías persistir estado de pago con deuda
     console.log('[Aranceles] Marcado con deuda. Total seleccionado:', this.totalArancelesSeleccionados, 'items:', this.selectedAranceles.length);
+  }
+
+  // Conmutador de estado de pago para todos los seleccionados
+  onTogglePagoSeleccionados(value: boolean) {
+    this.pagoCompletoSeleccionados = value;
+    // Propagar a cada ítem seleccionado (si tiene campo pagado)
+    this.selectedAranceles = this.selectedAranceles.map(a => ({ ...a, pagado: value }));
   }
 
   private toNumber(val: any): number {

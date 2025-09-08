@@ -29,7 +29,7 @@ export class PostulanteService {
   private baseUrl = environment.apiUrl;
   private apiUrl = `${this.baseUrl}/postulantes`;
   private sgaUrl = `${this.baseUrl}/sga`; // Base para endpoints SGA
-  private modalidadUrl = `${this.baseUrl}/modalidad`;
+  private modalidadUrl = `${this.baseUrl}/modalidades`;
 
   constructor(private http: HttpClient) {}
 
@@ -84,7 +84,7 @@ export class PostulanteService {
     return this.http.get<ModalidadPostulante>(`${this.apiUrl}/${postulanteId}/modalidad`);
   }
 
-  // Listado de modalidades desde backend
+  // Listado de modalidades desde backend (ruta pública /api/modalidades)
   getModalidades(): Observable<any[]> {
     return this.http.get<any[]>(this.modalidadUrl);
   }

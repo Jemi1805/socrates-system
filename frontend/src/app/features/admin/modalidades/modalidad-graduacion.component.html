@@ -65,17 +65,24 @@
                 name="codigoCeta" 
                 placeholder="Ingrese código CETA"
                 class="form-control"
+                inputmode="numeric"
+                maxlength="9"
+                pattern="\\d{9}"
+                (input)="onCodigoCetaInput($event)"
                 (keyup.enter)="buscarPorCeta()">
               <button 
                 type="button" 
                 (click)="buscarPorCeta()" 
-                [disabled]="loading || !codigoCeta.trim()"
+                [disabled]="loading || !cetaValido"
                 class="btn btn-primary">
                 <i *ngIf="loading" class="bi bi-arrow-clockwise spin me-1"></i>
                 <i *ngIf="!loading" class="bi bi-search me-1"></i>
                 {{ loading ? 'Buscando...' : 'Buscar' }}
               </button>
             </div>
+            <small class="text-danger" *ngIf="intentoBusqueda && !cetaValido">
+              El código CETA debe tener exactamente 9 dígitos numéricos.
+            </small>
           </div>
 
           <!-- Búsqueda por Nombre -->
@@ -93,6 +100,7 @@
                   name="ap_pat" 
                   placeholder="Apellido paterno"
                   class="form-control"
+                  (input)="onNombreInput('ap_pat', $event)"
                   (keyup.enter)="buscarPorNombre()">
               </div>
               
@@ -108,6 +116,7 @@
                   name="ap_mat" 
                   placeholder="Apellido materno"
                   class="form-control"
+                  (input)="onNombreInput('ap_mat', $event)"
                   (keyup.enter)="buscarPorNombre()">
               </div>
               
@@ -123,6 +132,7 @@
                   name="nombres" 
                   placeholder="Nombre(s) del estudiante"
                   class="form-control"
+                  (input)="onNombreInput('nombres', $event)"
                   (keyup.enter)="buscarPorNombre()">
               </div>
             </div>
@@ -131,13 +141,16 @@
               <button 
                 type="button" 
                 (click)="buscarPorNombre()" 
-                [disabled]="loading || (!nombres.trim() && !ap_pat.trim() && !ap_mat.trim())"
+                [disabled]="loading || (!nombres.trim() && !ap_pat.trim() && !ap_mat.trim()) || !nombresValidos"
                 class="btn btn-primary">
                 <i *ngIf="loading" class="bi bi-arrow-clockwise spin me-1"></i>
                 <i *ngIf="!loading" class="bi bi-search me-1"></i>
                 {{ loading ? 'Buscando...' : 'Buscar' }}
               </button>
             </div>
+            <small class="text-danger" *ngIf="intentoBusqueda && !nombresValidos">
+              Los campos de nombres y apellidos solo admiten letras y espacios (sin números).
+            </small>
           </div>
 
           <!-- Botón limpiar -->

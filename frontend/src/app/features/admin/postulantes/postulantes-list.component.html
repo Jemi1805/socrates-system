@@ -405,7 +405,7 @@
       </div>
 
       <!-- Registro manual de aranceles (solo para nuevo postulante) -->
-      <div class="manual-arancel my-3 p-3 border rounded" *ngIf="esNuevoPostulante">
+      <div class="manual-arancel my-3 border rounded" *ngIf="esNuevoPostulante">
         <div class="row g-2">
           <div class="col-md-2">
             <label class="form-label">Gestión</label>
@@ -455,10 +455,24 @@
             <div *ngIf="arancelManualError" class="alert alert-warning py-1 px-2 me-auto mb-0">
               {{ arancelManualError }}
             </div>
-            <button type="button" class="btn ms-auto" (click)="agregarArancelManual()">
-              <i class="bi bi-plus-lg me-1"></i>
-              Agregar arancel
-            </button>
+            <ng-container *ngIf="editingArancelIndex === null; else editButtonsTpl">
+              <button type="button" class="btn ms-auto" (click)="agregarArancelManual()">
+                <i class="bi bi-plus-lg me-1"></i>
+                Agregar arancel
+              </button>
+            </ng-container>
+            <ng-template #editButtonsTpl>
+              <div class="ms-auto d-flex gap-2">
+                <button type="button" class="btn btn-primary" (click)="agregarArancelManual()">
+                  <i class="bi bi-save me-1"></i>
+                  Guardar cambios
+                </button>
+                <button type="button" class="btn btn-outline-secondary" (click)="cancelarEdicionArancelManual()">
+                  <i class="bi bi-x-circle me-1"></i>
+                  Cancelar
+                </button>
+              </div>
+            </ng-template>
           </div>
         </div>
       </div>
@@ -486,6 +500,7 @@
               <th>Recibo</th>
               <th>Razón Social/NIT</th>
               <th class="text-center">Sel</th>
+              <th *ngIf="esNuevoPostulante">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -567,6 +582,7 @@
                 <th>Fecha</th>
                 <th>Concepto</th>
                 <th class="text-end">Monto</th>
+                <th *ngIf="esNuevoPostulante">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -575,26 +591,39 @@
                 <td>{{ a.fecha || '-' }}</td>
                 <td>{{ a.concepto || '-' }}</td>
                 <td class="text-end">{{ a.monto || '-' }}</td>
+                <td *ngIf="esNuevoPostulante" class="text-center">
+                  <button class="btn btn-sm btn-outline-secondary" title="Editar" *ngIf="a.origen === 'manual'" (click)="editarArancelManual(a, i)">
+                    <i class="bi bi-pencil-square"></i>
+                  </button>
+                </td>
               </tr>
             </tbody>
             <tfoot>
               <tr>
-                <th colspan="3" class="text-end">Total</th>
+                <th *ngIf="!esNuevoPostulante" colspan="3" class="text-end">Total</th>
+                <th *ngIf="esNuevoPostulante" colspan="4" class="text-end">Total</th>
                 <th class="text-end">{{ totalArancelesSeleccionados | number:'1.2-2' }}</th>
               </tr>
             </tfoot>
           </table>
         </div>
-        <!-- Acciones debajo de la tabla de aranceles seleccionados -->
-        <div class="d-flex justify-content-end gap-2 mt-2" *ngIf="selectedAranceles.length > 0">
-          <button type="button" class="btn btn-success btn-sm" (click)="marcarPagoCompleto()">
-            <i class="bi bi-check2-circle me-1"></i>
-            Pago completo
-          </button>
-          <button type="button" class="btn btn-outline-warning btn-sm" (click)="marcarConDeuda()">
-            <i class="bi bi-exclamation-triangle me-1"></i>
-            Con deuda
-          </button>
+        <!-- Conmutador de estado de pago para aranceles seleccionados -->
+        <div class="d-flex justify-content-end mt-2" *ngIf="selectedAranceles.length > 0">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="pagoSwitch"
+                   [checked]="pagoCompletoSeleccionados"
+                   (change)="onTogglePagoSeleccionados($any($event.target).checked)" />
+            <label class="form-check-label ms-2" for="pagoSwitch">
+              <ng-container *ngIf="pagoCompletoSeleccionados; else conDeudaTpl">
+                <i class="bi bi-check2-circle me-1 text-success"></i>
+                Pago completo
+              </ng-container>
+              <ng-template #conDeudaTpl>
+                <i class="bi bi-exclamation-triangle me-1 text-warning"></i>
+                Con deuda
+              </ng-template>
+            </label>
+          </div>
         </div>
       </div>
     

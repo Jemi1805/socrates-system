@@ -133,3 +133,7 @@ Route::prefix('sga')->group(function () {
     
     Route::post('sync-estudiante', [SgaController::class, 'syncEstudiante']);
 });
+
+// 📈 RUTA PÚBLICA: listado de modalidades (solo lectura)
+// Permite que el frontend cargue las modalidades sin requerir autenticación
+Route::get('modalidades', [ModalidadController::class, 'index']);

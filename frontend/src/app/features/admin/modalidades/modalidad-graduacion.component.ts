@@ -52,6 +52,10 @@ export class ModalidadGraduacionComponent implements OnInit {
   modalVisible = false;
   loadingModalidades = false;
 
+  // Validaciones
+  private readonly CETA_REGEX = /^\d{9}$/; // exactamente 9 dígitos
+  private readonly NOMBRE_REGEX = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ'\-\s]+$/; // letras, espacios, apóstrofe, guion
+
   constructor(
     private estudianteService: EstudianteService,
     private router: Router,
@@ -90,9 +94,10 @@ export class ModalidadGraduacionComponent implements OnInit {
 
   buscarPorCeta() {
     this.intentoBusqueda = true;
-    
-    if (!this.codigoCeta.trim()) {
-      this.error = 'Por favor, ingrese un código CETA válido';
+    // Sanitizar y validar CETA (solo dígitos, 9 caracteres)
+    this.codigoCeta = (this.codigoCeta || '').replace(/\D+/g, '').slice(0, 9);
+    if (!this.CETA_REGEX.test(this.codigoCeta)) {
+      this.error = 'El código CETA debe tener exactamente 9 dígitos numéricos';
       return;
     }
 
@@ -166,6 +171,20 @@ export class ModalidadGraduacionComponent implements OnInit {
     // Verificar que al menos uno de los campos de nombre tenga contenido
     if (!this.nombres.trim() && !this.ap_pat.trim() && !this.ap_mat.trim()) {
       this.error = 'Por favor, ingrese al menos un criterio de búsqueda (nombres, apellido paterno o apellido materno)';
+      return;
+    }
+
+    // Sanitizar entradas: quitar números y caracteres inválidos
+    this.nombres = this.sanitizarNombre(this.nombres);
+    this.ap_pat = this.sanitizarNombre(this.ap_pat);
+    this.ap_mat = this.sanitizarNombre(this.ap_mat);
+
+    // Validar que lo ingresado no contenga números
+    const nombresValid = !this.nombres || this.NOMBRE_REGEX.test(this.nombres);
+    const apPatValid = !this.ap_pat || this.NOMBRE_REGEX.test(this.ap_pat);
+    const apMatValid = !this.ap_mat || this.NOMBRE_REGEX.test(this.ap_mat);
+    if (!nombresValid || !apPatValid || !apMatValid) {
+      this.error = 'Los campos de nombre y apellidos solo admiten letras y espacios (sin números)';
       return;
     }
 
@@ -281,6 +300,39 @@ export class ModalidadGraduacionComponent implements OnInit {
 
     // Navegar a la página de postulantes
     this.router.navigate(['/postulantes']);
+  }
+
+  // --- Helpers de validación/sanitización ---
+  onCodigoCetaInput(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    const clean = (input.value || '').replace(/\D+/g, '').slice(0, 9);
+    input.value = clean;
+    this.codigoCeta = clean;
+  }
+
+  onNombreInput(campo: 'nombres' | 'ap_pat' | 'ap_mat', ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    const clean = this.sanitizarNombre(input.value || '');
+    input.value = clean;
+    (this as any)[campo] = clean;
+  }
+
+  get cetaValido(): boolean {
+    return this.CETA_REGEX.test((this.codigoCeta || '').trim());
+  }
+
+  get nombresValidos(): boolean {
+    const check = (v: string) => !v || this.NOMBRE_REGEX.test(v);
+    return check(this.nombres) && check(this.ap_pat) && check(this.ap_mat);
+  }
+
+  private sanitizarNombre(v: string): string {
+    // eliminar números y caracteres no permitidos, permitir letras con acentos, espacios, apóstrofe y guion
+    return (v || '')
+      .replace(/\d+/g, '')
+      .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ'\-\s]+/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trimStart();
   }
 
   limpiarFormulario() {
