@@ -312,7 +312,9 @@ export class ModalidadGraduacionComponent implements OnInit {
 
   onNombreInput(campo: 'nombres' | 'ap_pat' | 'ap_mat', ev: Event) {
     const input = ev.target as HTMLInputElement;
-    const clean = this.sanitizarNombre(input.value || '');
+    let clean = this.sanitizarNombre(input.value || '');
+    // Capitalizar automáticamente la primera letra de cada palabra
+    clean = this.capitalizarPalabras(clean);
     input.value = clean;
     (this as any)[campo] = clean;
   }
@@ -333,6 +335,13 @@ export class ModalidadGraduacionComponent implements OnInit {
       .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ'\-\s]+/g, '')
       .replace(/\s{2,}/g, ' ')
       .trimStart();
+  }
+
+  private capitalizarPalabras(v: string): string {
+    // Convierte todo a minúsculas y luego capitaliza la primera letra de cada palabra
+    // Palabras separadas por espacio, guion o apóstrofe. Soporta Unicode.
+    const lower = (v || '').toLocaleLowerCase();
+    return lower.replace(/(?:^|[\s\-'])\p{L}/gu, (m) => m.toUpperCase());
   }
 
   limpiarFormulario() {
