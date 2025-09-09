@@ -336,6 +336,10 @@ input {
       align-items: center;
     }
     
+    .btn-primary, .btn-success{
+      color: $primary-color !important;
+    }
+    
     .btn {
       padding: 0.25rem 0.5rem;
       background: transparent;
@@ -347,6 +351,10 @@ input {
       
       i {
         font-size: 1.2rem;
+      }
+
+      .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+        color: $primary-color !important;
       }
     }
   }

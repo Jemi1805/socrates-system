@@ -166,18 +166,12 @@
           </div>
         </div>
 
-        <!-- Mensajes -->
-        <div *ngIf="error" class="alert alert-danger mt-3">
-          <i class="bi bi-exclamation-triangle me-2"></i>
-          {{ error }}
-        </div>
-
         <!-- Acción cuando no se encuentran estudiantes -->
         <div 
           *ngIf="!loading && intentoBusqueda && estudiantes.length === 0" 
-          class="alert alert-info mt-3 d-flex justify-content-between align-items-center">
+          class="alert alert-danger mt-3 d-flex justify-content-between align-items-center">
           <div>
-            <i class="bi bi-info-circle me-2"></i>
+            <i class="bi bi-exclamation-triangle me-2"></i>
             No se encontraron estudiantes con los criterios proporcionados.
           </div>
           <button type="button" class="btn btn-success btn-sm" (click)="registrarNuevoPostulante()">

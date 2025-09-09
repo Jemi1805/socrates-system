@@ -16,9 +16,19 @@
           <i class="bi bi-person-vcard me-2"></i>
           Datos del estudiante
         </h3>
-        <button class="btn btn-sm" (click)="toggleBiographicalData()">
-          <i class="bi" [ngClass]="showBiographicalData ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
-        </button>
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-sm btn-primary" *ngIf="!isEditing" (click)="iniciarEdicionBiograficos()">
+            <i class="bi bi-pencil-square me-1"></i>
+            Editar
+          </button>
+          <button class="btn btn-sm btn-success" *ngIf="isEditing" (click)="guardarBiograficos()">
+            <i class="bi bi-save me-1"></i>
+            Guardar
+          </button>
+          <button class="btn btn-sm" (click)="toggleBiographicalData()">
+            <i class="bi" [ngClass]="showBiographicalData ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+          </button>
+        </div>
       </div>
       
       <div class="bio-content" *ngIf="showBiographicalData">
@@ -40,41 +50,47 @@
           </div>
           <div class="bio-item">
             <span class="bio-label">Código CETA:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.cod_ceta" name="cod_ceta" placeholder="Ingrese Código CETA" required />
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.cod_ceta" name="cod_ceta" [disabled]="!esNuevoPostulante" placeholder="Ingrese Código CETA" required
+                   inputmode="numeric" maxlength="9" (input)="onCetaInput($event)" />
           </div>
         </div>
 
         <div class="bio-row">
           <div class="bio-item">
             <span class="bio-label">Nombres:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.nombres_est" name="nombres" placeholder="Ingrese Nombres" required />
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.nombres_est" name="nombres" placeholder="Ingrese Nombres" required [disabled]="!isEditing"
+                   (input)="onNombreInput('nombres_est', $event)" />
           </div>
           <div class="bio-item">
             <span class="bio-label">Apellido Paterno:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_pat" name="ap_pat" placeholder="Ingrese Apellido Paterno" required />
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_pat" name="ap_pat" placeholder="Ingrese Apellido Paterno" required [disabled]="!isEditing"
+                   (input)="onNombreInput('ap_pat', $event)" />
           </div>
           <div class="bio-item">
             <span class="bio-label">Apellido Materno:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_mat" name="ap_mat" placeholder="Ingrese Apellido Materno" required />
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_mat" name="ap_mat" placeholder="Ingrese Apellido Materno" required [disabled]="!isEditing"
+                   (input)="onNombreInput('ap_mat', $event)" />
           </div>
         </div>
         
         <div class="bio-row">
           <div class="bio-item">
             <span class="bio-label">Fecha de Nacimiento:</span>
-            <input type="date" class="form-control" [(ngModel)]="postulanteActual.fecha_nacimiento" name="fecha_nacimiento" placeholder="Ingrese Fecha de Nacimiento" required />
+            <input type="date" class="form-control" [(ngModel)]="postulanteActual.fecha_nacimiento" name="fecha_nacimiento" placeholder="Ingrese Fecha de Nacimiento" required [disabled]="!isEditing" />
           </div>
           <div class="bio-item">
             <span class="bio-label">Lugar de Nacimiento:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.lugar_nacimiento" name="lugar_nacimiento" placeholder="Ingrese Fecha de Nacimiento" required />
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.lugar_nacimiento" name="lugar_nacimiento" placeholder="Ingrese Fecha de Nacimiento" required [disabled]="!isEditing"
+                   (input)="onLugarNacimientoInput($event)" />
           </div>
           <div class="bio-item">
             <span class="bio-label">CI:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ci" name="ci" placeholder="Ingrese Documento de Identidad" required />
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ci" name="ci" placeholder="Ingrese Documento de Identidad" required [disabled]="!isEditing" />
           </div>
           <div class="bio-item">
             <span class="bio-label">Procedencia:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.procedencia" name="procedencia" placeholder="Ingrese Procedencia" required />
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.procedencia" name="procedencia" placeholder="Ingrese Procedencia" required [disabled]="!isEditing"
+                   (input)="onProcedenciaInput($event)" />
           </div>
         </div>
       </div>

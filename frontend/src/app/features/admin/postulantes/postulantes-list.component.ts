@@ -75,6 +75,8 @@ export class PostulantesListComponent implements OnInit {
   showBachilleratoData = true;
   // Nuevo registro: habilita selects de carrera y pensum
   esNuevoPostulante = false;
+  // Modo de edición para Datos del estudiante (biográficos)
+  isEditing = false;
 
   // Aranceles
   aranceles: any[] = [];
@@ -222,6 +224,7 @@ export class PostulantesListComponent implements OnInit {
       semestreActual = 2;
       yearActual = yearActual - 1;
     }
+
     const ultimaGestion = `${semestreActual}/${yearActual}`;
 
     const opciones: string[] = [];
@@ -595,6 +598,83 @@ export class PostulantesListComponent implements OnInit {
   }
 
   // --- Bachillerato: lógica de UI ---
+
+  // --- Edición de datos biográficos ---
+  iniciarEdicionBiograficos() {
+    this.isEditing = true;
+  }
+
+  guardarBiograficos() {
+    // Si existe cod_ceta, persistimos los cambios; si es nuevo, solo cerramos edición
+    if (this.postulanteActual.cod_ceta) {
+      this.postulanteService
+        .update(this.postulanteActual.cod_ceta as number, this.postulanteActual as Postulante)
+        .subscribe({
+          next: () => {
+            this.cargarPostulantes();
+            this.isEditing = false;
+          },
+          error: () => {
+            // En caso de error, mantenemos el modo de edición para que el usuario pueda corregir
+          }
+        });
+    } else {
+      this.isEditing = false;
+    }
+  }
+
+  // --- Handlers de validación/sanitización en inputs biográficos ---
+  onCetaInput(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    const clean = (input.value || '').replace(/\D+/g, '').slice(0, 9);
+    input.value = clean;
+    (this.postulanteActual as any).cod_ceta = clean ? parseInt(clean, 10) : undefined;
+  }
+
+  onNombreInput(campo: 'nombres_est' | 'ap_pat' | 'ap_mat', ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    let clean = this.sanitizarNombre(input.value || '');
+    clean = this.capitalizarPalabras(clean);
+    input.value = clean;
+    (this.postulanteActual as any)[campo] = clean;
+  }
+
+  onLugarNacimientoInput(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    let clean = this.sanitizarNombre(input.value || '');
+    clean = this.capitalizarPalabras(clean);
+    input.value = clean;
+    this.postulanteActual.lugar_nacimiento = clean;
+  }
+
+  onProcedenciaInput(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    let val = (input.value || '');
+    // Solo letras, espacios, guion y apóstrofe
+    val = val.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ'\-\s]+/g, '').replace(/\s{2,}/g, ' ').trimStart();
+    // Si es un código corto (<=3) lo dejamos en mayúsculas completas (caso 'QR')
+    if (val.trim().length > 0 && val.trim().length <= 3 && !val.includes(' ')) {
+      val = val.toLocaleUpperCase();
+    } else {
+      // En otro caso, capitalizar palabras
+      val = this.capitalizarPalabras(val.toLocaleLowerCase());
+    }
+    input.value = val;
+    this.postulanteActual.procedencia = val;
+  }
+
+  private sanitizarNombre(v: string): string {
+    return (v || '')
+      .replace(/\d+/g, '')
+      .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ'\-\s]+/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trimStart();
+  }
+
+  private capitalizarPalabras(v: string): string {
+    const lower = (v || '').toLocaleLowerCase();
+    return lower.replace(/(?:^|[\s\-'])\p{L}/gu, (m) => m.toUpperCase());
+  }
   onTipoBachillerChange(tipo: 'nacional' | 'extranjero') {
     this.tipoBachiller = tipo;
     // Reset de formularios específicos
