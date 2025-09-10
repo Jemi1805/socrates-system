@@ -204,7 +204,7 @@ export class PostulantesListComponent implements OnInit {
 
   // --- Gestiones (inicio/conclusión) ---
   gestionesOpciones: string[] = [];
-  private readonly MIN_GESTIONES_DIF = 1; // conclusión debe ser al menos 5 gestiones después del inicio
+  private readonly MIN_GESTIONES_DIF = 1; // conclusión debe ser al menos 1 gestion después del inicio
   // Opción 1: mostrar pocas opciones por defecto y permitir "ver todas"
   mostrarTodasGestiones = false;
   private readonly N_ULTIMAS = 20;
@@ -225,19 +225,23 @@ export class PostulantesListComponent implements OnInit {
       yearActual = yearActual - 1;
     }
 
-    const ultimaGestion = `${semestreActual}/${yearActual}`;
-
+    // Construir en orden DESCENDENTE respecto a la gestión actual
     const opciones: string[] = [];
-    for (let y = desdeYear; y <= yearActual; y++) {
-      // 1er semestre siempre
-      opciones.push(`1/${y}`);
-      // 2do semestre solo si no sobrepasa la última gestión
-      if (!(y === yearActual && semestreActual === 1)) {
-        opciones.push(`2/${y}`);
-      }
+    // Año actual
+    if (semestreActual === 2) {
+      opciones.push(`2/${yearActual}`);
+      opciones.push(`1/${yearActual}`);
+    } else {
+      // semestreActual === 1
+      opciones.push(`1/${yearActual}`);
     }
-    // Asegurar que la última gestión calculada está incluida y quitar posibles extras
-    this.gestionesOpciones = opciones.filter(g => this.indiceGestion(g) <= this.indiceGestion(ultimaGestion));
+    // Años previos completos
+    for (let y = yearActual - 1; y >= desdeYear; y--) {
+      opciones.push(`2/${y}`);
+      opciones.push(`1/${y}`);
+    }
+
+    this.gestionesOpciones = opciones;
   }
 
   private indiceGestion(gestion: string): number {
@@ -261,13 +265,15 @@ export class PostulantesListComponent implements OnInit {
   get gestionesOpcionesUI(): string[] {
     if (this.mostrarTodasGestiones) return this.gestionesOpciones;
     const arr = this.gestionesOpciones;
-    return arr.slice(Math.max(0, arr.length - this.N_ULTIMAS));
+    // Ahora la lista está en orden descendente, tomamos las primeras N
+    return arr.slice(0, this.N_ULTIMAS);
   }
 
   get gestionesConclusionOpcionesUI(): string[] {
     const base = this.gestionesConclusionOpciones;
     if (this.mostrarTodasGestiones) return base;
-    return base.slice(Math.max(0, base.length - this.N_ULTIMAS));
+    // Base también queda en orden descendente
+    return base.slice(0, this.N_ULTIMAS);
   }
 
   get gestionValida(): boolean {
@@ -661,6 +667,37 @@ export class PostulantesListComponent implements OnInit {
     }
     input.value = val;
     this.postulanteActual.procedencia = val;
+  }
+
+  // --- Validaciones específicas: CI y Complemento ---
+  onCiInput(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    // Mantener solo dígitos y limitar a 9
+    let clean = (input.value || '').replace(/\D+/g, '').slice(0, 9);
+    input.value = clean;
+    this.postulanteActual.ci = clean;
+  }
+
+  onComplementoInput(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    let v = (input.value || '').toUpperCase();
+    // Tomar solo primeros 2 caracteres válidos segun patrón: [0-9][A-Z]
+    // Primero filtrar a dígitos y letras
+    v = v.replace(/[^0-9A-Z]/g, '');
+    if (v.length > 0) {
+      // Asegurar que el primer caracter sea dígito
+      if (!/^[0-9]/.test(v[0])) {
+        v = v.replace(/^[A-Z]+/, '');
+      }
+    }
+    if (v.length > 1) {
+      // Asegurar que el segundo caracter sea letra
+      const first = v[0];
+      const rest = v.slice(1).replace(/[^A-Z]/g, '');
+      v = (first || '') + (rest ? rest[0] : '');
+    }
+    v = v.slice(0, 2);
+    input.value = v;
   }
 
   private sanitizarNombre(v: string): string {

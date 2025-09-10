@@ -32,9 +32,21 @@
       </div>
       
       <div class="bio-content" *ngIf="showBiographicalData">
+        <div class="alert alert-info py-1 px-2 mb-2" *ngIf="!isEditing && !esNuevoPostulante">
+          <i class="bi bi-info-circle me-1"></i>
+          Verifique y luego guarde los datos biográficos del postulante.
+        </div>
+        <div class="alert alert-info py-1 px-2 mb-2" *ngIf="isEditing">
+          <i class="bi bi-info-circle me-1"></i>
+          Actualice y luego guarde los datos biográficos del postulante.
+        </div>
+        <div class="alert alert-info py-1 px-2 mb-2" *ngIf="esNuevoPostulante && !isEditing">
+          <i class="bi bi-info-circle me-1"></i>
+          Ingrese y luego guarde los datos biográficos del postulante.
+        </div>
         <div class="bio-row">
           <div class="bio-item">
-            <span class="bio-label">Carrera:</span>
+            <span class="form-label">Carrera:</span>
             <select class="form-select" [(ngModel)]="carreraNormalizada" name="carrera" [disabled]="!esNuevoPostulante" (ngModelChange)="onCarreraChange($event)">
               <option [ngValue]="null">Seleccione carrera</option>
               <option [ngValue]="'mecanica'">Mecánica Automotriz</option>
@@ -42,14 +54,14 @@
             </select>
           </div>
           <div class="bio-item">
-            <span class="bio-label">Pensum:</span>
+            <span class="form-label">Pensum:</span>
             <select class="form-select" [(ngModel)]="postulanteActual.pensum" name="pensum" [disabled]="!esNuevoPostulante">
               <option [ngValue]="null" disabled>Seleccione pensum</option>
               <option *ngFor="let p of pensums" [ngValue]="p">{{ p }}</option>
             </select>
           </div>
           <div class="bio-item">
-            <span class="bio-label">Código CETA:</span>
+            <span class="form-label">Código CETA:</span>
             <input type="text" class="form-control" [(ngModel)]="postulanteActual.cod_ceta" name="cod_ceta" [disabled]="!esNuevoPostulante" placeholder="Ingrese Código CETA" required
                    inputmode="numeric" maxlength="9" (input)="onCetaInput($event)" />
           </div>
@@ -57,39 +69,57 @@
 
         <div class="bio-row">
           <div class="bio-item">
-            <span class="bio-label">Nombres:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.nombres_est" name="nombres" placeholder="Ingrese Nombres" required [disabled]="!isEditing"
+            <span class="form-label">Nombres:</span>
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.nombres_est" name="nombres" placeholder="Ingrese Nombres" required [disabled]="!isEditing && !esNuevoPostulante"
                    (input)="onNombreInput('nombres_est', $event)" />
           </div>
           <div class="bio-item">
-            <span class="bio-label">Apellido Paterno:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_pat" name="ap_pat" placeholder="Ingrese Apellido Paterno" required [disabled]="!isEditing"
+            <span class="form-label">Apellido Paterno:</span>
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_pat" name="ap_pat" placeholder="Ingrese Apellido Paterno" required [disabled]="!isEditing && !esNuevoPostulante"
                    (input)="onNombreInput('ap_pat', $event)" />
           </div>
           <div class="bio-item">
-            <span class="bio-label">Apellido Materno:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_mat" name="ap_mat" placeholder="Ingrese Apellido Materno" required [disabled]="!isEditing"
+            <span class="form-label">Apellido Materno:</span>
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_mat" name="ap_mat" placeholder="Ingrese Apellido Materno" required [disabled]="!isEditing && !esNuevoPostulante"
                    (input)="onNombreInput('ap_mat', $event)" />
           </div>
         </div>
         
-        <div class="bio-row">
-          <div class="bio-item">
-            <span class="bio-label">Fecha de Nacimiento:</span>
-            <input type="date" class="form-control" [(ngModel)]="postulanteActual.fecha_nacimiento" name="fecha_nacimiento" placeholder="Ingrese Fecha de Nacimiento" required [disabled]="!isEditing" />
+        <div class="row g-1">
+          <div class="col-md-2">
+            <span class="form-label">Fecha de Nacimiento:</span>
+            <input type="date" class="form-control" [(ngModel)]="postulanteActual.fecha_nacimiento" name="fecha_nacimiento" placeholder="Ingrese Fecha de Nacimiento" required [disabled]="!isEditing && !esNuevoPostulante" />
           </div>
-          <div class="bio-item">
-            <span class="bio-label">Lugar de Nacimiento:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.lugar_nacimiento" name="lugar_nacimiento" placeholder="Ingrese Fecha de Nacimiento" required [disabled]="!isEditing"
+          <div class="col-md-3">
+            <span class="form-label">Lugar de Nacimiento:</span>
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.lugar_nacimiento" name="lugar_nacimiento" placeholder="Ingrese Lugar de Nacimiento" required [disabled]="!isEditing && !esNuevoPostulante"
                    (input)="onLugarNacimientoInput($event)" />
           </div>
-          <div class="bio-item">
-            <span class="bio-label">CI:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ci" name="ci" placeholder="Ingrese Documento de Identidad" required [disabled]="!isEditing" />
+          <div class="col-auto">
+            <span class="form-label">CI:</span>
+            <input type="text" class="form-control"
+                   [(ngModel)]="postulanteActual.ci" name="ci"
+                   placeholder="Ingrese CI" required
+                   inputmode="numeric" minlength="8" maxlength="9"
+                   pattern="^\\d{8,9}$"
+                   (input)="onCiInput($event)"
+                   [disabled]="!isEditing && !esNuevoPostulante" />
           </div>
-          <div class="bio-item">
-            <span class="bio-label">Procedencia:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.procedencia" name="procedencia" placeholder="Ingrese Procedencia" required [disabled]="!isEditing"
+          <!-- Separador visual entre CI y Complemento -->
+          <div *ngIf="esNuevoPostulante || isEditing" class="col-auto d-flex align-items-end justify-content-center">
+            <span class="px-1 pb-2">-</span>
+          </div>
+          <div *ngIf="esNuevoPostulante || isEditing" class="col-auto">
+            <span class="form-label">Complemento:</span>
+            <input type="text" class="form-control" name="complemento"
+                   placeholder="Ej.: 1A"
+                   inputmode="text" maxlength="2" pattern="^[0-9][A-Z]$"
+                   (input)="onComplementoInput($event)"
+                   required [disabled]="!isEditing && !esNuevoPostulante" />
+          </div>
+          <div class="col">
+            <span class="form-label">Procedencia:</span>
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.procedencia" name="procedencia" placeholder="Ej: Cochabamba" required [disabled]="!isEditing && !esNuevoPostulante"
                    (input)="onProcedenciaInput($event)" />
           </div>
         </div>
@@ -113,6 +143,10 @@
           <div class="row g-3 align-items-end">
             <div class="col-md-4">
               <label class="form-label">Tipo de bachiller</label>
+              <div class="alert alert-info py-1 px-2 mb-2">
+                <i class="bi bi-info-circle me-1"></i>
+                Seleccione el tipo de bachiller que posee el postulante.
+              </div>
               <select class="form-select" [(ngModel)]="tipoBachiller" (ngModelChange)="onTipoBachillerChange($event)">
                 <option [ngValue]="null" disabled>Seleccione tipo de Bachiller</option>
                 <option [ngValue]="'nacional'">Bachiller Nacional</option>
@@ -153,7 +187,7 @@
           <div class="row g-3">
             <div class="col-md-3">
               <label class="form-label">Nro. Resolución Administrativa</label>
-              <input type="text" class="form-control" [(ngModel)]="homologacionExtranjero.nro_resolucion" placeholder="Ej. RES-2023-001" />
+              <input type="text" class="form-control" [(ngModel)]="postulanteActual.nro_serie_titulo" placeholder="Ej. RES-2023-001" />
             </div>
             <div class="col-md-3">
               <label class="form-label">Fecha de Emisión</label>
@@ -177,6 +211,10 @@
                 </div>
               </div>
               <div>
+                <div class="alert alert-info py-1 px-2 mb-2">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Agrega las gestiones y grados cursados.
+                </div>
                 <button class="btn btn-outline-primary btn-sm" (click)="agregarGradoGestion()">
                   <i class="bi bi-plus-lg me-1"></i>
                   Agregar grado/gestión
@@ -189,6 +227,10 @@
         <!-- Opciones habilitadas -->
         <div class="mt-3">
           <label class="form-label">Opciones</label>
+          <div class="alert alert-info py-1 px-2 mb-2">
+            <i class="bi bi-info-circle me-1"></i>
+            Seleccione una opción para ingresar datos adicionales.
+          </div>
           <div class="row g-2">
             <div class="col-md-6">
               <div class="form-check">
@@ -211,7 +253,7 @@
             <div class="col-md-6">
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="transitabilidad" id="optHomoPlan" [(ngModel)]="selectedOpcion" value="homologacionCambioPlan" (change)="onOpcionToggle('homologacionCambioPlan', true)" [disabled]="isOpcionDisabled('homologacionCambioPlan')" />
-                <label class="form-check-label" for="optHomoPlan">Homologación/convalidación por cambio de plan de estudios</label>
+                <label class="form-check-label" for="optHomoPlan">Homologación por cambio de plan de estudios</label>
               </div>
             </div>
           </div>
@@ -282,6 +324,10 @@
                 </div>
               </div>
               <div>
+                <div class="alert alert-info py-1 px-2 mb-2">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Agrega las gestiones y grados cursados.
+                </div>
                 <button class="btn btn-outline-primary btn-sm" (click)="agregarGradoGestionTraspaso()">
                   <i class="bi bi-plus-lg me-1"></i>
                   Agregar grado/gestión
@@ -320,6 +366,10 @@
                 </div>
               </div>
               <div>
+                <div class="alert alert-info py-1 px-2 mb-2">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Agrega las gestiones y grados cursados.
+                </div>
                 <button class="btn btn-outline-primary btn-sm" (click)="agregarGradoGestionCambioPlan()">
                   <i class="bi bi-plus-lg me-1"></i>
                   Agregar grado/gestión
@@ -339,6 +389,10 @@
           <i class="bi bi-mortarboard me-2"></i>
           Datos de Inicio de Carrera
         </h3>
+        <div class="alert alert-info py-1 px-2 mb-2">
+          <i class="bi bi-info-circle me-1"></i>
+          Ingrese los datos de inicio de carrera del postulante.
+        </div>
         <div class="row g-3">
           <div class="col-md-7">
             <label class="form-label">Tipo de Regimen</label>
@@ -371,6 +425,10 @@
           <i class="bi bi-mortarboard me-2"></i>
           Datos de Conclusión de Carrera
         </h3>
+        <div class="alert alert-info py-1 px-2 mb-2">
+          <i class="bi bi-info-circle me-1"></i>
+          Ingrese los datos de conclusión de carrera del postulante.
+        </div>
         <div class="row g-3">
           <div class="col-md-7">
             <label class="form-label">Tipo de Regimen</label>
@@ -408,12 +466,20 @@
       <h3 class="card-title">
         <i class="bi bi-receipt me-2"></i>
         Aranceles (Material Extra)
-        <small class="text-muted" *ngIf="!loadingAranceles">Total: {{ totalAranceles }}</small>
+        <small class="text-muted" *ngIf="!loadingAranceles">Total: {{ totalAranceles }} </small>
       </h3>
 
       <div class="row g-2 align-items-end mb-2">
         <div class="col-md-12">
-          <button class="btn btn-outline-primary" (click)="cargarArancelesMaterialExtra()">
+          <div class="alert alert-info py-1 px-2 mb-0" *ngIf="!esNuevoPostulante">
+            <i class="bi bi-info-circle me-1"></i>
+            Selecciona los aranceles para modalidad de graduación
+          </div>
+          <div class="alert alert-info py-1 px-2 mb-0" *ngIf="esNuevoPostulante">
+            <i class="bi bi-info-circle me-1"></i>
+            Ingrese datos de los aranceles para modalidad de graduación
+          </div>
+          <button class="btn btn-outline-primary" (click)="cargarArancelesMaterialExtra()" *ngIf="!esNuevoPostulante">
             <i class="bi bi-arrow-repeat me-1"></i>
             Actualizar
           </button>
@@ -499,7 +565,7 @@
         </div>
       </div>
 
-      <div *ngIf="!loadingAranceles && aranceles.length === 0" class="alert alert-info">
+      <div *ngIf="!loadingAranceles && aranceles.length === 0 && !esNuevoPostulante" class="alert alert-info">
         No se encontraron aranceles de material extra.
       </div>
 
@@ -526,8 +592,8 @@
               <td>{{ a.fecha || '-' }}</td>
               <td>{{ a.concepto || '-' }}</td>
               <td class="text-end">{{ a.monto || '-' }}</td>
-              <td>{{ a.num_factura || '-' }}</td>
-              <td>{{ a.num_comprobante || '-' }}</td>
+              <td>{{ (a.num_factura && a.num_factura !== '0') ? a.num_factura : '' }}</td>
+              <td>{{ (a.num_comprobante && a.num_comprobante !== '0') ? a.num_comprobante : '' }}</td>
               <td>
                 <ng-container *ngIf="a.razon || a.nit; else razonNitVacio">
                   {{ a.razon || '' }}<ng-container *ngIf="a.nit"> / {{ a.nit }}</ng-container>
@@ -587,7 +653,8 @@
         </h3>
         
         <div *ngIf="selectedAranceles.length === 0" class="alert alert-info">
-          Selecciona aranceles en la tabla de la izquierda para verlos aquí.
+          <i class="bi bi-info-circle me-1"></i>
+          Selecciona aranceles en la tabla de arriba para verlos aquí.
         </div>
 
         <div class="table-responsive" *ngIf="selectedAranceles.length > 0">
@@ -597,6 +664,8 @@
                 <th>N°</th>
                 <th>Fecha</th>
                 <th>Concepto</th>
+                <th>Factura</th>
+                <th>Recibo</th>
                 <th class="text-end">Monto</th>
                 <th *ngIf="esNuevoPostulante">Acciones</th>
               </tr>
@@ -606,6 +675,8 @@
                 <td>{{ i + 1 }}</td>
                 <td>{{ a.fecha || '-' }}</td>
                 <td>{{ a.concepto || '-' }}</td>
+                <td>{{ (a.num_factura && a.num_factura !== '0') ? a.num_factura : '' }}</td>
+                <td>{{ (a.num_comprobante && a.num_comprobante !== '0') ? a.num_comprobante : '' }}</td>
                 <td class="text-end">{{ a.monto || '-' }}</td>
                 <td *ngIf="esNuevoPostulante" class="text-center">
                   <button class="btn btn-sm btn-outline-secondary" title="Editar" *ngIf="a.origen === 'manual'" (click)="editarArancelManual(a, i)">
@@ -616,29 +687,35 @@
             </tbody>
             <tfoot>
               <tr>
-                <th *ngIf="!esNuevoPostulante" colspan="3" class="text-end">Total</th>
-                <th *ngIf="esNuevoPostulante" colspan="4" class="text-end">Total</th>
+                <th *ngIf="!esNuevoPostulante" colspan="5" class="text-end">Total</th>
+                <th *ngIf="esNuevoPostulante" colspan="6" class="text-end">Total</th>
                 <th class="text-end">{{ totalArancelesSeleccionados | number:'1.2-2' }}</th>
               </tr>
             </tfoot>
           </table>
         </div>
         <!-- Conmutador de estado de pago para aranceles seleccionados -->
-        <div class="d-flex justify-content-end mt-2" *ngIf="selectedAranceles.length > 0">
-          <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="pagoSwitch"
-                   [checked]="pagoCompletoSeleccionados"
-                   (change)="onTogglePagoSeleccionados($any($event.target).checked)" />
-            <label class="form-check-label ms-2" for="pagoSwitch">
-              <ng-container *ngIf="pagoCompletoSeleccionados; else conDeudaTpl">
-                <i class="bi bi-check2-circle me-1 text-success"></i>
-                Pago completo
-              </ng-container>
-              <ng-template #conDeudaTpl>
-                <i class="bi bi-exclamation-triangle me-1 text-warning"></i>
-                Con deuda
-              </ng-template>
-            </label>
+        <div class="mt-2" *ngIf="selectedAranceles.length > 0">
+          <div class="alert alert-info py-1 px-2 mb-2">
+            <i class="bi bi-info-circle me-1"></i>
+            Indica si el pago es completo o no
+          </div>
+          <div class="status-pago d-flex align-items-center justify-content-end gap-2">
+            <span class="badge rounded-pill px-2 py-1"
+                  [ngClass]="pagoCompletoSeleccionados ? 'bg-secondary-subtle text-secondary' : 'bg-warning text-dark-blue'">
+              <i class="bi bi-exclamation-triangle me-1"></i>
+              Con deuda
+            </span>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="pagoSwitch"
+                     [checked]="pagoCompletoSeleccionados"
+                     (change)="onTogglePagoSeleccionados($any($event.target).checked)" />
+            </div>
+            <span class="badge rounded-pill px-2 py-1"
+                  [ngClass]="pagoCompletoSeleccionados ? 'bg-success text-white' : 'bg-secondary-subtle text-secondary'">
+              <i class="bi bi-check2-circle me-1"></i>
+              Pago completo
+            </span>
           </div>
         </div>
       </div>

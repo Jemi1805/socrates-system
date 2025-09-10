@@ -402,6 +402,12 @@ input {
   }
 }
 
+.bachiller-card {
+  .alert-info {
+    width: 30rem;
+  }
+}
+
 // Estilos de tabla para Aranceles (basados en Modalidad de Graduación)
 .aranceles-card, .docs-card {
   .card-title {
@@ -414,6 +420,24 @@ input {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .col-md-12 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between
+  }
+
+  .text-dark-blue {
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+      color: $text-dark-blue !important;
+    }
+  }
+
+  .text-white {
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+        color: white !important;
+      }
   }
 
   .table-responsive {
@@ -432,16 +456,15 @@ input {
       color: white !important;
     }
   }
+}
 
-  // Alertas informativas al estilo Modalidad de Graduación
-  .alert.alert-info {
-    background: rgba(23, 162, 184, 0.1);
-    color: #0c5460;
-    border-left: 4px solid #17a2b8;
-    border-radius: 8px;
-    border: none;
-    margin-top: 1rem;
-  }
+// Alertas informativas al estilo Modalidad de Graduación
+.alert.alert-info {
+  background: rgba(23, 162, 184, 0.1);
+  color: #0c5460;
+  border-left: 4px solid #17a2b8;
+  border-radius: 8px;
+  border: none;
 }
 
 // Estados de carga

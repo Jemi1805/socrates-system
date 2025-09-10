@@ -153,32 +153,38 @@
             </small>
           </div>
 
-          <!-- Botón limpiar -->
-          <div class="form-actions mt-3">
-            <button 
-              type="button" 
-              (click)="limpiarFormulario()" 
-              class="btn btn-outline-secondary"
-              [disabled]="loading">
-              <i class="bi bi-arrow-clockwise me-1"></i>
-              Limpiar
-            </button>
+          <!-- Botones de acciones -->
+          <div class="form-actions mt-3 d-flex align-items-center">
+            <div>
+              <button 
+                type="button" 
+                (click)="limpiarFormulario()" 
+                class="btn btn-outline-secondary"
+                [disabled]="loading">
+                <i class="bi bi-arrow-clockwise me-1"></i>
+                Limpiar
+              </button>
+            </div>
+            <div class="flex-grow-1 px-2" *ngIf="!loading && intentoBusqueda && estudiantes.length === 0">
+              <div class="alert alert-danger mb-0 py-1">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                No se encontraron estudiantes con los criterios proporcionados.
+              </div>
+            </div>
+            <div class="ms-auto">
+              <button 
+                type="button" 
+                class="btn btn-primary btn-sm text-white"
+                (click)="registrarNuevoPostulante()"
+                *ngIf="!loading && estudiantes.length === 0">
+                <i class="bi bi-person-plus me-1"></i>
+                Registrar postulante nuevo
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Acción cuando no se encuentran estudiantes -->
-        <div 
-          *ngIf="!loading && intentoBusqueda && estudiantes.length === 0" 
-          class="alert alert-danger mt-3 d-flex justify-content-between align-items-center">
-          <div>
-            <i class="bi bi-exclamation-triangle me-2"></i>
-            No se encontraron estudiantes con los criterios proporcionados.
-          </div>
-          <button type="button" class="btn btn-success btn-sm" (click)="registrarNuevoPostulante()">
-            <i class="bi bi-person-plus me-1"></i>
-            Registrar postulante
-          </button>
-        </div>
+        <!-- Mensaje ya incorporado en la fila de acciones -->
       </div>
     </div>
 
