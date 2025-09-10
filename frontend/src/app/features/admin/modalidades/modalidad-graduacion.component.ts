@@ -259,6 +259,16 @@ export class ModalidadGraduacionComponent implements OnInit {
 
   seleccionarModalidad(modalidad: ModalidadGraduacion) {
     this.modalidadSeleccionada = modalidad;
+    // Desplazar la vista hacia el bloque de información para dar visibilidad inmediata
+    setTimeout(() => {
+      const el = document.getElementById('infoModalidad');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        try {
+          (el as HTMLElement).focus({ preventScroll: true });
+        } catch {}
+      }
+    }, 0);
   }
   
   seleccionarEstudiante(estudiante: Estudiante) {

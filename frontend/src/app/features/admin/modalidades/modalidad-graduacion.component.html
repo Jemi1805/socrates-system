@@ -322,11 +322,11 @@
               </div>
               
               <!-- Información adicional -->
-              <div *ngIf="modalidadSeleccionada" class="selected-info mt-4 p-3 bg-light rounded">
-                <h6 class="mb-3">
+              <div *ngIf="modalidadSeleccionada" id="infoModalidad" tabindex="-1" class="selected-info mt-3 alert alert-info border-start border-4 shadow-sm">
+                <h5 class="mb-3 d-flex align-items-center">
                   <i class="bi bi-info-circle me-2"></i>
                   Información de {{ modalidadSeleccionada.nombre }}
-                </h6>
+                </h5>
                 
                 <div class="row">
                   <div class="col-md-3">
