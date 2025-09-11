@@ -68,6 +68,13 @@ export class PostulantesListComponent implements OnInit {
   modalidad: ModalidadGraduacion | null = null;
   modalidades: ModalidadGraduacion[] = [];
   inscripciones: InscripcionModalidad[] = [];
+  // Control de visibilidad del botón final de registro
+  showRegistrarInscripcion: boolean = false;
+  // Modal de éxito
+  modalExitoVisible: boolean = false;
+  // Estado y error de inscripción
+  inscripcionLoading: boolean = false;
+  inscripcionError: string | null = null;
   
   // Control del modal
   modalVisible = false;
@@ -354,7 +361,6 @@ export class PostulantesListComponent implements OnInit {
 
   ngOnInit() {
     this.cargarDatosPostulacion();
-    this.cargarPostulantes();
     // Asegurar carga de pensums aún si no hay datos en sessionStorage
     this.cargarPensums();
     // Cargar modalidades desde el backend
@@ -686,6 +692,8 @@ export class PostulantesListComponent implements OnInit {
         this.isEditing = false;
         this.esNuevoPostulante = false;
         this.pasoBiograficosCompletado = true;
+        // Mostrar el botón final de registro solo después de guardar biográficos
+        this.showRegistrarInscripcion = true;
       },
       error: (err) => {
         console.error('Error al guardar datos biográficos:', err);
@@ -777,6 +785,7 @@ export class PostulantesListComponent implements OnInit {
     const lower = (v || '').toLocaleLowerCase();
     return lower.replace(/(?:^|[\s\-'])\p{L}/gu, (m) => m.toUpperCase());
   }
+
   onTipoBachillerChange(tipo: 'nacional' | 'extranjero') {
     this.tipoBachiller = tipo;
     // Reset de formularios específicos
@@ -908,6 +917,112 @@ export class PostulantesListComponent implements OnInit {
 
   recalcularTotalSeleccionados() {
     this.totalArancelesSeleccionados = this.selectedAranceles.reduce((sum, x) => sum + this.toNumber(x?.monto), 0);
+  }
+
+  // Normaliza una fecha a formato YYYY-MM-DD; si viene vacía o inválida devuelve null
+  private normalizarFecha(f: any): string | null {
+    if (!f) return null;
+    // Si es Date
+    if (f instanceof Date && !isNaN(f.getTime())) {
+      const y = f.getFullYear();
+      const m = String(f.getMonth() + 1).padStart(2, '0');
+      const d = String(f.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    const s = String(f).trim();
+    if (!s) return null;
+    // Ya está en YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    // Formato común dd/mm/yyyy o d/m/yyyy
+    const m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m1) {
+      const d = m1[1].padStart(2, '0');
+      const mo = m1[2].padStart(2, '0');
+      const y = m1[3];
+      return `${y}-${mo}-${d}`;
+    }
+    // Intento de parseo nativo
+    const d2 = new Date(s);
+    if (!isNaN(d2.getTime())) {
+      const y = d2.getFullYear();
+      const mo = String(d2.getMonth() + 1).padStart(2, '0');
+      const dd = String(d2.getDate()).padStart(2, '0');
+      return `${y}-${mo}-${dd}`;
+    }
+    return null;
+  }
+
+  // --- Registro de inscripción ---
+  puedeRegistrar(): boolean {
+    // Debe haber guardado biográficos
+    if (!this.pasoBiograficosCompletado) return false;
+    // Debe existir estudiante/cod_ceta
+    const cod = this.postulanteActual?.cod_ceta || this.estudiante?.cod_ceta;
+    if (!cod) return false;
+    // Nombres y apellidos mínimos
+    if (!this.postulanteActual?.nombres_est || !this.postulanteActual?.ap_pat) return false;
+    // Modalidad seleccionada
+    if (!this.modalidad) return false;
+    // Validación de gestión de inicio/conclusión (si aplica)
+    if (this.gestionErrorMessage) return false;
+    return true;
+  }
+
+  registrarInscripcion() {
+    if (!this.puedeRegistrar()) {
+      alert('Complete los datos requeridos antes de registrar la inscripción.');
+      return;
+    }
+
+    const cod = (this.postulanteActual?.cod_ceta || this.estudiante?.cod_ceta) as number;
+    const nombres = this.postulanteActual?.nombres_est || '';
+    const apellidos = [this.postulanteActual?.ap_pat || '', this.postulanteActual?.ap_mat || ''].filter(Boolean).join(' ');
+
+    const payload: any = {
+      cod_ceta_est: cod,
+      nombres_est: nombres,
+      apellidos_est: apellidos,
+      modalidad_id: this.modalidad?.id,
+      modalidad_nom: this.modalidad?.nombre,
+      aranceles_completos: !!this.pagoCompletoSeleccionados,
+      aranceles: (this.selectedAranceles || []).map((a: any) => ({
+        id: a.id || null,
+        gestion: a.gestion || null,
+        fecha: this.normalizarFecha(a.fecha),
+        concepto: a.concepto || null,
+        monto: a.monto || null,
+        num_factura: a.num_factura || null,
+        num_comprobante: a.num_comprobante || null,
+        razon: a.razon || null,
+        nit: a.nit || null,
+        pagado: !!(a.pagado || this.pagoCompletoSeleccionados),
+        origen: a.origen || 'sga',
+        seleccionado: true,
+      }))
+    };
+
+    this.inscripcionLoading = true;
+    this.inscripcionError = null;
+    this.postulanteService.registrarInscripcion(payload).subscribe({
+      next: (res) => {
+        // Mostrar modal bonito de éxito
+        this.modalExitoVisible = true;
+        this.inscripcionLoading = false;
+      },
+      error: (err) => {
+        console.error('Error al registrar inscripción:', err);
+        this.inscripcionLoading = false;
+        // Mensaje amigable según código
+        if (err && err.status === 401) {
+          this.inscripcionError = 'No autenticado. Inicie sesión nuevamente para registrar la inscripción.';
+        } else if (err && err.status === 422) {
+          const detalle = (err.error && (err.error.message || JSON.stringify(err.error))) || 'Datos inválidos';
+          this.inscripcionError = 'Validación fallida: ' + detalle;
+        } else {
+          this.inscripcionError = 'No se pudo registrar la inscripción. Intente nuevamente.';
+        }
+      }
+    });
   }
 
   // --- Arancel manual: agregar a seleccionados ---

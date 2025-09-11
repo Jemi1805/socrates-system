@@ -30,11 +30,17 @@ export class PostulanteService {
   private apiUrl = `${this.baseUrl}/postulantes`;
   private sgaUrl = `${this.baseUrl}/sga`; // Base para endpoints SGA
   private modalidadUrl = `${this.baseUrl}/modalidades`;
+  private inscripcionesUrl = `${this.baseUrl}/inscripciones`;
 
   constructor(private http: HttpClient) {}
 
   getAll(): Observable<Postulante[]> {
     return this.http.get<Postulante[]>(this.apiUrl);
+  }
+
+  // --- Inscripciones ---
+  registrarInscripcion(payload: any): Observable<any> {
+    return this.http.post<any>(this.inscripcionesUrl, payload);
   }
 
   getById(id: number): Observable<Postulante> {

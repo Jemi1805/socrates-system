@@ -161,11 +161,11 @@
         <!-- Formulario: Bachiller Nacional -->
         <div class="mt-3" *ngIf="tipoBachiller === 'nacional'">
           <div class="row g-3">
-            <div class="col-md-3">
+            <div class="col-3">
               <label class="form-label">N° de Serie</label>
               <input type="text" class="form-control" [(ngModel)]="postulanteActual.nro_serie_titulo" placeholder="Ej. 123456" />
             </div>
-            <div class="col-md-4">
+            <div class="col-5">
               <label class="form-label">Emisión</label>
               <input type="text" class="form-control" [(ngModel)]="diplomaNacional.emision" placeholder="Ej: Universidad Mayor de San Simón" />
             </div>
@@ -173,7 +173,7 @@
               <label class="form-label">Fecha de Emisión</label>
               <input type="date" class="form-control" [(ngModel)]="diplomaNacional.fecha_emision" />
             </div>
-            <div class="col-md-3">
+            <div class="col-2">
               <label class="form-label">Gestión de Bachillerato</label>
               <input type="text" class="form-control" [(ngModel)]="diplomaNacional.gestion_bachillerato" placeholder="Ej. 2019" />
             </div>
@@ -733,6 +733,53 @@
       </ng-template>
     </div>
   
+  <!-- Aviso y botón final para registrar la inscripción -->
+  <div class="mt-3" *ngIf="showRegistrarInscripcion">
+    <div class="alert alert-warning py-2" role="alert">
+      <i class="bi bi-exclamation-triangle me-1"></i>
+      Verifique los datos (biográficos, bachillerato, modalidad y aranceles seleccionados) antes de registrar la inscripción.
+    </div>
+    <div *ngIf="inscripcionError" class="alert alert-danger py-2" role="alert">
+      <i class="bi bi-exclamation-octagon me-1"></i>
+      {{ inscripcionError }}
+    </div>
+    <button
+      type="button"
+      class="btn btn-success"
+      (click)="registrarInscripcion()"
+      [disabled]="!puedeRegistrar() || inscripcionLoading">
+      <ng-container *ngIf="!inscripcionLoading; else loadingTpl">
+        <i class="bi bi-check2-circle me-1"></i>
+        Registrar inscripción
+      </ng-container>
+      <ng-template #loadingTpl>
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        Registrando...
+      </ng-template>
+    </button>
+  </div>
+
+  <!-- Modal de éxito de inscripción -->
+  <div class="modal-overlay" *ngIf="modalExitoVisible">
+    <div class="modal-container success">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <i class="bi bi-check2-circle text-success me-2"></i>
+          Inscripción registrada
+        </h3>
+        <button class="btn-close" (click)="modalExitoVisible = false">
+          <i class="bi bi-x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>El estudiante ha sido registrado satisfactoriamente en su modalidad de graduación.</p>
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-success" (click)="modalExitoVisible = false">Aceptar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal de selección de modalidad -->
   <div class="modal-overlay" *ngIf="modalVisible">
     <div class="modal-container">

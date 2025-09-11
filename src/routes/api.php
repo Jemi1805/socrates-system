@@ -88,6 +88,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('res_homol_cp', ResHomolCpController::class);
     Route::apiResource('grados_homol_cp', GradosHomolCpController::class);
     Route::apiResource('grados_trasp', GradosTraspController::class);
+    // Registro de inscripción con aranceles seleccionados
+    Route::post('inscripciones', [InscripModalidadController::class, 'storeWithAranceles']);
     // Catálogos base
     Route::apiResource('carrera', CarreraController::class);
     Route::apiResource('pensum', PensumController::class);
