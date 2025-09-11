@@ -373,6 +373,11 @@ export class PostulantesListComponent implements OnInit {
       
       // Pre-llenar el formulario con los datos del estudiante
       if (this.estudiante) {
+        // Tomar nro_serie_titulo desde la respuesta directa o desde raw si fuese necesario
+        const raw = (this.estudiante as any)?.raw || {};
+        const serieDesdeRaw = raw['N° Serie Titulo de Bachiller'] || raw['N° Serie Título de Bachiller'] || raw['Nro Serie Titulo de Bachiller'] || '';
+        const nroSerieTitulo = (this.estudiante as any)?.nro_serie_titulo || (this.estudiante as any)?.nroSerieTitulo || serieDesdeRaw || '';
+
         this.postulanteActual = {
           cod_ceta: parseInt(this.estudiante.cod_ceta),
           nombres_est: this.estudiante.nombres,
@@ -384,8 +389,23 @@ export class PostulantesListComponent implements OnInit {
           lugar_nacimiento: this.estudiante.lugar_nacimiento,
           carrera: this.estudiante.carrera,
           pensum: this.estudiante.pensum,
-          nro_serie_titulo: this.estudiante.nro_serie_titulo || '',
+          nro_serie_titulo: nroSerieTitulo,
         };
+        // Diagnóstico
+        console.log('[BIO] Prefill SGA:', {
+          nro_serie_titulo: nroSerieTitulo,
+          procedencia: this.estudiante.procedencia,
+        });
+        // Si viene número de serie, asumimos Bachiller Nacional por defecto para mostrar el campo
+        if (!this.tipoBachiller && this.postulanteActual.nro_serie_titulo) {
+          this.tipoBachiller = 'nacional';
+        }
+        // Reasignar en el siguiente tick para asegurar que el input reciba el valor
+        if (nroSerieTitulo) {
+          setTimeout(() => {
+            this.postulanteActual.nro_serie_titulo = nroSerieTitulo;
+          }, 0);
+        }
       }
       if (this.estudiante?.cod_ceta) {
         this.cargarArancelesMaterialExtra();
@@ -653,7 +673,16 @@ export class PostulantesListComponent implements OnInit {
     // Usamos POST que en backend hace updateOrCreate por cod_ceta
     this.postulanteService.create(this.postulanteActual as Postulante).subscribe({
       next: (res) => {
-        this.postulanteActual = res as any;
+        // Conservar campos del front que el backend no devuelve (p. ej., nro_serie_titulo)
+        const prev = { ...this.postulanteActual } as any;
+        this.postulanteActual = { ...prev, ...(res as any) };
+        if (!this.postulanteActual.nro_serie_titulo && prev.nro_serie_titulo) {
+          this.postulanteActual.nro_serie_titulo = prev.nro_serie_titulo;
+        }
+        // Asegurar visibilidad del input de serie
+        if (this.postulanteActual.nro_serie_titulo && !this.tipoBachiller) {
+          this.tipoBachiller = 'nacional';
+        }
         this.isEditing = false;
         this.esNuevoPostulante = false;
         this.pasoBiograficosCompletado = true;
