@@ -336,7 +336,7 @@ input {
       align-items: center;
     }
     
-    .btn-primary, .btn-success{
+    .btn-primary{
       color: $primary-color !important;
     }
     
@@ -727,19 +727,19 @@ input {
   }
 }
 
-.docs-card {
-  .btn-success {
+.btn-success {
+  color: white !important;
+  border-color: $success-color;
+  .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
     color: white !important;
-    border-color: $success-color;
-    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
-      color: white !important;
-    }
-    &:hover {
-      background: $success-color;
-      color: white !important;
-    }
+  }
+  &:hover {
+    background: $success-color;
+    color: white !important;
   }
 }
+// .docs-card {
+// }
 
 // Responsive
 @media (max-width: 768px) {

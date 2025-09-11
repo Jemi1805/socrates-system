@@ -77,6 +77,8 @@ export class PostulantesListComponent implements OnInit {
   esNuevoPostulante = false;
   // Modo de edición para Datos del estudiante (biográficos)
   isEditing = false;
+  // Paso 1 completado: al guardar datos biográficos se habilitan las demás secciones
+  pasoBiograficosCompletado = false;
 
   // Aranceles
   aranceles: any[] = [];
@@ -397,6 +399,8 @@ export class PostulantesListComponent implements OnInit {
       this.esNuevoPostulante = true;
     }
     // Nota: la carga de pensums se realiza en ngOnInit()
+    // Al iniciar SIEMPRE se requiere guardar biográficos antes de continuar
+    this.pasoBiograficosCompletado = false;
   }
 
   // --- Pensums ---
@@ -627,6 +631,38 @@ export class PostulantesListComponent implements OnInit {
     } else {
       this.isEditing = false;
     }
+  }
+
+  // Guardar datos biográficos y habilitar el resto de secciones
+  guardarYContinuarInscripcion() {
+    // Validaciones mínimas
+    const p = this.postulanteActual as any;
+    const faltantes: string[] = [];
+    if (!p.cod_ceta) faltantes.push('Código CETA');
+    if (!p.nombres_est) faltantes.push('Nombres');
+    if (!p.ap_pat) faltantes.push('Apellido Paterno');
+    if (!p.ap_mat) faltantes.push('Apellido Materno');
+    if (!p.ci) faltantes.push('CI');
+    if (!p.carrera) faltantes.push('Carrera');
+    if (!p.pensum) faltantes.push('Pensum');
+    if (faltantes.length) {
+      alert('Complete los siguientes campos: ' + faltantes.join(', '));
+      return;
+    }
+
+    // Usamos POST que en backend hace updateOrCreate por cod_ceta
+    this.postulanteService.create(this.postulanteActual as Postulante).subscribe({
+      next: (res) => {
+        this.postulanteActual = res as any;
+        this.isEditing = false;
+        this.esNuevoPostulante = false;
+        this.pasoBiograficosCompletado = true;
+      },
+      error: (err) => {
+        console.error('Error al guardar datos biográficos:', err);
+        alert('No se pudo guardar los datos biográficos. Verifique e intente nuevamente.');
+      }
+    });
   }
 
   // --- Handlers de validación/sanitización en inputs biográficos ---

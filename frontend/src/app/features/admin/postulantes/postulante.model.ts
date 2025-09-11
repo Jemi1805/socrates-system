@@ -4,6 +4,7 @@ export interface Postulante {
   ap_pat: string;
   ap_mat: string;
   ci: string;
+  complemento: string;
   procedencia: string;
   ci_completo: string; // Nuevo campo para CI completo
   fecha_nacimiento: string;
