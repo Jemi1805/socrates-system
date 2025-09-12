@@ -163,7 +163,16 @@
           <div class="row g-3">
             <div class="col-3">
               <label class="form-label">N° de Serie</label>
-              <input type="text" class="form-control" [(ngModel)]="postulanteActual.nro_serie_titulo" placeholder="Ej. 123456" />
+              <input
+                type="text"
+                class="form-control"
+                [(ngModel)]="postulanteActual.nro_serie_titulo"
+                placeholder="Ej. 123456"
+                style="text-transform: uppercase"
+                pattern='^[A-Z0-9\-\"°\s]+$'
+                title='Solo MAYÚSCULAS, números, guion -, " y °'
+                (input)="onSerieInput($event, postulanteActual, 'nro_serie_titulo', true)"
+              />
             </div>
             <div class="col-5">
               <label class="form-label">Emisión</label>
@@ -175,7 +184,15 @@
             </div>
             <div class="col-2">
               <label class="form-label">Gestión de Bachillerato</label>
-              <input type="text" class="form-control" [(ngModel)]="diplomaNacional.gestion_bachillerato" placeholder="Ej. 2019" />
+              <input
+                type="text"
+                class="form-control"
+                [(ngModel)]="diplomaNacional.gestion_bachillerato"
+                placeholder="Ej. 2019"
+                pattern='^[0-9/]+$'
+                title='Solo números y /'
+                (input)="onGestionInput($event, diplomaNacional, 'gestion_bachillerato')"
+              />
             </div>
             <div class="col-12">
               <label class="form-label">Observación</label>
@@ -195,8 +212,9 @@
                 [(ngModel)]="postulanteActual.nro_serie_titulo"
                 placeholder="Ej. RES-2023-001"
                 style="text-transform: uppercase"
-                pattern='^[A-Z0-9\-\"°]+$'
+                pattern='^[A-Z0-9\-\"°\s]+$'
                 title='Solo MAYÚSCULAS, números, guion -, " y °'
+                (input)="onSerieInput($event, postulanteActual, 'nro_serie_titulo', true)"
               />
             </div>
             <div class="col-md-3">
@@ -212,7 +230,15 @@
                   <input type="text" class="form-control" [(ngModel)]="gg.grado" placeholder="Grado (p. ej., 1ro, 2do)" />
                 </div>
                 <div class="col-md-3">
-                  <input type="text" class="form-control" [(ngModel)]="gg.gestion" placeholder="Gestión (p. ej., 2018)" />
+                  <input
+                    type="text"
+                    class="form-control"
+                    [(ngModel)]="gg.gestion"
+                    placeholder="Gestión (p. ej., 2018)"
+                    pattern='^[0-9/]+$'
+                    title='Solo números y /'
+                    (input)="onGestionInput($event, gg, 'gestion')"
+                  />
                 </div>
                 <div class="col-md-2">
                   <button class="btn btn-outline-danger w-100" (click)="eliminarGradoGestion(i)">
@@ -278,11 +304,29 @@
           <div class="row g-3">
             <div class="col-md-4">
               <label class="form-label">Serie título Profesional - Técnico Medio</label>
-              <input type="text" class="form-control" [(ngModel)]="eduRegularData.serie_titulo_tm" placeholder="Ej. SERIE-001" />
+              <input
+                type="text"
+                class="form-control"
+                [(ngModel)]="eduRegularData.serie_titulo_tm"
+                placeholder="Ej. SERIE-001"
+                style="text-transform: uppercase"
+                pattern='^[A-Z0-9\-\"°\s]+$'
+                title='Solo MAYÚSCULAS, números, guion -, " y °'
+                (input)="onSerieInput($event, eduRegularData, 'serie_titulo_tm', true)"
+              />
             </div>
             <div class="col-md-4">
               <label class="form-label">N° de Título Profesional - Técnico Medio</label>
-              <input type="text" class="form-control" [(ngModel)]="eduRegularData.numero_titulo_tm" placeholder="Ej. 123456" />
+              <input
+                type="text"
+                class="form-control"
+                [(ngModel)]="eduRegularData.numero_titulo_tm"
+                placeholder="Ej. 123456"
+                style="text-transform: uppercase"
+                pattern='^[A-Z0-9\-\"°\s]+$'
+                title='Solo MAYÚSCULAS, números, guion -, " y °'
+                (input)="onSerieInput($event, eduRegularData, 'numero_titulo_tm', true)"
+              />
             </div>
             <div class="col-md-4">
               <label class="form-label">Fecha de emisión</label>
@@ -296,11 +340,29 @@
           <div class="row g-3">
             <div class="col-md-4">
               <label class="form-label">Serie título Profesional - Técnico Medio</label>
-              <input type="text" class="form-control" [(ngModel)]="tecnicoMedioData.serie_titulo_tm" placeholder="Ej. SERIE-001" />
+              <input
+                type="text"
+                class="form-control"
+                [(ngModel)]="tecnicoMedioData.serie_titulo_tm"
+                placeholder="Ej. SERIE-001"
+                style="text-transform: uppercase"
+                pattern='^[A-Z0-9\-\"°\s]+$'
+                title='Solo MAYÚSCULAS, números, guion -, " y °'
+                (input)="onSerieInput($event, tecnicoMedioData, 'serie_titulo_tm', true)"
+              />
             </div>
             <div class="col-md-4">
               <label class="form-label">N° de Título Profesional - Técnico Medio</label>
-              <input type="text" class="form-control" [(ngModel)]="tecnicoMedioData.numero_titulo_tm" placeholder="Ej. 123456" />
+              <input
+                type="text"
+                class="form-control"
+                [(ngModel)]="tecnicoMedioData.numero_titulo_tm"
+                placeholder="Ej. 123456"
+                style="text-transform: uppercase"
+                pattern='^[A-Z0-9\-\"°\s]+$'
+                title='Solo MAYÚSCULAS, números, guion -, " y °'
+                (input)="onSerieInput($event, tecnicoMedioData, 'numero_titulo_tm', true)"
+              />
             </div>
             <div class="col-md-4">
               <label class="form-label">Fecha de emisión</label>
@@ -325,7 +387,15 @@
                   <input type="text" class="form-control" [(ngModel)]="gg.grado" placeholder="Grado (p. ej., 1ro, 2do)" />
                 </div>
                 <div class="col-md-3">
-                  <input type="text" class="form-control" [(ngModel)]="gg.gestion" placeholder="Gestión (p. ej., 2018)" />
+                  <input
+                    type="text"
+                    class="form-control"
+                    [(ngModel)]="gg.gestion"
+                    placeholder="Gestión (p. ej., 2018)"
+                    pattern='^[0-9/]+$'
+                    title='Solo números y /'
+                    (input)="onGestionInput($event, gg, 'gestion')"
+                  />
                 </div>
                 <div class="col-md-2">
                   <button class="btn btn-outline-danger w-100" (click)="eliminarGradoGestionTraspaso(i)">
@@ -358,8 +428,9 @@
                 [(ngModel)]="homoCambioPlanData.nro_resolucion_rectoral"
                 placeholder="Ej. RES-2025-001"
                 style="text-transform: uppercase"
-                pattern='^[A-Z0-9\-\"°]+$'
+                pattern='^[A-Z0-9\-\"°\s]+$'
                 title='Solo MAYÚSCULAS, números, guion -, " y °'
+                (input)="onSerieInput($event, homoCambioPlanData, 'nro_resolucion_rectoral', true)"
               />
             </div>
             <div class="col-md-3">

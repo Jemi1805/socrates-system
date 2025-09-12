@@ -302,6 +302,94 @@ export class PostulantesListComponent implements OnInit {
     return `La gestión de conclusión debe ser mayor a la de inicio por al menos ${this.MIN_GESTIONES_DIF} gestiones.`;
   }
 
+  // --- Validación integral de campos requeridos ---
+  private isNonEmpty(v: any): boolean {
+    return v !== undefined && v !== null && String(v).toString().trim() !== '';
+  }
+
+  private validarCampos(): string[] {
+    const faltantes: string[] = [];
+
+    // Datos biográficos mínimos
+    const p = this.postulanteActual as any;
+    if (!this.isNonEmpty(p.cod_ceta)) faltantes.push('Código CETA');
+    if (!this.isNonEmpty(p.nombres_est)) faltantes.push('Nombres');
+    if (!this.isNonEmpty(p.ap_pat)) faltantes.push('Apellido Paterno');
+    if (!this.isNonEmpty(p.ap_mat)) faltantes.push('Apellido Materno');
+    if (!this.isNonEmpty(p.ci)) faltantes.push('CI');
+    if (!this.isNonEmpty(p.carrera)) faltantes.push('Carrera');
+    if (!this.isNonEmpty(p.pensum)) faltantes.push('Pensum');
+    if (!this.isNonEmpty(p.fecha_nacimiento)) faltantes.push('Fecha de Nacimiento');
+    if (!this.isNonEmpty(p.lugar_nacimiento)) faltantes.push('Lugar de Nacimiento');
+    if (!this.isNonEmpty(p.procedencia)) faltantes.push('Procedencia');
+
+    // Bachillerato (según tipo)
+    if (this.tipoBachiller === 'nacional') {
+      if (!this.isNonEmpty(p.nro_serie_titulo)) faltantes.push('N° de Serie (Bachiller Nacional)');
+      if (!this.isNonEmpty(this.diplomaNacional.emision)) faltantes.push('Emisión (Bachiller Nacional)');
+      if (!this.isNonEmpty(this.diplomaNacional.fecha_emision)) faltantes.push('Fecha de Emisión (Bachiller Nacional)');
+      if (!this.isNonEmpty(this.diplomaNacional.gestion_bachillerato)) faltantes.push('Gestión de Bachillerato');
+    } else if (this.tipoBachiller === 'extranjero') {
+      // Nota: En HTML actual el Nro. Resolución se enlaza a postulanteActual.nro_serie_titulo.
+      // Para evitar falsos positivos, exigimos al menos la fecha y, si hubiese resolución en el modelo, validarla.
+      if (!this.isNonEmpty(this.homologacionExtranjero.fecha_emision)) faltantes.push('Fecha de Emisión (Bachiller Extranjero)');
+    }
+
+    // Datos de Inicio/Conclusión (si el usuario los está usando)
+    if (!this.isNonEmpty(this.datosInicioCarrera.gestion_ini)) faltantes.push('Gestión de Inicio de Carrera');
+    if (!this.isNonEmpty(this.datosConclusionCarrera.gestion_fin)) faltantes.push('Gestión de Conclusión de Carrera');
+    if (this.gestionErrorMessage) faltantes.push(this.gestionErrorMessage);
+
+    // Validación por opción seleccionada (solo valida si está seleccionada)
+    switch (this.selectedOpcion) {
+      case 'educacionRegular': {
+        const e = this.eduRegularData;
+        if (!this.isNonEmpty(e.serie_titulo_tm)) faltantes.push('Serie título (Educación Regular)');
+        if (!this.isNonEmpty(e.numero_titulo_tm)) faltantes.push('N° de Título (Educación Regular)');
+        if (!this.isNonEmpty(e.fecha_emision)) faltantes.push('Fecha de Emisión (Educación Regular)');
+        break;
+      }
+      case 'tecnicoMedio': {
+        const t = this.tecnicoMedioData;
+        if (!this.isNonEmpty(t.serie_titulo_tm)) faltantes.push('Serie título (Técnico Medio)');
+        if (!this.isNonEmpty(t.numero_titulo_tm)) faltantes.push('N° de Título (Técnico Medio)');
+        if (!this.isNonEmpty(t.fecha_emision)) faltantes.push('Fecha de Emisión (Técnico Medio)');
+        break;
+      }
+      case 'traspasoInstituto': {
+        if (!this.isNonEmpty(this.traspasoData.instituto_origen)) faltantes.push('Instituto de origen (Traspaso)');
+        // Si el usuario añadió filas, exigir que estén completas
+        (this.traspasoData.grados_gestiones || []).forEach((gg, i) => {
+          if (this.isNonEmpty(gg.grado) || this.isNonEmpty(gg.gestion)) {
+            if (!this.isNonEmpty(gg.grado)) faltantes.push(`Grado #${i + 1} (Traspaso)`);
+            if (!this.isNonEmpty(gg.gestion)) faltantes.push(`Gestión #${i + 1} (Traspaso)`);
+          }
+        });
+        break;
+      }
+      case 'homologacionCambioPlan': {
+        if (!this.isNonEmpty(this.homoCambioPlanData.nro_resolucion_rectoral)) faltantes.push('N° de Resolución Rectoral (Cambio de plan)');
+        if (!this.isNonEmpty(this.homoCambioPlanData.fecha_emision)) faltantes.push('Fecha de Emisión (Cambio de plan)');
+        (this.homoCambioPlanData.grados_gestiones || []).forEach((gg, i) => {
+          if (this.isNonEmpty(gg.grado) || this.isNonEmpty(gg.gestion)) {
+            if (!this.isNonEmpty(gg.grado)) faltantes.push(`Grado #${i + 1} (Cambio de plan)`);
+            if (!this.isNonEmpty(gg.gestion)) faltantes.push(`Gestión #${i + 1} (Cambio de plan)`);
+          }
+        });
+        break;
+      }
+      default:
+        // Sin opción seleccionada, no validamos secciones específicas
+        break;
+    }
+    // Aranceles: exigir al menos uno seleccionado para poder registrar
+    if (!Array.isArray(this.selectedAranceles) || this.selectedAranceles.length === 0) {
+      faltantes.push('Seleccione al menos un arancel');
+    }
+
+    return faltantes;
+  }
+
   // --- Handlers para dropdown custom ---
   setGestionInicio(g: string) {
     this.datosInicioCarrera.gestion_ini = g;
@@ -663,21 +751,6 @@ export class PostulantesListComponent implements OnInit {
 
   // Guardar datos biográficos y habilitar el resto de secciones
   guardarYContinuarInscripcion() {
-    // Validaciones mínimas
-    const p = this.postulanteActual as any;
-    const faltantes: string[] = [];
-    if (!p.cod_ceta) faltantes.push('Código CETA');
-    if (!p.nombres_est) faltantes.push('Nombres');
-    if (!p.ap_pat) faltantes.push('Apellido Paterno');
-    if (!p.ap_mat) faltantes.push('Apellido Materno');
-    if (!p.ci) faltantes.push('CI');
-    if (!p.carrera) faltantes.push('Carrera');
-    if (!p.pensum) faltantes.push('Pensum');
-    if (faltantes.length) {
-      alert('Complete los siguientes campos: ' + faltantes.join(', '));
-      return;
-    }
-
     // Usamos POST que en backend hace updateOrCreate por cod_ceta
     this.postulanteService.create(this.postulanteActual as Postulante).subscribe({
       next: (res) => {
@@ -773,6 +846,39 @@ export class PostulantesListComponent implements OnInit {
     }
     v = v.slice(0, 2);
     input.value = v;
+  }
+
+  // --- Sanitización de números de serie/resolución (front) ---
+  private sanitizeSerieStr(v: string, allowSpace: boolean = false): string {
+    const re = allowSpace ? /[^A-Z0-9\-\"°\s]+/g : /[^A-Z0-9\-\"°]+/g;
+    return (v || '')
+      .toUpperCase()
+      .replace(re, '');
+  }
+
+  onSerieInput(ev: Event, target: any, prop: string, allowSpace: boolean = false) {
+    const input = ev.target as HTMLInputElement;
+    const clean = this.sanitizeSerieStr(input.value || '', allowSpace);
+    input.value = clean;
+    if (target && typeof target === 'object') {
+      target[prop] = clean;
+    }
+  }
+
+  // --- Sanitización para 'gestión' (solo números y '/') ---
+  private sanitizeGestionStr(v: string): string {
+    return (v || '')
+      .replace(/[^0-9\/]+/g, '')
+      .replace(/\/{2,}/g, '/');
+  }
+
+  onGestionInput(ev: Event, target: any, prop: string) {
+    const input = ev.target as HTMLInputElement;
+    const clean = this.sanitizeGestionStr(input.value || '');
+    input.value = clean;
+    if (target && typeof target === 'object') {
+      target[prop] = clean;
+    }
   }
 
   private sanitizarNombre(v: string): string {
@@ -971,17 +1077,23 @@ export class PostulantesListComponent implements OnInit {
   }
 
   registrarInscripcion() {
+    // Validación integral antes del registro definitivo
+    const faltantes = this.validarCampos();
+    if (faltantes.length) {
+      alert('Complete los siguientes campos: ' + faltantes.join(', '));
+      return;
+    }
     if (!this.puedeRegistrar()) {
       alert('Complete los datos requeridos antes de registrar la inscripción.');
       return;
     }
 
-    const cod = (this.postulanteActual?.cod_ceta || this.estudiante?.cod_ceta) as number;
+    const codEst = (this.postulanteActual?.cod_ceta || this.estudiante?.cod_ceta) as number;
     const nombres = this.postulanteActual?.nombres_est || '';
     const apellidos = [this.postulanteActual?.ap_pat || '', this.postulanteActual?.ap_mat || ''].filter(Boolean).join(' ');
 
     const payload: any = {
-      cod_ceta_est: cod,
+      cod_ceta_est: codEst,
       nombres_est: nombres,
       apellidos_est: apellidos,
       modalidad_id: this.modalidad?.id,

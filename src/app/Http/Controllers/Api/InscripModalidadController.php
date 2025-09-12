@@ -22,6 +22,17 @@ use App\Models\GradosTrasp;
 class InscripModalidadController extends CrudController
 {
     protected $modelClass = InscripModalidad::class;
+    /**
+     * Sanitiza números de serie/resoluciones: permite solo A-Z, 0-9, guion -, comillas dobles " y símbolo °, y devuelve en MAYÚSCULAS.
+     */
+    private function sanitizeSerie(?string $v): ?string
+    {
+        if ($v === null) return null;
+        $v = strtoupper($v);
+        // Mantener solo A-Z, 0-9, -, " , ° y espacios
+        $v = preg_replace('/[^A-Z0-9\-\"°\s]+/u', '', $v);
+        return $v;
+    }
     
     protected function rules()
     {
@@ -205,13 +216,17 @@ class InscripModalidadController extends CrudController
             }
 
             // Guardar Diploma de Bachiller (solo nacional) según payload y esquema actual
-            if (!empty($data['tipo_bachiller']) && $data['tipo_bachiller'] === 'nacional' && !empty($data['diploma_bachiller'])) {
+            if (!empty($data['diploma_bachiller']) && $data['tipo_bachiller'] === 'nacional' && !empty($data['diploma_bachiller'])) {
                 $d = $data['diploma_bachiller'];
+                // Sanear número de serie del diploma nacional
+                if (isset($d['nro_serie_titulo'])) {
+                    $d['nro_serie_titulo'] = $this->sanitizeSerie($d['nro_serie_titulo']);
+                }
                 DiplomaBachiller::updateOrCreate(
                     ['cod_ceta_est' => $data['cod_ceta_est']],
                     [
                         'tipo_bachiller' => $data['tipo_bachiller'],
-                        'nro_serie_titulo' => data_get($data, 'diploma_bachiller.nro_serie_titulo'),
+                        'nro_serie_titulo' => $d['nro_serie_titulo'] ?? null,
                         'emision' => data_get($data, 'diploma_bachiller.emision'),
                         'fecha_emision' => data_get($data, 'diploma_bachiller.fecha_emision'),
                         'observacion' => data_get($data, 'diploma_bachiller.observacion'),
@@ -224,6 +239,9 @@ class InscripModalidadController extends CrudController
             if (!empty($data['transitabilidad_edu_reg'])) {
                 if (Schema::hasTable('transitabilidad_edu_reg')) {
                     $t = $data['transitabilidad_edu_reg'];
+                    // Sanitizar serie y número de título TM
+                    if (isset($t['serie_titulo_tm'])) $t['serie_titulo_tm'] = $this->sanitizeSerie($t['serie_titulo_tm']);
+                    if (isset($t['numero_titulo_tm'])) $t['numero_titulo_tm'] = $this->sanitizeSerie($t['numero_titulo_tm']);
                     TransitabilidadEduReg::updateOrCreate(
                         ['cod_ceta_est' => $data['cod_ceta_est']],
                         [
@@ -245,6 +263,9 @@ class InscripModalidadController extends CrudController
             if (!empty($data['transitabilidad_inst_tec'])) {
                 if (Schema::hasTable('transitabilidad_inst_tec')) {
                     $t2 = $data['transitabilidad_inst_tec'];
+                    // Sanitizar serie y número de título TM (inst. técnica)
+                    if (isset($t2['serie_titulo_tm'])) $t2['serie_titulo_tm'] = $this->sanitizeSerie($t2['serie_titulo_tm']);
+                    if (isset($t2['numero_titulo_tm'])) $t2['numero_titulo_tm'] = $this->sanitizeSerie($t2['numero_titulo_tm']);
                     TransitabilidadInstTec::updateOrCreate(
                         ['cod_ceta_est' => $data['cod_ceta_est']],
                         [
@@ -269,6 +290,7 @@ class InscripModalidadController extends CrudController
             if (!empty($data['tipo_bachiller']) && $data['tipo_bachiller'] === 'extranjero') {
                 $nroRes = data_get($data, 'homol_extranjero.nro_resolucion')
                     ?: data_get($data, 'diploma_bachiller.nro_serie_titulo');
+                $nroRes = $this->sanitizeSerie($nroRes);
                 $diplomaExtranjero = DiplomaBachiller::updateOrCreate(
                     ['cod_ceta_est' => $data['cod_ceta_est']],
                     [
@@ -412,7 +434,7 @@ class InscripModalidadController extends CrudController
                         $payloadCp['cod_ceta_est'] = $data['cod_ceta_est'] ?? null;
                     }
                     if (Schema::hasColumn('homologacion_cambio_plan', 'nro_resolucion')) {
-                        $payloadCp['nro_resolucion'] = $cp['nro_resolucion'] ?? null;
+                        $payloadCp['nro_resolucion'] = isset($cp['nro_resolucion']) ? $this->sanitizeSerie($cp['nro_resolucion']) : null;
                     }
                     if (Schema::hasColumn('homologacion_cambio_plan', 'fecha_emision')) {
                         $payloadCp['fecha_emision'] = $cp['fecha_emision'] ?? null;
