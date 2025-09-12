@@ -427,23 +427,47 @@ class InscripModalidadController extends CrudController
                     if (!empty($payloadCp['nro_resolucion'])) {
                         $exists = DB::table('homologacion_cambio_plan')->where('nro_resolucion', $payloadCp['nro_resolucion'])->first();
                         if ($exists) {
+                            // Actualizar por nro_resolucion para no depender de una columna 'id' inexistente
                             DB::table('homologacion_cambio_plan')
-                                ->where('id', $exists->id)
+                                ->where('nro_resolucion', $payloadCp['nro_resolucion'])
                                 ->update(array_merge($payloadCp, ['updated_at' => now()]));
-                            $homolCpGuardado = DB::table('homologacion_cambio_plan')->where('id', $exists->id)->first();
+                            $homolCpGuardado = DB::table('homologacion_cambio_plan')->where('nro_resolucion', $payloadCp['nro_resolucion'])->first();
                         } else {
+                            // Insert y obtención robusta del registro insertado
+                            $id = null;
+                            if (Schema::hasColumn('homologacion_cambio_plan', 'id')) {
+                                $id = DB::table('homologacion_cambio_plan')->insertGetId(array_merge($payloadCp, [
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ]));
+                            } else {
+                                DB::table('homologacion_cambio_plan')->insert(array_merge($payloadCp, [
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ]));
+                            }
+                            $homolCpGuardado = $id !== null
+                                ? DB::table('homologacion_cambio_plan')->where('id', $id)->first()
+                                : DB::table('homologacion_cambio_plan')->where('nro_resolucion', $payloadCp['nro_resolucion'])->first();
+                        }
+                    } else {
+                        // Sin nro_resolucion: insert directo
+                        $id = null;
+                        if (Schema::hasColumn('homologacion_cambio_plan', 'id')) {
                             $id = DB::table('homologacion_cambio_plan')->insertGetId(array_merge($payloadCp, [
                                 'created_at' => now(),
                                 'updated_at' => now(),
                             ]));
                             $homolCpGuardado = DB::table('homologacion_cambio_plan')->where('id', $id)->first();
+                        } else {
+                            DB::table('homologacion_cambio_plan')->insert(array_merge($payloadCp, [
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]));
+                            // Si no hay 'id' ni 'nro_resolucion' para identificar, no podemos recuperar con certeza
+                            $homolCpGuardado = null;
+                            Log::warning('homologacion_cambio_plan insertado sin id ni nro_resolucion; no se puede recuperar el registro automáticamente.');
                         }
-                    } else {
-                        $id = DB::table('homologacion_cambio_plan')->insertGetId(array_merge($payloadCp, [
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ]));
-                        $homolCpGuardado = DB::table('homologacion_cambio_plan')->where('id', $id)->first();
                     }
 
                     // Guardar grados en grados_homologacion_cp si existe
@@ -455,29 +479,40 @@ class InscripModalidadController extends CrudController
                             if (Schema::hasColumn('grados_homologacion_cp', $cand)) { $fk = $cand; break; }
                         }
                         if ($fk) {
-                            DB::table('grados_homologacion_cp')->where($fk, $homolCpGuardado->id)->delete();
-                            $insertados = 0;
-                            foreach ($gradosCp as $gg) {
-                                $g = $gg['grado'] ?? null;
-                                $gest = $gg['gestion'] ?? null;
-                                if ($g || $gest) {
-                                    DB::table('grados_homologacion_cp')->insert([
-                                        $fk => $homolCpGuardado->id,
-                                        'grado' => $g,
-                                        'gestion' => $gest,
-                                        'created_at' => now(),
-                                        'updated_at' => now(),
-                                    ]);
-                                    $insertados++;
+                            // Obtener valor para la FK: preferir 'id' si existe; si no, usar nro_resolucion si la FK parece textual
+                            $parentIdVal = property_exists($homolCpGuardado, 'id') ? $homolCpGuardado->id : null;
+                            if ($parentIdVal === null) {
+                                if (in_array($fk, ['homologacion_cambio_plan', 'homologacion'])) {
+                                    $parentIdVal = $homolCpGuardado->nro_resolucion ?? null;
                                 }
                             }
-                            Log::info('Grados de homologación CP insertados', [
-                                'cp_id' => $homolCpGuardado->id,
-                                'count' => $insertados,
-                                'fk' => $fk,
-                                'primer_grado' => $gradosCp[0]['grado'] ?? null,
-                                'primer_gestion' => $gradosCp[0]['gestion'] ?? null,
-                            ]);
+                            if ($parentIdVal === null) {
+                                Log::warning('No se pudo determinar valor para la FK en grados_homologacion_cp; omitiendo inserción de grados.', ['fk' => $fk]);
+                            } else {
+                                DB::table('grados_homologacion_cp')->where($fk, $parentIdVal)->delete();
+                                $insertados = 0;
+                                foreach ($gradosCp as $gg) {
+                                    $g = $gg['grado'] ?? null;
+                                    $gest = $gg['gestion'] ?? null;
+                                    if ($g || $gest) {
+                                        DB::table('grados_homologacion_cp')->insert([
+                                            $fk => $parentIdVal,
+                                            'grado' => $g,
+                                            'gestion' => $gest,
+                                            'created_at' => now(),
+                                            'updated_at' => now(),
+                                        ]);
+                                        $insertados++;
+                                    }
+                                }
+                                Log::info('Grados de homologación CP insertados', [
+                                    'parent_val' => $parentIdVal,
+                                    'count' => $insertados,
+                                    'fk' => $fk,
+                                    'primer_grado' => $gradosCp[0]['grado'] ?? null,
+                                    'primer_gestion' => $gradosCp[0]['gestion'] ?? null,
+                                ]);
+                            }
                         } else {
                             Log::warning('Tabla grados_homologacion_cp no tiene columna FK esperada (homol_cp_id, cambio_plan_id, homologacion_id o id_homologacion).');
                         }

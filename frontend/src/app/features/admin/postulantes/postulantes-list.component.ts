@@ -234,6 +234,8 @@ export class PostulantesListComponent implements OnInit {
       yearActual = yearActual - 1;
     }
 
+  
+
     // Construir en orden DESCENDENTE respecto a la gestión actual
     const opciones: string[] = [];
     // Año actual

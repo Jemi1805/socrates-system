@@ -189,7 +189,15 @@
           <div class="row g-3">
             <div class="col-md-3">
               <label class="form-label">Nro. Resolución Administrativa</label>
-              <input type="text" class="form-control" [(ngModel)]="postulanteActual.nro_serie_titulo" placeholder="Ej. RES-2023-001" />
+              <input
+                type="text"
+                class="form-control"
+                [(ngModel)]="postulanteActual.nro_serie_titulo"
+                placeholder="Ej. RES-2023-001"
+                style="text-transform: uppercase"
+                pattern='^[A-Z0-9\-\"°]+$'
+                title='Solo MAYÚSCULAS, números, guion -, " y °'
+              />
             </div>
             <div class="col-md-3">
               <label class="form-label">Fecha de Emisión</label>
@@ -344,7 +352,15 @@
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label">N° de Resolución Rectoral</label>
-              <input type="text" class="form-control" [(ngModel)]="homoCambioPlanData.nro_resolucion_rectoral" placeholder="Ej. RES-2025-001" />
+              <input
+                type="text"
+                class="form-control"
+                [(ngModel)]="homoCambioPlanData.nro_resolucion_rectoral"
+                placeholder="Ej. RES-2025-001"
+                style="text-transform: uppercase"
+                pattern='^[A-Z0-9\-\"°]+$'
+                title='Solo MAYÚSCULAS, números, guion -, " y °'
+              />
             </div>
             <div class="col-md-3">
               <label class="form-label">Fecha de emisión</label>
@@ -759,25 +775,28 @@
     </button>
   </div>
 
-  <!-- Modal de éxito de inscripción -->
-  <div class="modal-overlay modal-sm" *ngIf="modalExitoVisible">
-    <div class="modal-container success">
-      <div class="modal-header">
-        <h3 class="modal-title">
-          <i class="bi bi-check2-circle text-success me-2"></i>
-          Inscripción registrada
-        </h3>
-        <button class="btn-close" (click)="modalExitoVisible = false">
-          <i class="bi bi-x"></i>
-        </button>
-      </div>
-      <div class="modal-body">
-        <p>El estudiante ha sido registrado satisfactoriamente en su modalidad de graduación.</p>
-        <div class="d-flex justify-content-end mt-3">
-          <button class="btn btn-success" (click)="modalExitoVisible = false">Aceptar</button>
+  <!-- Modal de éxito de inscripción (Bootstrap modal-sm) -->
+  <div *ngIf="modalExitoVisible">
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalExitoLabel">
+      <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h5 class="modal-title" id="modalExitoLabel">
+              <i class="bi bi-check2-circle text-success me-2"></i>
+              Inscripción registrada
+            </h5>
+            <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="modalExitoVisible = false"></button>
+          </div>
+          <div class="modal-body">
+            <small>El estudiante ha sido registrado satisfactoriamente en su modalidad de graduación.</small>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-success btn-sm" (click)="modalExitoVisible = false">Aceptar</button>
+          </div>
         </div>
       </div>
     </div>
+    <div class="modal-backdrop fade show"></div>
   </div>
 
   <!-- Modal de selección de modalidad -->

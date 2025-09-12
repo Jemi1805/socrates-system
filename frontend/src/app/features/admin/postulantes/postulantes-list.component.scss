@@ -727,6 +727,29 @@ input {
   }
 }
 
+.modal-dialog {
+  .modal-header {
+    background: $primary-color;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .modal-title {
+      margin: 0;
+      font-size: 1.3rem;
+      font-weight: 600;
+    }
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+      color: white !important;
+    }
+  }
+
+  .modal-footer {
+    justify-content: center;
+  }
+}
+
 .btn-success {
   color: white !important;
   border-color: $success-color;
