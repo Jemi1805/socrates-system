@@ -1001,6 +1001,110 @@ export class PostulantesListComponent implements OnInit {
       }))
     };
 
+    // Incluir datos de Bachillerato si corresponde
+    payload.tipo_bachiller = this.tipoBachiller || null;
+    if (this.tipoBachiller === 'nacional') {
+      const d = this.diplomaNacional || ({} as any);
+      payload.diploma_bachiller = {
+        nro_serie_titulo: (d.nro_serie || this.postulanteActual?.nro_serie_titulo || '').toString().trim() || null,
+        emision: (d.emision || '').toString().trim() || null,
+        fecha_emision: this.normalizarFecha(d.fecha_emision),
+        observacion: (d.observacion || '').toString().trim() || null,
+        // En UI es gestion_bachillerato, el backend normaliza a gestion_bachiller
+        gestion_bachillerato: (d.gestion_bachillerato || '').toString().trim() || null,
+      };
+    }
+
+    // Incluir datos de carrera (regímenes y gestiones) con nuevo esquema
+    if (this.datosInicioCarrera?.gestion_ini) {
+      payload.datos_carrera = {
+        regimen_ini: (this.datosInicioCarrera.reg_ini_c || '').toString().trim() || null,
+        regimen_fin: (this.datosConclusionCarrera.reg_con_c || '').toString().trim() || null,
+        gestion_ini: (this.datosInicioCarrera.gestion_ini || '').toString().trim() || null,
+        gestion_fin: (this.datosConclusionCarrera.gestion_fin || '').toString().trim() || null,
+      };
+    }
+
+    // Transitabilidad Educación Regular (si la opción seleccionada es educación regular)
+    if (this.selectedOpcion === 'educacionRegular') {
+      const t = this.eduRegularData || ({} as any);
+      payload.transitabilidad_edu_reg = {
+        serie_titulo_tm: (t.serie_titulo_tm || '').toString().trim() || null,
+        numero_titulo_tm: (t.numero_titulo_tm || '').toString().trim() || null,
+        fecha_emision: this.normalizarFecha(t.fecha_emision),
+        observacion: null,
+      };
+    }
+
+    // Transitabilidad Técnico Medio (si la opción seleccionada es técnico medio)
+    if (this.selectedOpcion === 'tecnicoMedio') {
+      const t2 = this.tecnicoMedioData || ({} as any);
+      payload.transitabilidad_inst_tec = {
+        serie_titulo_tm: (t2.serie_titulo_tm || '').toString().trim() || null,
+        numero_titulo_tm: (t2.numero_titulo_tm || '').toString().trim() || null,
+        fecha_emision: this.normalizarFecha(t2.fecha_emision),
+        observacion: null,
+      };
+    }
+
+    // Homologación de Bachiller Extranjero: guardar resolución y grados/gestiones
+    if (this.tipoBachiller === 'extranjero') {
+      const h = this.homologacionExtranjero || ({} as any);
+      const nroDesdePostulante = (this.postulanteActual?.nro_serie_titulo || '').toString().trim() || null;
+      payload.homol_extranjero = {
+        nro_resolucion: ((h.nro_resolucion || '') || nroDesdePostulante)?.toString().trim() || null,
+        fecha_emision: this.normalizarFecha(h.fecha_emision),
+        grados_gestiones: Array.isArray(h.grados_gestiones)
+          ? h.grados_gestiones.map((g: any) => ({
+              grado: (g?.grado || '').toString().trim() || null,
+              gestion: (g?.gestion || '').toString().trim() || null,
+            }))
+          : [],
+      };
+      // En backend se permite mapear nro_serie_titulo como nro_resolucion para extranjero
+      // Para robustez, enviamos también diploma_bachiller con ese mismo valor
+      const nroSerieComoResol = ((h.nro_resolucion || '') || nroDesdePostulante)?.toString().trim() || null;
+      payload.diploma_bachiller = {
+        nro_serie_titulo: nroSerieComoResol,
+      };
+    }
+
+    // Traspaso de Instituto: enviar bloque al backend cuando está seleccionada esta opción
+    if (this.selectedOpcion === 'traspasoInstituto') {
+      const t = this.traspasoData || ({} as any);
+      payload.traspaso_instituto = {
+        instituto_origen: (t.instituto_origen || '').toString().trim() || null,
+        // estos dos campos son opcionales en backend; si en el futuro se agregan inputs, completar aquí
+        grados_cursados: null,
+        gestiones_cursadas: null,
+        grados: Array.isArray(t.grados_gestiones)
+          ? t.grados_gestiones.map((gg: any) => ({
+              grado: (gg?.grado || '').toString().trim() || null,
+              gestion: (gg?.gestion || '').toString().trim() || null,
+            }))
+          : [],
+      };
+    }
+
+    // Homologación por cambio de plan de estudios: enviar bloque al backend
+    if (this.selectedOpcion === 'homologacionCambioPlan') {
+      const cp = (this as any).homoCambioPlanData || ({} as any);
+      // Permitir que el número venga como nro_resolucion_rectoral en la UI
+      const nroResCp = ((cp.nro_resolucion || cp.nro_resolucion_rectoral) || '').toString().trim() || null;
+      payload.homol_cambio_plan = {
+        nro_resolucion: nroResCp,
+        fecha_emision: this.normalizarFecha(cp.fecha_emision),
+        grados_cursados: (cp.grados_cursados || '').toString().trim() || null,
+        gestiones_cursadas: (cp.gestiones_cursadas || '').toString().trim() || null,
+        grados_gestiones: Array.isArray(cp.grados_gestiones)
+          ? cp.grados_gestiones.map((g: any) => ({
+              grado: (g?.grado || '').toString().trim() || null,
+              gestion: (g?.gestion || '').toString().trim() || null,
+            }))
+          : [],
+      };
+    }
+
     this.inscripcionLoading = true;
     this.inscripcionError = null;
     this.postulanteService.registrarInscripcion(payload).subscribe({

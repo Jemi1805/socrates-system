@@ -10,22 +10,24 @@ class DiplomaBachiller extends Model
     use HasFactory;
 
     protected $table = 'diploma_bachiller';
-    protected $primaryKey = 'nro_serie';
-    public $incrementing = false;
-    protected $keyType = 'string';
 
     protected $fillable = [
-        'nro_serie',
-        'id_doc_req',
+        'cod_ceta_est',
+        'tipo_bachiller',
+        'nro_serie_titulo',
         'emision',
         'fecha_emision',
-        'observación',
-        'gestion_bachiller',
+        'observacion',
+        'gestion_bachillerato',
+        'nro_resolucion',
+        'fecha_resolucion',
+        'is_active',
     ];
 
     protected $casts = [
         'fecha_emision' => 'date',
-        'gestion_bachiller' => 'integer',
+        'fecha_resolucion' => 'date',
+        'is_active' => 'boolean',
     ];
 
     public function documentoRequerido()

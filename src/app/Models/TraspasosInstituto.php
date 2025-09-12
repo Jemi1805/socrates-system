@@ -12,6 +12,7 @@ class TraspasosInstituto extends Model
     protected $table = 'traspasos_instituto';
 
     protected $fillable = [
+        'cod_ceta_est',
         'id_doc_req',
         'instituto_origen',
         'grados_cursados',
