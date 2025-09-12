@@ -72,6 +72,22 @@ export class PostulantesListComponent implements OnInit {
   showRegistrarInscripcion: boolean = false;
   // Modal de éxito
   modalExitoVisible: boolean = false;
+  // Resumen de inscripción
+  resumenVisible: boolean = false;
+  resumenInscripcion: {
+    carrera: string | null;
+    pensum: string | null;
+    cod_ceta: string | number | null;
+    nombre_completo: string;
+    modalidad: string | null;
+    tipo_bachiller: string | null;
+    pago_estado: 'Completo' | 'Con deuda';
+    aranceles: Array<{ gestion?: string; fecha?: string | null; concepto?: string; monto?: number | string; num_factura?: string; num_comprobante?: string }>;
+    es_edu_regular: boolean;
+    es_tecnico_medio: boolean;
+    es_traspaso: boolean;
+    es_cambio_plan: boolean;
+  } | null = null;
   // Estado y error de inscripción
   inscripcionLoading: boolean = false;
   inscripcionError: string | null = null;
@@ -233,8 +249,6 @@ export class PostulantesListComponent implements OnInit {
       semestreActual = 2;
       yearActual = yearActual - 1;
     }
-
-  
 
     // Construir en orden DESCENDENTE respecto a la gestión actual
     const opciones: string[] = [];
@@ -1067,6 +1081,59 @@ export class PostulantesListComponent implements OnInit {
     return null;
   }
 
+  // --- Resumen de inscripción ---
+  private construirResumenInscripcion() {
+    const carrera = this.carreraNormalizada || (this.postulanteActual.carrera as string) || null;
+    const pensum = (this.postulanteActual.pensum as string) || null;
+    const cod = this.postulanteActual.cod_ceta || null;
+    const nombreCompleto = [
+      this.postulanteActual.nombres_est || '',
+      this.postulanteActual.ap_pat || '',
+      this.postulanteActual.ap_mat || '',
+    ].filter(Boolean).join(' ');
+    const modalidad = this.modalidad?.nombre || null;
+    const tipoBach = this.tipoBachiller || null;
+    const pagoEstado: 'Completo' | 'Con deuda' = this.pagoCompletoSeleccionados ? 'Completo' : 'Con deuda';
+    const aranceles = (this.selectedAranceles || []).map((a: any) => ({
+      gestion: a.gestion || undefined,
+      fecha: this.normalizarFecha(a.fecha),
+      concepto: a.concepto || undefined,
+      monto: a.monto || undefined,
+      num_factura: a.num_factura || undefined,
+      num_comprobante: a.num_comprobante || undefined,
+    }));
+    this.resumenInscripcion = {
+      carrera,
+      pensum,
+      cod_ceta: cod || null,
+      nombre_completo: nombreCompleto,
+      modalidad,
+      tipo_bachiller: tipoBach,
+      pago_estado: pagoEstado,
+      aranceles,
+      es_edu_regular: this.selectedOpcion === 'educacionRegular',
+      es_tecnico_medio: this.selectedOpcion === 'tecnicoMedio',
+      es_traspaso: this.selectedOpcion === 'traspasoInstituto',
+      es_cambio_plan: this.selectedOpcion === 'homologacionCambioPlan',
+    };
+  }
+
+  cerrarModalExito() {
+    this.modalExitoVisible = false;
+    // Asegurar que el resumen esté construido
+    if (!this.resumenInscripcion) {
+      this.construirResumenInscripcion();
+    }
+    this.resumenVisible = !!this.resumenInscripcion;
+    // Ocultar CTA de registro y llevar al usuario al inicio para ver el resumen
+    this.showRegistrarInscripcion = false;
+    try {
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 0);
+    } catch (e) {}
+  }
+
   // --- Registro de inscripción ---
   puedeRegistrar(): boolean {
     // Debe haber guardado biográficos
@@ -1248,6 +1315,9 @@ export class PostulantesListComponent implements OnInit {
             }
           });
         }
+        // Construir resumen (se mostrará al cerrar el modal)
+        this.construirResumenInscripcion();
+        this.resumenVisible = false;
         // Mostrar modal bonito de éxito
         this.modalExitoVisible = true;
         this.inscripcionLoading = false;

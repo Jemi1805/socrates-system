@@ -93,6 +93,12 @@ $transition: all 0.3s ease;
   padding: 2rem 1rem;
 }
 
+// Contenedor estrecho para el resumen (similar al card de biográficos visualmente)
+.resumen-card-container {
+  max-width: 900px; // ajustar si deseas más o menos ancho
+  margin: 0 auto;
+}
+
 // Información del estudiante y modalidad
 .info-card {
   background: #ffffffd2;
@@ -311,7 +317,7 @@ input {
 }
 
 // Estilos para datos biográficos
-.biographical-card, .bachiller-card, .aranceles-card {
+.biographical-card, .bachiller-card, .aranceles-card, .card {
   background: #ffffffd2;
   border-radius: $border-radius;
   box-shadow: $shadow;
