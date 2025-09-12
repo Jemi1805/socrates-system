@@ -17,8 +17,8 @@ class PostulanteController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            // Clave primaria / identificador de estudiante
-            'cod_ceta' => 'required|integer',
+            // Clave primaria / identificador de estudiante (si no llega, se generará)
+            'cod_ceta' => 'nullable|integer',
 
             // Datos biográficos
             'nombres_est' => 'required|string|max:255',
@@ -40,6 +40,27 @@ class PostulanteController extends Controller
             'gestion_fin' => 'nullable|string|max:20',
             'incrip_uni' => 'nullable|boolean',
         ]);
+
+        // Generar Código CETA si no se envió
+        if (empty($data['cod_ceta'])) {
+            $year = (int) date('Y');
+            $flag = 0; // 0 = mecánica, 1 = electrónica
+            $carrera = strtolower((string)(isset($data['carrera']) ? $data['carrera'] : ''));
+            if (strpos($carrera, 'elect') !== false) { $flag = 1; }
+            $yearPrefix = '9' . sprintf('%04d', $year);
+            // Rango por año (independiente del flag) en tabla postulantes
+            $minRange = (int)($yearPrefix . '0000'); // 9 + AAAA + 0 + 000
+            $maxRange = (int)($yearPrefix . '1999'); // 9 + AAAA + 1 + 999
+            $max = Postulante::query()
+                ->whereBetween('cod_ceta', [$minRange, $maxRange])
+                ->max('cod_ceta');
+            $seq = 0;
+            if ($max) {
+                $seq = (int) substr((string)$max, -3);
+            }
+            $seq = $seq + 1;
+            $data['cod_ceta'] = (int)($yearPrefix . $flag . str_pad((string)$seq, 3, '0', STR_PAD_LEFT));
+        }
 
         // Mapear 'procedencia' (UI) al campo 'expedido' (DB) si no se envía 'expedido'
         if ((empty($data['expedido']) || !isset($data['expedido'])) && isset($data['procedencia'])) {

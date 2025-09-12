@@ -58,8 +58,8 @@
           </div>
           <div class="bio-item">
             <span class="form-label">Código CETA:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.cod_ceta" name="cod_ceta" [disabled]="!esNuevoPostulante" placeholder="Ingrese Código CETA" required
-                   inputmode="numeric" maxlength="9" (input)="onCetaInput($event)" />
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.cod_ceta" name="cod_ceta" [disabled]="isEditing || esNuevoPostulante || !isEditing"
+                   placeholder="Se generará automáticamente al registrar" inputmode="numeric" maxlength="9" (input)="onCetaInput($event)" />
           </div>
         </div>
 

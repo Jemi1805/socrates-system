@@ -312,7 +312,6 @@ export class PostulantesListComponent implements OnInit {
 
     // Datos biográficos mínimos
     const p = this.postulanteActual as any;
-    if (!this.isNonEmpty(p.cod_ceta)) faltantes.push('Código CETA');
     if (!this.isNonEmpty(p.nombres_est)) faltantes.push('Nombres');
     if (!this.isNonEmpty(p.ap_pat)) faltantes.push('Apellido Paterno');
     if (!this.isNonEmpty(p.ap_mat)) faltantes.push('Apellido Materno');
@@ -751,23 +750,31 @@ export class PostulantesListComponent implements OnInit {
 
   // Guardar datos biográficos y habilitar el resto de secciones
   guardarYContinuarInscripcion() {
-    // Usamos POST que en backend hace updateOrCreate por cod_ceta
-    this.postulanteService.create(this.postulanteActual as Postulante).subscribe({
+    // Siempre persistimos en backend. Si no hay cod_ceta, el backend lo generará.
+    const datosBio: any = {
+      ...this.postulanteActual,
+      // asegurar campos mínimos y mapeos que backend espera
+      apellidos_est: [this.postulanteActual.ap_pat || '', this.postulanteActual.ap_mat || ''].filter(Boolean).join(' ').trim(),
+    };
+    this.postulanteService.create(datosBio as Postulante).subscribe({
       next: (res) => {
-        // Conservar campos del front que el backend no devuelve (p. ej., nro_serie_titulo)
         const prev = { ...this.postulanteActual } as any;
         this.postulanteActual = { ...prev, ...(res as any) };
+        // Si backend generó cod_ceta, reflejarlo
+        if ((res as any)?.cod_ceta) {
+          this.postulanteActual.cod_ceta = (res as any).cod_ceta;
+          // Con el CETA generado, cargar aranceles de material extra
+          this.cargarArancelesMaterialExtra();
+        }
         if (!this.postulanteActual.nro_serie_titulo && prev.nro_serie_titulo) {
           this.postulanteActual.nro_serie_titulo = prev.nro_serie_titulo;
         }
-        // Asegurar visibilidad del input de serie
         if (this.postulanteActual.nro_serie_titulo && !this.tipoBachiller) {
           this.tipoBachiller = 'nacional';
         }
         this.isEditing = false;
-        this.esNuevoPostulante = false;
+        // Importante: conservar esNuevoPostulante = true para mostrar formulario de aranceles manuales
         this.pasoBiograficosCompletado = true;
-        // Mostrar el botón final de registro solo después de guardar biográficos
         this.showRegistrarInscripcion = true;
       },
       error: (err) => {
@@ -1064,9 +1071,6 @@ export class PostulantesListComponent implements OnInit {
   puedeRegistrar(): boolean {
     // Debe haber guardado biográficos
     if (!this.pasoBiograficosCompletado) return false;
-    // Debe existir estudiante/cod_ceta
-    const cod = this.postulanteActual?.cod_ceta || this.estudiante?.cod_ceta;
-    if (!cod) return false;
     // Nombres y apellidos mínimos
     if (!this.postulanteActual?.nombres_est || !this.postulanteActual?.ap_pat) return false;
     // Modalidad seleccionada
@@ -1098,6 +1102,7 @@ export class PostulantesListComponent implements OnInit {
       apellidos_est: apellidos,
       modalidad_id: this.modalidad?.id,
       modalidad_nom: this.modalidad?.nombre,
+      carrera: this.carreraNormalizada || this.postulanteActual.carrera || null,
       aranceles_completos: !!this.pagoCompletoSeleccionados,
       aranceles: (this.selectedAranceles || []).map((a: any) => ({
         id: a.id || null,
@@ -1223,6 +1228,26 @@ export class PostulantesListComponent implements OnInit {
     this.inscripcionError = null;
     this.postulanteService.registrarInscripcion(payload).subscribe({
       next: (res) => {
+        // Si backend generó cod_ceta, reflejarlo en el front
+        const gen = (res && (res.data?.inscripcion?.cod_ceta_est ?? res.inscripcion?.cod_ceta_est)) || null;
+        if (gen) {
+          this.postulanteActual.cod_ceta = gen;
+          // Si es nuevo postulante, persistir biográficos ahora con el cod_ceta generado
+          const datosBio: any = {
+            ...this.postulanteActual,
+            cod_ceta: gen,
+            // Asegurar campos mínimos requeridos por backend de postulantes
+            apellidos_est: [this.postulanteActual.ap_pat || '', this.postulanteActual.ap_mat || ''].filter(Boolean).join(' ').trim(),
+          };
+          this.postulanteService.create(datosBio as Postulante).subscribe({
+            next: () => {
+              this.esNuevoPostulante = false;
+            },
+            error: (e) => {
+              console.error('No se pudo persistir biográficos tras generar CETA:', e);
+            }
+          });
+        }
         // Mostrar modal bonito de éxito
         this.modalExitoVisible = true;
         this.inscripcionLoading = false;

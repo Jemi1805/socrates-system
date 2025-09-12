@@ -49,11 +49,12 @@ class InscripModalidadController extends CrudController
     public function storeWithAranceles(Request $request)
     {
         $data = $request->validate([
-            'cod_ceta_est' => 'required|integer',
+            'cod_ceta_est' => 'nullable|integer',
             'nombres_est' => 'nullable|string|max:150',
             'apellidos_est' => 'nullable|string|max:200',
             'modalidad_id' => 'nullable|exists:modalidad,id',
             'modalidad_nom' => 'nullable|string|max:120',
+            'carrera' => 'nullable|string|max:100',
             'aranceles_completos' => 'nullable|boolean',
             'user_id' => 'nullable|integer',
             'user_name' => 'nullable|string|max:150',
@@ -127,6 +128,29 @@ class InscripModalidadController extends CrudController
         $user = $request->user();
 
         return DB::transaction(function () use ($data, $user) {
+            $codCeta = $data['cod_ceta_est'] ?? null;
+            if (empty($codCeta)) {
+                // Generar código CETA: 9 + AAAA + F + NNN
+                $year = (int) date('Y');
+                $flag = 0; // 0 = mecánica, 1 = electrónica
+                $carrera = strtolower((string)($data['carrera'] ?? ''));
+                if (strpos($carrera, 'elect') !== false) { $flag = 1; }
+                // Prefijo base por año (sin distinguir carrera para el correlativo)
+                $yearPrefix = '9' . sprintf('%04d', $year);
+                // Buscar correlativo máximo para el año actual (independiente del flag/carrera)
+                $minRange = (int)($yearPrefix . '0000'); // 9 + AAAA + 0 + 000
+                $maxRange = (int)($yearPrefix . '1999'); // 9 + AAAA + 1 + 999
+                $max = DB::table('inscrip_modalidad')
+                    ->whereBetween('cod_ceta_est', [$minRange, $maxRange])
+                    ->max('cod_ceta_est');
+                $seq = 0;
+                if ($max) {
+                    $seq = (int) substr((string)$max, -3);
+                }
+                $seq = $seq + 1;
+                $codCeta = (int)($yearPrefix . $flag . str_pad((string)$seq, 3, '0', STR_PAD_LEFT));
+                $data['cod_ceta_est'] = $codCeta;
+            }
             $ins = new InscripModalidad();
             $ins->cod_ceta_est = $data['cod_ceta_est'];
             if (isset($data['nombres_est'])) $ins->nombres_est = $data['nombres_est'];
