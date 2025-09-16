@@ -317,7 +317,7 @@ input {
 }
 
 // Estilos para datos biográficos
-.biographical-card, .bachiller-card, .aranceles-card, .card {
+.biographical-card, .bachiller-card, .aranceles-card, .card{
   background: #ffffffd2;
   border-radius: $border-radius;
   box-shadow: $shadow;
@@ -398,7 +398,7 @@ input {
     }
   }
 
-  .form-label {
+  .form-label, label{
     color:$text-dark-blue;
     font-weight: 500;
   }
@@ -414,6 +414,38 @@ input {
   }
 }
 
+.card{
+  .card-title {
+    color: $text-dark-blue;
+    margin: 0 0 1rem 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+    border-bottom: 2px solid $primary-color;
+    padding-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: space-between;
+  }
+
+  .table-responsive {
+    width: 100%;
+    border-collapse: collapse;
+    border-radius: $border-radius;
+    background-color: #ffffffd2;
+
+    td {
+      color: $text-dark-blue;
+    }
+
+    thead.table-dark {
+      --bs-table-bg: #4C9DBD !important;
+      --bs-table-border-color: #4C9DBD !important;
+      color: white !important;
+    }
+  }
+}
+
 // Estilos de tabla para Aranceles (basados en Modalidad de Graduación)
 .aranceles-card, .docs-card {
   .card-title {
@@ -426,6 +458,7 @@ input {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    justify-content: space-between;
   }
 
   .col-md-12 {
