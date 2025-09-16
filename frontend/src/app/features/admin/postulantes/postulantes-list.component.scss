@@ -68,11 +68,13 @@ $transition: all 0.3s ease;
 // Priorizar superposición de la tarjeta de Inicio sobre la de Conclusión
 .inicio-card {
   position: relative;
-  z-index: 15; // asegurar prioridad sobre tarjetas siguientes
+  z-index: 15; // prioridad suave
+  overflow: visible;
 }
 .conclusion-card {
   position: relative;
-  z-index: 12;
+  z-index: 12; // por debajo de inicio pero suficiente
+  overflow: visible;
 }
 
 // Ajustes responsivos para el dropdown (evitar desbordes en pantallas pequeñas)
@@ -458,7 +460,6 @@ input {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    justify-content: space-between;
   }
 
   .col-md-12 {
@@ -527,7 +528,7 @@ input {
 // Tarjeta de modalidad
 .datos-carrera-container{
   position: relative; // crear contexto para z-index de dropdown en inicio-card
-  z-index: 10; // por encima de aranceles-card y otras tarjetas debajo
+  z-index: 20; // suficiente sobre tarjetas vecinas sin exagerar
   isolation: isolate; // aísla stacking context para respetar z-index internos
 
   // Menú de gestiones con altura limitada (~5 ítems) y scroll
@@ -535,38 +536,36 @@ input {
     max-height: 200px; // aprox. 5 elementos visibles
     overflow-y: auto;
     min-width: 100%;
-    z-index: 2000; // forzar por encima de otras cards y sombras
+    z-index: 1051; // cercano a capas de Bootstrap (navbar: 1000, modal: 1050)
     position: absolute; // asegurar superposición correcta
     left: 0;
     right: 0;
     top: calc(100% + 4px); // anclar justo debajo del botón
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    border: 1px solid #ced4da;
+    border-radius: .375rem;
+    padding: .25rem 0;
+    transform: none !important; // evitar jumps de popper
   }
   // Asegurar contexto de posicionamiento para el menú
   .dropdown.w-100 {
     position: relative;
-    z-index: 2001; // contenedor por encima también
+    z-index: 1052; // por encima del menú
     .btn-secondary {
+      // Aspecto tipo form-select
       height: 38px;
-      border-color: transparent;
+      background-color: #fff;
+      color: $text-dark-blue;
+      border: 1px solid #ced4da;
+      border-radius: .375rem;
       font-weight: 400;
-      &:hover {
-      color: $text-dark-blue !important;
-      background-color: white;
-
-        .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
-            color: white !important;
-        }
-      }
-      &:hover {
-        transform: none;
-        box-shadow: none;
-      }
+      box-shadow: none;
+      &:hover { background-color: #fff; }
     }
 
     .dropdown-toggle {
       position: relative;
-      z-index: 2100; // asegurar que el texto/botón quede por encima de tarjetas que se solapen
+      z-index: 1053;
     }
   }
   .gestion-dropdown-menu .dropdown-item {
@@ -880,4 +879,28 @@ input {
 
 .spin {
   animation: spin 1s linear infinite;
+}
+
+// --- Fix superposición del dropdown de Gestión (aranceles manuales) ---
+// Nota: más abajo había una regla genérica que aplicaba overflow:hidden a .aranceles-card.
+// La anulamos aquí con mayor especificidad y usamos !important para evitar recortes del menú.
+.aranceles-card {
+  overflow: visible !important;
+  position: relative;
+  z-index: 18; // debajo de datos-carrera para que no tape
+
+  .dropdown.w-100 { position: relative; z-index: 1040; }
+  .gestion-dropdown-menu {
+    position: absolute;
+    left: 0; right: 0; top: calc(100% + 4px);
+    min-width: 100%;
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 1039; // ligeramente por debajo de datos-carrera
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    border: 1px solid #ced4da;
+    border-radius: .375rem;
+    padding: .25rem 0;
+    transform: none !important;
+  }
 }

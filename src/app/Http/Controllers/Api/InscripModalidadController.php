@@ -249,7 +249,8 @@ class InscripModalidadController extends CrudController
                 DiplomaBachiller::updateOrCreate(
                     ['cod_ceta_est' => $data['cod_ceta_est']],
                     [
-                        'tipo_bachiller' => $data['tipo_bachiller'],
+                        // Persistir capitalizado
+                        'tipo_bachiller' => ucfirst(strtolower($data['tipo_bachiller'])),
                         'nro_serie_titulo' => $d['nro_serie_titulo'] ?? null,
                         'emision' => data_get($data, 'diploma_bachiller.emision'),
                         'fecha_emision' => data_get($data, 'diploma_bachiller.fecha_emision'),
@@ -318,7 +319,8 @@ class InscripModalidadController extends CrudController
                 $diplomaExtranjero = DiplomaBachiller::updateOrCreate(
                     ['cod_ceta_est' => $data['cod_ceta_est']],
                     [
-                        'tipo_bachiller' => 'extranjero',
+                        // Persistir capitalizado
+                        'tipo_bachiller' => 'Extranjero',
                         'nro_resolucion' => $nroRes,
                         'fecha_resolucion' => data_get($data, 'homol_extranjero.fecha_emision'),
                         'is_active' => true,

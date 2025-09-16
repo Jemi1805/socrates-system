@@ -563,19 +563,10 @@
           </div>
           <div class="col-md-5">
             <label class="form-label">Gestión de Inicio</label>
-            <div class="dropdown w-100">
-              <button class="btn btn-secondary w-100 dropdown-toggle d-flex justify-content-between align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <span>{{ labelGestionInicio }}</span>
-              </button>
-              <ul class="dropdown-menu w-100 gestion-dropdown-menu">
-                <li>
-                  <button class="dropdown-item" type="button" (click)="setGestionInicio('')">Seleccione gestión</button>
-                </li>
-                <li *ngFor="let g of gestionesOpciones">
-                  <button class="dropdown-item" type="button" (click)="setGestionInicio(g)">{{ g }}</button>
-                </li>
-              </ul>
-            </div>
+            <select class="form-select" [ngModel]="datosInicioCarrera.gestion_ini" (ngModelChange)="setGestionInicio($event)">
+              <option [ngValue]="''">Seleccione gestión</option>
+              <option *ngFor="let g of gestionesOpciones" [ngValue]="g">{{ g }}</option>
+            </select>
           </div>
         </div>
       </div>
@@ -599,19 +590,10 @@
           </div>
           <div class="col-md-5">
               <label class="form-label">Gestión de Conclusión</label>
-              <div class="dropdown w-100">
-                <button class="btn btn-secondary w-100 dropdown-toggle d-flex justify-content-between align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                  <span>{{ labelGestionFin }}</span>
-                </button>
-                <ul class="dropdown-menu w-100 gestion-dropdown-menu">
-                  <li>
-                    <button class="dropdown-item" type="button" (click)="setGestionFin('')">Seleccione gestión</button>
-                  </li>
-                  <li *ngFor="let g of gestionesConclusionOpciones">
-                    <button class="dropdown-item" type="button" (click)="setGestionFin(g)">{{ g }}</button>
-                  </li>
-                </ul>
-              </div>
+              <select class="form-select" [ngModel]="datosConclusionCarrera.gestion_fin" (ngModelChange)="setGestionFin($event)">
+                <option [ngValue]="''">Seleccione gestión</option>
+                <option *ngFor="let g of gestionesConclusionOpciones" [ngValue]="g">{{ g }}</option>
+              </select>
               <div *ngIf="gestionErrorMessage" class="text-danger mt-1">
                 <small>{{ gestionErrorMessage }}</small>
               </div>
@@ -650,19 +632,10 @@
         <div class="row g-2">
           <div class="col-md-2">
             <label class="form-label">Gestión</label>
-            <div class="dropdown w-100">
-              <button class="btn btn-secondary w-100 dropdown-toggle d-flex justify-content-between align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <span>{{ labelNuevoArancelGestion }}</span>
-              </button>
-              <ul class="dropdown-menu w-100 gestion-dropdown-menu">
-                <li>
-                  <button class="dropdown-item" type="button" (click)="setNuevoArancelGestion('')">Seleccione gestión</button>
-                </li>
-                <li *ngFor="let g of gestionesOpciones">
-                  <button class="dropdown-item" type="button" (click)="setNuevoArancelGestion(g)">{{ g }}</button>
-                </li>
-              </ul>
-            </div>
+            <select class="form-select" [ngModel]="nuevoArancel.gestion" (ngModelChange)="setNuevoArancelGestion($event)">
+              <option [ngValue]="''">Seleccione gestión</option>
+              <option *ngFor="let g of gestionesOpciones" [ngValue]="g">{{ g }}</option>
+            </select>
           </div>
           <div class="col-md-2">
             <label class="form-label">Fecha</label>
@@ -678,19 +651,60 @@
           </div>
           <div class="col-md-4">
             <label class="form-label">Razón Social</label>
-            <input type="text" class="form-control" [(ngModel)]="nuevoArancel.razon" placeholder="Nombre / Razón Social" />
+            <input
+              type="text"
+              class="form-control"
+              [ngModel]="nuevoArancel.razon"
+              (ngModelChange)="onRazonInput($event)"
+              placeholder="Nombre / Razón Social"
+              style="text-transform: uppercase"
+              pattern="^[A-Z0-9\. '&quot;°\s]+$"
+              title="Solo MAYÚSCULAS, números, punto ., comillas simples ', comillas dobles &quot; y símbolo °"
+            />
           </div>
           <div class="col-md-2">
             <label class="form-label">NIT</label>
-            <input type="text" class="form-control" [(ngModel)]="nuevoArancel.nit" placeholder="NIT" />
+            <input
+              type="text"
+              class="form-control"
+              [ngModel]="nuevoArancel.nit"
+              (ngModelChange)="onNitInput($event)"
+              placeholder="NIT"
+              inputmode="numeric"
+              pattern="^\\d+$"
+              title="Solo números"
+              (keydown)="onlyDigits($event)"
+            />
           </div>
           <div class="col-md-2">
             <label class="form-label">Factura</label>
-            <input type="text" class="form-control" [(ngModel)]="nuevoArancel.num_factura" placeholder="N° Factura" />
+            <input
+              type="text"
+              class="form-control"
+              [ngModel]="nuevoArancel.num_factura"
+              (ngModelChange)="onFacturaInput($event)"
+              placeholder="N° Factura"
+              inputmode="numeric"
+              pattern="^\\d+$"
+              title="Solo números"
+              [disabled]="(nuevoArancel.num_comprobante || '').length > 0"
+              (keydown)="onlyDigits($event)"
+            />
           </div>
           <div class="col-md-2">
             <label class="form-label">Recibo</label>
-            <input type="text" class="form-control" [(ngModel)]="nuevoArancel.num_comprobante" placeholder="N° Recibo" />
+            <input
+              type="text"
+              class="form-control"
+              [ngModel]="nuevoArancel.num_comprobante"
+              (ngModelChange)="onReciboInput($event)"
+              placeholder="N° Recibo"
+              inputmode="numeric"
+              pattern="^\\d+$"
+              title="Solo números"
+              [disabled]="(nuevoArancel.num_factura || '').length > 0"
+              (keydown)="onlyDigits($event)"
+            />
           </div>
           <div class="col-12 d-flex align-items-center mt-1">
             <div *ngIf="arancelManualError" class="alert alert-warning py-1 px-2 me-auto mb-0">

@@ -65,6 +65,8 @@ export class PostulantesListComponent implements OnInit {
   
   // Datos del estudiante y modalidad
   estudiante: Estudiante | null = null;
+  // Snapshot del postulante desde la BD (para mostrar datos persistidos en el resumen)
+  postulanteDesdeBD: Partial<Postulante> | null = null;
   modalidad: ModalidadGraduacion | null = null;
   modalidades: ModalidadGraduacion[] = [];
   inscripciones: InscripcionModalidad[] = [];
@@ -462,8 +464,20 @@ export class PostulantesListComponent implements OnInit {
 
   constructor(private postulanteService: PostulanteService, private sgaService: SgaService) {}
 
+  // Normalizador para Tipo de Bachiller: siempre 'Nacional' o 'Extranjero'
+  private formatTipoBachiller(v: string | null | undefined): string | null {
+    if (!v) return null;
+    const s = v.toString().trim().toLowerCase();
+    if (s.startsWith('nac')) return 'Nacional';
+    if (s.startsWith('ext')) return 'Extranjero';
+    // Otros valores: capitalizar primera letra por defecto
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : null;
+  }
+
   ngOnInit() {
     this.cargarDatosPostulacion();
+    // Intentar traer el postulante desde BD para usar sus valores persistidos
+    this.cargarPostulanteDesdeBD();
     // Asegurar carga de pensums aún si no hay datos en sessionStorage
     this.cargarPensums();
     // Cargar modalidades desde el backend
@@ -522,6 +536,8 @@ export class PostulantesListComponent implements OnInit {
         if (!this.modalidad) {
           this.cargarModalidadActual();
         }
+        // Con cod_ceta conocido, sincronizar snapshot desde BD
+        this.cargarPostulanteDesdeBD();
       }
     } else {
       // Si no hay datos en sessionStorage venimos de "Registrar postulante": habilitar selectores
@@ -530,6 +546,25 @@ export class PostulantesListComponent implements OnInit {
     // Nota: la carga de pensums se realiza en ngOnInit()
     // Al iniciar SIEMPRE se requiere guardar biográficos antes de continuar
     this.pasoBiograficosCompletado = false;
+  }
+
+  // --- Cargar postulante desde BD para usar valores persistidos ---
+  private cargarPostulanteDesdeBD() {
+    const cod = (this.postulanteActual?.cod_ceta || this.estudiante?.cod_ceta) as number | undefined;
+    if (!cod) return;
+    this.postulanteService.getById(cod).subscribe({
+      next: (p) => {
+        this.postulanteDesdeBD = p || null;
+        // Si ya existe un resumen o está visible, reconstruirlo para usar datos de BD
+        if (this.resumenInscripcion || this.resumenVisible) {
+          this.construirResumenInscripcion();
+        }
+      },
+      error: (e) => {
+        console.warn('No se pudo cargar postulante desde BD:', e);
+        this.postulanteDesdeBD = null;
+      }
+    });
   }
 
   // --- Pensums ---
@@ -779,6 +814,8 @@ export class PostulantesListComponent implements OnInit {
           this.postulanteActual.cod_ceta = (res as any).cod_ceta;
           // Con el CETA generado, cargar aranceles de material extra
           this.cargarArancelesMaterialExtra();
+          // Y sincronizar snapshot desde BD
+          this.cargarPostulanteDesdeBD();
         }
         if (!this.postulanteActual.nro_serie_titulo && prev.nro_serie_titulo) {
           this.postulanteActual.nro_serie_titulo = prev.nro_serie_titulo;
@@ -915,6 +952,58 @@ export class PostulantesListComponent implements OnInit {
     return lower.replace(/(?:^|[\s\-'])\p{L}/gu, (m) => m.toUpperCase());
   }
 
+  // --- Sanitización específica para arancel manual ---
+  private sanitizeRazonUpper(v: string | null | undefined): string {
+    if (!v) return '';
+    const up = v.toString().toUpperCase();
+    // Permitir: A-Z, 0-9, espacio, punto ., comilla simple ', comilla doble ", símbolo °
+    return up.replace(/[^A-Z0-9\.\'"°\s]+/g, '');
+  }
+
+  private sanitizeDigits(v: string | null | undefined): string {
+    if (!v) return '';
+    return v.toString().replace(/\D+/g, '');
+  }
+
+  onRazonInput(val: any) {
+    const s = this.sanitizeRazonUpper(val);
+    if (!this.nuevoArancel) this.nuevoArancel = {} as any;
+    this.nuevoArancel.razon = s;
+  }
+
+  onFacturaInput(val: any) {
+    const d = this.sanitizeDigits(val);
+    if (!this.nuevoArancel) this.nuevoArancel = {} as any;
+    this.nuevoArancel.num_factura = d || '';
+    if ((this.nuevoArancel.num_factura || '').length > 0) {
+      this.nuevoArancel.num_comprobante = '';
+    }
+  }
+
+  onReciboInput(val: any) {
+    const d = this.sanitizeDigits(val);
+    if (!this.nuevoArancel) this.nuevoArancel = {} as any;
+    this.nuevoArancel.num_comprobante = d || '';
+    if ((this.nuevoArancel.num_comprobante || '').length > 0) {
+      this.nuevoArancel.num_factura = '';
+    }
+  }
+
+  onNitInput(val: any) {
+    const d = this.sanitizeDigits(val);
+    if (!this.nuevoArancel) this.nuevoArancel = {} as any;
+    this.nuevoArancel.nit = d || '';
+  }
+
+  // Bloquea teclas que no sean dígitos, permite teclas de control (backspace, delete, arrows, tab)
+  onlyDigits(evt: KeyboardEvent) {
+    const allowedControl = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'];
+    if (allowedControl.includes(evt.key)) return;
+    if (!/^[0-9]$/.test(evt.key)) {
+      evt.preventDefault();
+    }
+  }
+
   onTipoBachillerChange(tipo: 'nacional' | 'extranjero') {
     this.tipoBachiller = tipo;
     // Reset de formularios específicos
@@ -1018,6 +1107,10 @@ export class PostulantesListComponent implements OnInit {
         this.aranceles = res?.data || [];
         this.totalAranceles = res?.total ?? this.aranceles.length;
         this.loadingAranceles = false;
+        // Si no hay modalidad ya establecida (p. ej., desde sessionStorage), consultar al backend
+        if (!this.modalidad) {
+          this.cargarModalidadActual();
+        }
       },
       error: (err) => {
         console.error('Error al cargar aranceles:', err);
@@ -1083,7 +1176,11 @@ export class PostulantesListComponent implements OnInit {
 
   // --- Resumen de inscripción ---
   private construirResumenInscripcion() {
-    const carrera = this.carreraNormalizada || (this.postulanteActual.carrera as string) || null;
+    // Preferir valores persistidos en BD cuando existan
+    const carreraBD = (this.postulanteDesdeBD as any)?.carrera as string | undefined;
+    const tipoBachBD = (this.postulanteDesdeBD as any)?.tipo_bachiller as string | undefined;
+    const carrera = (carreraBD && carreraBD.toString()) || this.carreraNormalizada || (this.postulanteActual.carrera as string) || null;
+    const carreraNombre = this.carreraLabelFromVal(carrera);
     const pensum = (this.postulanteActual.pensum as string) || null;
     const cod = this.postulanteActual.cod_ceta || null;
     const nombreCompleto = [
@@ -1092,7 +1189,7 @@ export class PostulantesListComponent implements OnInit {
       this.postulanteActual.ap_mat || '',
     ].filter(Boolean).join(' ');
     const modalidad = this.modalidad?.nombre || null;
-    const tipoBach = this.tipoBachiller || null;
+    const tipoBach = this.formatTipoBachiller((tipoBachBD && tipoBachBD.toString()) || this.tipoBachiller || null);
     const pagoEstado: 'Completo' | 'Con deuda' = this.pagoCompletoSeleccionados ? 'Completo' : 'Con deuda';
     const aranceles = (this.selectedAranceles || []).map((a: any) => ({
       gestion: a.gestion || undefined,
@@ -1103,7 +1200,7 @@ export class PostulantesListComponent implements OnInit {
       num_comprobante: a.num_comprobante || undefined,
     }));
     this.resumenInscripcion = {
-      carrera,
+      carrera: carreraNombre,
       pensum,
       cod_ceta: cod || null,
       nombre_completo: nombreCompleto,
@@ -1187,8 +1284,8 @@ export class PostulantesListComponent implements OnInit {
       }))
     };
 
-    // Incluir datos de Bachillerato si corresponde
-    payload.tipo_bachiller = this.tipoBachiller || null;
+    // Incluir datos de Bachillerato si corresponde (enviar en minúsculas para pasar validación backend)
+    payload.tipo_bachiller = (this.tipoBachiller || null) ? this.tipoBachiller!.toString().trim().toLowerCase() : null;
     if (this.tipoBachiller === 'nacional') {
       const d = this.diplomaNacional || ({} as any);
       payload.diploma_bachiller = {
@@ -1450,6 +1547,19 @@ export class PostulantesListComponent implements OnInit {
     // Si menciona mecánica o automotriz (y no electricidad)
     if (s.includes('mec') || (s.includes('automotriz') && !s.includes('elect'))) return 'mecanica';
     return null; // dejar que el backend use default
+  }
+
+  private carreraLabelFromVal(val: string | null | undefined): string | null {
+    if (!val) return null;
+    const s = val.toString().trim().toLowerCase();
+    if (s === 'mecanica') return 'Mecánica Automotriz';
+    if (s === 'electricidad') return 'Electricidad y Electrónica Automotriz';
+    // Si viene ya con nombre desde BD, respetarlo
+    // También capitalizamos mínimamente si parece en minúsculas puras
+    if (s && s === val) {
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+    return val.toString();
   }
 
   private normalizePensumCode(p: string | null | undefined): string {

@@ -12,10 +12,12 @@ class TransitabilidadInstTec extends Model
     protected $table = 'transitabilidad_inst_tec';
 
     protected $fillable = [
+        'cod_ceta_est',
         'id_doc_req',
         'serie_titulo_tm',
         'numero_titulo_tm',
         'fecha_emision',
+        'is_active',
     ];
 
     protected $casts = [
