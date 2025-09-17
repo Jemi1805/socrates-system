@@ -1,0 +1,83 @@
+<div class="tutores-container">
+  <app-header 
+    pageTitle="Designar Tutor"
+    [breadcrumbItems]="[
+      { label: 'Tutores', route: '/tutores' },
+      { label: 'Designar' }
+    ]">
+  </app-header>
+
+  <div class="content-wrapper">
+    <!-- Tarjeta de búsqueda (alineada al estilo de Modalidades) -->
+    <div class="modalidad-card mb-3">
+      <div class="card-body">
+        <h5 class="card-title d-flex align-items-center gap-2">
+          <i class="bi bi-search"></i>
+          Búsqueda de Estudiantes
+        </h5>
+
+        <ul class="nav nav-pills mb-3">
+          <li class="nav-item">
+            <button class="nav-link" [class.active]="criterio==='ceta'" (click)="criterio='ceta'">
+              <i class="bi bi-credit-card-2-front me-1"></i> Por Código CETA
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" [class.active]="criterio==='nombre'" (click)="criterio='nombre'">
+              <i class="bi bi-person-lines-fill me-1"></i> Por Nombre
+            </button>
+          </li>
+        </ul>
+
+        <div *ngIf="criterio==='ceta'">
+          <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+              <label class="form-label">Código CETA</label>
+              <input class="form-control" [(ngModel)]="codigoCeta" maxlength="9" />
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-sm btn-primary" (click)="buscar()">
+                <i class="bi bi-search me-1"></i> Buscar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="criterio==='nombre'">
+          <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+              <label class="form-label">Nombres</label>
+              <input class="form-control" [(ngModel)]="nombres" />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Apellido Paterno</label>
+              <input class="form-control" [(ngModel)]="ap_pat" />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Apellido Materno</label>
+              <input class="form-control" [(ngModel)]="ap_mat" />
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-sm btn-primary" (click)="buscar()">
+                <i class="bi bi-search me-1"></i> Buscar
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Tarjeta de resultados (placeholder) -->
+    <div class="student-table-card">
+      <div class="card-body">
+        <h5 class="card-title d-flex align-items-center gap-2">
+          <i class="bi bi-people"></i>
+          Estudiantes encontrados
+        </h5>
+        <div class="alert alert-info mb-0">Pendiente de conectar a la API. Aquí se listarán los estudiantes y un botón "Designar" para elegir tutor.</div>
+      </div>
+    </div>
+
+  </div>
+</div>

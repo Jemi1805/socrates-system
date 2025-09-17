@@ -1,3 +1,19 @@
+@use "sass:color";
+
+// Variables
+$primary-color: #4C9DBD;
+$secondary-color: #FF9800;
+$success-color: #4CAF50;
+$danger-color: #F44336;
+$info-color: #17a2b8;
+$light-gray: #f5f5f5;
+$border-color: #e0e0e0;
+$text-dark-blue: #052544;
+$text-light: #666;
+$shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+$border-radius: 12px;
+$transition: all 0.3s ease;
+
 /* Importar Bootstrap CSS */
 @import 'bootstrap/dist/css/bootstrap.min.css';
 
@@ -125,6 +141,7 @@ body {
 
 .bg-success {
     background-color: rgb(78 201 127) !important;
+    border-color: rgb(59, 173, 105) !important;
 }
 
 .text-dark-blue {
@@ -134,4 +151,61 @@ body {
 .btn-success {
     background-color: rgb(59, 173, 105) !important;
     border-color: rgb(78 201 127) !important;
+    color: white !important;
+}
+
+.btn {
+  color : #052544;
+  border-color: #4C9DBD;
+  border-radius: 8px;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  transition: all 0.3s ease;
+
+  &:hover {
+  color: white !important;
+  background-color: #4C9DBD;
+  border-color: #4C9DBD;
+
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+        color: white !important;
+    }
+  }
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+  
+  &.btn-primary {
+    background: $primary-color;
+    color: white;
+
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+        color: white !important;
+    }
+
+    &:hover {
+      background: color.adjust($primary-color, $lightness: -10%);
+    }
+  }
+  
+  &.btn-secondary {
+    background-color: white;
+    color : #052544;
+    border-color: #4C9DBD;
+
+    &:hover {
+    color: white !important;
+    background-color: #4C9DBD;
+
+      .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+          color: white !important;
+      }
+    }
+  }
 }
