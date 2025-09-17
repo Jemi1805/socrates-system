@@ -90,6 +90,24 @@ export class ModalidadGraduacionComponent implements OnInit {
     } as Estudiante;
   }
 
+  // Normaliza cualquier representación de carrera a una clave estable ('mecanica' | 'electricidad')
+  private normalizeCarreraKey(v: string | null | undefined): 'mecanica' | 'electricidad' | null {
+    const s = (v || '').toString().trim().toLowerCase();
+    if (!s) return null;
+    // Códigos y nombres conocidos
+    if (s === 'mea' || s.includes('mecánica') || s.includes('mecanica')) return 'mecanica';
+    if (s === 'eea' || s.includes('electricidad') || s.includes('electrónica') || s.includes('electronica')) return 'electricidad';
+    return null;
+  }
+
+  // Valida si un Estudiante coincide con la carrera seleccionada en la UI
+  private matchesSelectedCarrera(e: Estudiante): boolean {
+    const selectedKey = this.normalizeCarreraKey(this.carreraSeleccionada);
+    if (!selectedKey) return true; // si por alguna razón no hay selección válida, no filtrar
+    const ek = this.normalizeCarreraKey((e as any).carrera || (e as any).carrera_nombre);
+    return ek === selectedKey;
+  }
+
   private addOrMergeEstudiante(e: Estudiante) {
     if (!e) return;
     const cod = (e.cod_ceta || '').toString().trim();
@@ -188,7 +206,14 @@ export class ModalidadGraduacionComponent implements OnInit {
               listaSga = [response.data];
             }
             for (const e of (listaSga || [])) {
-              if (this.tieneDatosEstudiante(e)) this.addOrMergeEstudiante(e);
+              if (!this.tieneDatosEstudiante(e)) continue;
+              if (!this.matchesSelectedCarrera(e)) {
+                console.warn('[BUSCAR CETA][SGA] Ignorado por carrera distinta a la seleccionada.', {
+                  seleccionado: this.carreraSeleccionada, estudianteCarrera: (e as any).carrera
+                });
+                continue;
+              }
+              this.addOrMergeEstudiante(e);
             }
 
             console.log('Estudiantes encontrados (CETA) tras fusionar:', this.estudiantes.length, this.estudiantes);
@@ -220,7 +245,13 @@ export class ModalidadGraduacionComponent implements OnInit {
           if (p && (p as any)?.cod_ceta) {
             console.log('[BUSCAR CETA][LOCAL] Postulante encontrado:', p);
             const e = this.mapPostulanteToEstudiante(p);
-            this.addOrMergeEstudiante(e);
+            if (!this.matchesSelectedCarrera(e)) {
+              console.warn('[BUSCAR CETA][LOCAL] Ignorado por carrera distinta a la seleccionada.', {
+                seleccionado: this.carreraSeleccionada, estudianteCarrera: e.carrera
+              });
+            } else {
+              this.addOrMergeEstudiante(e);
+            }
             console.log('[BUSCAR CETA][LOCAL] Estudiantes luego de merge:', this.estudiantes);
             this.estudiantesEncontrados = (this.estudiantes || []).length > 0;
             // Mostrar inmediatamente los resultados locales
@@ -362,7 +393,11 @@ export class ModalidadGraduacionComponent implements OnInit {
           const okN = !needle.nombres || n.includes(needle.nombres);
           const okAp = !needle.ap_pat || ap.includes(needle.ap_pat);
           const okAm = !needle.ap_mat || am.includes(needle.ap_mat);
-          return okN && okAp && okAm;
+          // Además, filtrar por carrera seleccionada
+          const key = this.normalizeCarreraKey(((p as any).carrera_nombre || p.carrera));
+          const sel = this.normalizeCarreraKey(this.carreraSeleccionada);
+          const okCarr = !sel || key === sel;
+          return okN && okAp && okAm && okCarr;
         });
         console.log('[BUSCAR NOMBRE][LOCAL] Coincidencias locales:', matches);
         for (const p of matches) {
