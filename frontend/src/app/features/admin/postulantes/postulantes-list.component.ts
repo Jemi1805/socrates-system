@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { PostulanteService, DocumentoPostulante, ModalidadPostulante } from './postulante.service';
 import { Postulante } from './postulante.model';
@@ -462,7 +463,7 @@ export class PostulantesListComponent implements OnInit {
     return this.nuevoArancel?.gestion || 'Seleccione gestión';
   }
 
-  constructor(private postulanteService: PostulanteService, private sgaService: SgaService) {}
+  constructor(private postulanteService: PostulanteService, private sgaService: SgaService, private router: Router) {}
 
   // Normalizador para Tipo de Bachiller: siempre 'Nacional' o 'Extranjero'
   private formatTipoBachiller(v: string | null | undefined): string | null {
@@ -648,6 +649,15 @@ export class PostulantesListComponent implements OnInit {
     
     // Resetear estado de modalidad
     this.modalidad = null;
+  }
+
+  // Navegar de vuelta al buscador de estudiantes (Modalidad de Graduación)
+  goBackToModalidades() {
+    try {
+      // Mantener datos por si el usuario regresa nuevamente
+      // sessionStorage.removeItem('datos_postulacion'); // si quisieras limpiar, descomenta
+    } catch {}
+    this.router.navigate(['/modalidad-graduacion']);
   }
   
   // Métodos para gestión de modalidades

@@ -1,10 +1,13 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Observable, of } from 'rxjs';
+import { tap, catchError, finalize, map } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
 import { Estudiante, EstudianteService } from '../../../core/services/estudiante.service';
 import { PostulanteService } from '../postulantes/postulante.service';
+import { Postulante } from '../postulantes/postulante.model';
 
 interface ModalidadGraduacion {
   id: number;
@@ -51,6 +54,10 @@ export class ModalidadGraduacionComponent implements OnInit {
   error = '';
   modalVisible = false;
   loadingModalidades = false;
+  loadingInscripcion = false;
+
+  // Inscripción actual (si ya está inscrito en alguna modalidad)
+  inscripcionActual: { modalidad_id: number; nombre: string; estado?: string; fecha_inscripcion?: string } | null = null;
 
   // Validaciones
   private readonly CETA_REGEX = /^\d{9}$/; // exactamente 9 dígitos
@@ -59,11 +66,43 @@ export class ModalidadGraduacionComponent implements OnInit {
   constructor(
     private estudianteService: EstudianteService,
     private router: Router,
-    private postulanteService: PostulanteService
+    private postulanteService: PostulanteService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
     this.cargarModalidades();
+  }
+
+  // --- Utilidades de mapeo/merge ---
+  private mapPostulanteToEstudiante(p: Postulante): Estudiante {
+    return {
+      cod_ceta: String(p.cod_ceta),
+      ap_pat: p.ap_pat,
+      ap_mat: p.ap_mat,
+      nombres: p.nombres_est,
+      ci: p.ci,
+      procedencia: (p as any).procedencia || (p as any).expedido || '',
+      carrera: (p as any).carrera_nombre || p.carrera,
+      pensum: p.pensum || undefined,
+      fecha_nacimiento: (p as any).fecha_nacimiento || undefined,
+      lugar_nacimiento: p.lugar_nacimiento || undefined,
+    } as Estudiante;
+  }
+
+  private addOrMergeEstudiante(e: Estudiante) {
+    if (!e) return;
+    const cod = (e.cod_ceta || '').toString().trim();
+    const arr = this.estudiantes || [];
+    const idx = arr.findIndex(x => (x.cod_ceta || '').toString().trim() === cod);
+    if (idx === -1) {
+      this.estudiantes = [...arr, e];
+    } else {
+      const merged = { ...arr[idx], ...Object.fromEntries(Object.entries(e).filter(([_, v]) => v !== undefined && v !== null && v !== '')) } as any;
+      const newArr = arr.slice();
+      newArr[idx] = merged;
+      this.estudiantes = newArr;
+    }
   }
  
   cargarModalidades() {
@@ -113,56 +152,95 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.estudianteEncontrado = false;
     this.estudiantesEncontrados = false;
 
+    // Banderas para terminar loading cuando ambas fuentes respondan
+    let doneSga = false;
+    let doneLocal = false;
+    let sgaError: string | null = null;
+    let localError: string | null = null;
+    const finish = () => {
+      if (doneSga && doneLocal) {
+        this.loading = false;
+        console.log('[BUSCAR CETA] Finalizado. SGA:', !sgaError, 'Local:', !localError, 'Total:', this.estudiantes.length, 'Estudiantes:', this.estudiantes);
+        if (!this.estudiantesEncontrados && (!this.estudiantes || this.estudiantes.length === 0)) {
+          // Priorizar error de SGA si existe, sino el local
+          this.error = sgaError || localError || 'No se encontraron estudiantes con los criterios proporcionados';
+        } else {
+          this.error = '';
+        }
+      }
+    };
+
+    // 1) Búsqueda en SGA
     this.estudianteService.buscarPorCeta(this.codigoCeta, this.carreraSeleccionada).subscribe({
       next: (response: any) => {
-        this.loading = false;
+        doneSga = true;
         console.log('Respuesta API estudiante (CETA):', response);
         
         if (response.success) {
           try {
-            let estudianteTmp: Estudiante | null = null;
-            
-            // Intentar extraer datos del estudiante de diferentes estructuras posibles
+            // Crear lista del SGA y fusionar sin sobreescribir los locales
+            let listaSga: Estudiante[] = [];
             if (response.data && response.data.data && Array.isArray(response.data.data) && response.data.data.length > 0) {
-              // Caso: response.data.data[0]
-              estudianteTmp = response.data.data[0];
-              this.estudiantes = response.data.data;
+              listaSga = response.data.data;
             } else if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-              // Caso: response.data[0]
-              estudianteTmp = response.data[0];
-              this.estudiantes = response.data;
+              listaSga = response.data;
             } else if (response.data && !Array.isArray(response.data)) {
-              // Caso: response.data como objeto directo
-              estudianteTmp = response.data;
-              this.estudiantes = [response.data];
+              listaSga = [response.data];
             }
-            
-            // Filtrar resultados vacíos/ inválidos para evitar filas sin datos
-            this.estudiantes = (this.estudiantes || []).filter(e => this.tieneDatosEstudiante(e));
+            for (const e of (listaSga || [])) {
+              if (this.tieneDatosEstudiante(e)) this.addOrMergeEstudiante(e);
+            }
 
-            console.log('Estudiantes encontrados (CETA):', this.estudiantes.length, this.estudiantes);
-            
-            if (this.estudiantes.length > 0) {
-              this.estudiantesEncontrados = true;
-              this.intentoBusqueda = false;
-            } else {
-              this.estudiantesEncontrados = false;
-            }
+            console.log('Estudiantes encontrados (CETA) tras fusionar:', this.estudiantes.length, this.estudiantes);
+            this.estudiantesEncontrados = (this.estudiantes || []).length > 0;
+            if (this.estudiantesEncontrados) this.intentoBusqueda = false;
           } catch (e) {
             console.error('Error al procesar datos (CETA):', e);
             this.error = 'Error al procesar los datos del estudiante';
           }
         } else {
           console.error('No se encontraron datos del estudiante (CETA):', response);
-          this.error = response.message || 'No se encontró ningún estudiante con el código CETA proporcionado';
+          sgaError = response.message || 'No se encontró ningún estudiante con el código CETA proporcionado';
         }
+        finish();
       },
       error: (error) => {
-        this.loading = false;
-        this.error = 'Error al conectar con el servidor. Intente nuevamente.';
+        doneSga = true;
+        sgaError = 'Error al conectar con el servidor. Intente nuevamente.';
         console.error('Error:', error);
+        finish();
       }
     });
+
+    // 2) Búsqueda en DB local por CETA exacto (usar string, sin convertir a número)
+    const codStr = (this.codigoCeta || '').trim();
+    if (codStr) {
+      this.postulanteService.getById(codStr as any).subscribe({
+        next: (p: Postulante) => {
+          if (p && (p as any)?.cod_ceta) {
+            console.log('[BUSCAR CETA][LOCAL] Postulante encontrado:', p);
+            const e = this.mapPostulanteToEstudiante(p);
+            this.addOrMergeEstudiante(e);
+            console.log('[BUSCAR CETA][LOCAL] Estudiantes luego de merge:', this.estudiantes);
+            this.estudiantesEncontrados = (this.estudiantes || []).length > 0;
+            // Mostrar inmediatamente los resultados locales
+            if (this.estudiantesEncontrados) {
+              this.loading = false;
+              this.cdr.detectChanges();
+            }
+            if (this.estudiantesEncontrados) this.intentoBusqueda = false;
+          }
+          doneLocal = true; finish();
+        },
+        error: (err) => {
+          // Si 404, no existe localmente
+          localError = (err && err.status !== 404) ? 'Error al consultar base de datos local' : null;
+          doneLocal = true; finish();
+        }
+      });
+    } else {
+      doneLocal = true; finish();
+    }
   }
 
   buscarPorNombre() {
@@ -200,60 +278,111 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.estudianteEncontrado = false;
     this.estudiantesEncontrados = false;
 
+    let doneSga = false;
+    let doneLocal = false;
+    let sgaError: string | null = null;
+    let localError: string | null = null;
+    const finish = () => {
+      if (doneSga && doneLocal) {
+        this.loading = false;
+        console.log('[BUSCAR NOMBRE] Finalizado. SGA:', !sgaError, 'Local:', !localError, 'Total:', this.estudiantes.length, 'Estudiantes:', this.estudiantes);
+        if (!this.estudiantesEncontrados && (!this.estudiantes || this.estudiantes.length === 0)) {
+          this.error = sgaError || localError || 'No se encontraron estudiantes con los criterios proporcionados';
+        } else {
+          this.error = '';
+        }
+      }
+    };
+
+    // 1) Búsqueda SGA por nombre
     this.estudianteService.buscarPorNombre(this.nombres, this.ap_pat, this.ap_mat, this.carreraSeleccionada).subscribe({
       next: (response: any) => {
-        this.loading = false;
+        doneSga = true;
         console.log('Respuesta API (Nombre):', response);
         
         if (response.success) {
           try {
-            // Procesar lista de estudiantes
+            // Fusionar resultados del SGA sin borrar los locales
             if (response.data) {
+              let listaSga: Estudiante[] = [];
               if (Array.isArray(response.data)) {
-                // Caso: response.data es un array
-                this.estudiantes = response.data;
+                listaSga = response.data;
               } else if (response.data.data && Array.isArray(response.data.data)) {
-                // Caso: response.data.data es un array
-                this.estudiantes = response.data.data;
+                listaSga = response.data.data;
               } else {
-                // Caso: response.data es un objeto único
-                this.estudiantes = [response.data];
+                listaSga = [response.data];
               }
-              
-              // Filtrar resultados vacíos/ inválidos
-              this.estudiantes = (this.estudiantes || []).filter(e => this.tieneDatosEstudiante(e));
+              for (const e of (listaSga || [])) {
+                if (this.tieneDatosEstudiante(e)) this.addOrMergeEstudiante(e);
+              }
 
-              console.log('Estudiantes encontrados:', this.estudiantes.length, this.estudiantes);
-              
-              if (this.estudiantes.length > 0) {
-                this.estudiantesEncontrados = true;
-                // Si solo hay un estudiante, seleccionarlo automáticamente
-                if (this.estudiantes.length === 1) {
-                  this.estudiante = this.estudiantes[0];
-                  this.estudianteEncontrado = true;
-                }
-                this.intentoBusqueda = false;
-              } else {
-                this.estudiantesEncontrados = false;
-                this.error = 'No se encontraron estudiantes con los criterios proporcionados';
+              console.log('Estudiantes encontrados (SGA+LOCAL):', this.estudiantes.length, this.estudiantes);
+              this.estudiantesEncontrados = (this.estudiantes || []).length > 0;
+              if (this.estudiantesEncontrados && this.estudiantes.length === 1) {
+                this.estudiante = this.estudiantes[0];
+                this.estudianteEncontrado = true;
               }
+              if (this.estudiantesEncontrados) this.intentoBusqueda = false;
+              if (!this.estudiantesEncontrados) this.error = 'No se encontraron estudiantes con los criterios proporcionados';
             } else {
-              this.error = 'No se recibieron datos de estudiantes';
+              sgaError = 'No se recibieron datos de estudiantes';
             }
+            finish();
           } catch (e) {
             console.error('Error al procesar datos (Nombre):', e);
-            this.error = 'Error al procesar los datos del estudiante';
+            sgaError = 'Error al procesar los datos del estudiante';
+            finish();
           }
         } else {
           console.error('No se encontraron datos del estudiante:', response);
-          this.error = response.message || 'No se encontró ningún estudiante con los criterios proporcionados';
+          sgaError = response.message || 'No se encontró ningún estudiante con los criterios proporcionados';
+          finish();
         }
       },
       error: (error) => {
-        this.loading = false;
-        this.error = 'Error al conectar con el servidor. Intente nuevamente.';
+        doneSga = true;
+        sgaError = 'Error al conectar con el servidor. Intente nuevamente.';
         console.error('Error:', error);
+        finish();
       }
+    });
+
+    // 2) Búsqueda local por nombre (filtrado en cliente)
+    this.postulanteService.getAll().subscribe({
+      next: (lista: Postulante[]) => {
+        const needle = {
+          nombres: this.nombres.trim().toLowerCase(),
+          ap_pat: this.ap_pat.trim().toLowerCase(),
+          ap_mat: this.ap_mat.trim().toLowerCase(),
+        };
+        const matches = (lista || []).filter(p => {
+          const n = (p.nombres_est || '').toLowerCase();
+          const ap = (p.ap_pat || '').toLowerCase();
+          const am = (p.ap_mat || '').toLowerCase();
+          const okN = !needle.nombres || n.includes(needle.nombres);
+          const okAp = !needle.ap_pat || ap.includes(needle.ap_pat);
+          const okAm = !needle.ap_mat || am.includes(needle.ap_mat);
+          return okN && okAp && okAm;
+        });
+        console.log('[BUSCAR NOMBRE][LOCAL] Coincidencias locales:', matches);
+        for (const p of matches) {
+          this.addOrMergeEstudiante(this.mapPostulanteToEstudiante(p));
+        }
+        console.log('[BUSCAR NOMBRE][LOCAL] Estudiantes luego de merge:', this.estudiantes);
+        this.estudiantesEncontrados = (this.estudiantes || []).length > 0 || this.estudiantesEncontrados;
+        if (this.estudiantesEncontrados && this.estudiantes.length === 1) {
+          this.estudiante = this.estudiantes[0];
+          this.estudianteEncontrado = true;
+        }
+        // Mostrar inmediatamente los resultados locales
+        if ((this.estudiantes || []).length > 0) {
+          this.loading = false;
+          this.cdr.detectChanges();
+        }
+        if (this.estudiantesEncontrados) this.intentoBusqueda = false;
+        doneLocal = true; finish();
+      },
+      error: (err) => { localError = 'Error al consultar base de datos local'; doneLocal = true; finish(); }
     });
   }
 
@@ -275,11 +404,24 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.estudiante = estudiante;
     this.estudianteEncontrado = true;
     this.modalidadSeleccionada = null;
+    // No cargar inscripción aquí; se hará en seleccionarEstudianteYAbrirModal
+    this.inscripcionActual = null;
   }
 
   seleccionarEstudianteYAbrirModal(estudiante: Estudiante) {
     this.seleccionarEstudiante(estudiante);
-    this.abrirModal();
+    const cod = (estudiante as any)?.cod_ceta || (estudiante as any)?.codCeta || (estudiante as any)?.codigo_ceta;
+    if (cod) {
+      this.cargarInscripcionActual$(cod).subscribe({
+        next: () => {},
+        complete: () => {
+          this.abrirModal();
+        }
+      });
+    } else {
+      this.inscripcionActual = null;
+      this.abrirModal();
+    }
   }
   
   abrirModal() {
@@ -366,6 +508,7 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.modalidadSeleccionada = null;
     this.error = '';
     this.intentoBusqueda = false;
+    this.inscripcionActual = null;
   }
 
   registrarNuevoPostulante() {
@@ -440,7 +583,83 @@ export class ModalidadGraduacionComponent implements OnInit {
     return processes[modalidadId as keyof typeof processes] || 'Proceso estándar';
   }
 
+  // Métodos para mejorar la UI de modalidades (existentes arriba)
   onToggleSidebar() {
     console.log('Toggle sidebar clicked');
   }
-} 
+
+// --- Inscripción existente y navegación a registro de proyecto ---
+  private cargarInscripcionActual$(codCeta: string | number): Observable<void> {
+    this.inscripcionActual = null;
+    this.loadingInscripcion = true;
+    return this.postulanteService.getModalidadPostulante(Number(codCeta)).pipe(
+      tap((res: any) => {
+        const mod = res?.modalidad || null;
+        if (mod) {
+          this.inscripcionActual = {
+            modalidad_id: Number(mod.id || mod.modalidad_id || 0),
+            nombre: mod.nombre || '',
+            estado: res?.estado || undefined,
+            fecha_inscripcion: res?.fecha_inscripcion || undefined
+          };
+        } else if (res?.modalidad_id) {
+          const mid = Number(res.modalidad_id);
+          const found = (this.modalidades || []).find(m => m.id === mid);
+          this.inscripcionActual = {
+            modalidad_id: mid,
+            nombre: found?.nombre || 'Modalidad #' + mid,
+            estado: res?.estado || undefined,
+            fecha_inscripcion: res?.fecha_inscripcion || undefined
+          };
+        } else {
+          this.inscripcionActual = null;
+        }
+      }),
+      catchError((err) => {
+        if (err && err.status === 404) {
+          this.inscripcionActual = null;
+        } else {
+          console.warn('No se pudo obtener la modalidad/inscripción actual:', err);
+          this.inscripcionActual = null;
+        }
+        return of(void 0);
+      }),
+      finalize(() => {
+        this.loadingInscripcion = false;
+      }),
+      map(() => void 0)
+    );
+  }
+
+  esExcelencia(modId?: number, nombre?: string | null): boolean {
+    if (!modId && !nombre) return false;
+    if (modId && Number(modId) === 6) return true;
+    const s = (nombre || '').toString().toLowerCase();
+    return s.includes('excelencia');
+  }
+
+  registrarProyecto() {
+    if (!this.estudiante || !this.inscripcionActual) return;
+    // Preparar modalidad a enviar a Postulantes desde la inscripción existente
+    const mid = this.inscripcionActual.modalidad_id;
+    const found = (this.modalidades || []).find(m => m.id === mid) || null;
+    const modalidad = found || {
+      id: mid,
+      nombre: this.inscripcionActual.nombre || 'Modalidad #' + mid,
+      descripcion: '',
+      monto_arancel: ''
+    };
+
+    const datosPostulacion = {
+      estudiante: this.estudiante,
+      modalidad: modalidad
+    };
+    try {
+      sessionStorage.setItem('datos_postulacion', JSON.stringify(datosPostulacion));
+    } catch {}
+
+    // Cerrar modal y navegar a Postulantes para continuar con el flujo de proyecto
+    this.cerrarModal();
+    this.router.navigate(['/postulantes']);
+  }
+}
