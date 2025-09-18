@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProductosController;
 use App\Http\Controllers\PostulanteController;
+use App\Http\Controllers\InscripcionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\RolController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Api\ModalidadController;
 use App\Http\Controllers\Api\PractIndController;
 use App\Http\Controllers\Api\ProyectoController;
 use App\Http\Controllers\Api\InscripModalidadController;
+use App\Http\Controllers\Api\DatosCarreraController;
 use App\Http\Controllers\Api\DocumentosRequeridosController;
 use App\Http\Controllers\Api\DocumentosAdjuntosController;
 use App\Http\Controllers\Api\DiplomaBachillerController;
@@ -88,6 +90,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('res_homol_cp', ResHomolCpController::class);
     Route::apiResource('grados_homol_cp', GradosHomolCpController::class);
     Route::apiResource('grados_trasp', GradosTraspController::class);
+    // Datos de carrera (inicio / conclusión)
+    Route::apiResource('datos_carrera', DatosCarreraController::class);
+    Route::post('datos_carrera/upsert', [DatosCarreraController::class, 'upsert']);
     // Registro de inscripción con aranceles seleccionados
     Route::post('inscripciones', [InscripModalidadController::class, 'storeWithAranceles']);
     // Catálogos base
@@ -106,6 +111,8 @@ Route::delete('/productos/{id}', [ProductosController::class, 'destroy']);
 Route::apiResource('postulantes', PostulanteController::class);
 Route::get('postulantes/{cod_ceta}/modalidad', [PostulanteController::class, 'getModalidad']);
 Route::post('postulantes/{cod_ceta}/modalidad', [PostulanteController::class, 'setModalidad']);
+// Endpoint composite para vista "Ver inscripción"
+Route::get('postulantes/{cod_ceta}/inscripcion', [InscripcionController::class, 'showByCodCeta']);
 
 // 🎓 RUTAS PARA SGA (Mantener existentes)
 Route::prefix('sga')->group(function () {

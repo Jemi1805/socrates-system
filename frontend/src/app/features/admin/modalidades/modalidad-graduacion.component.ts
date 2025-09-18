@@ -3,7 +3,7 @@ import { Observable, of } from 'rxjs';
 import { tap, catchError, finalize, map } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
 import { Estudiante, EstudianteService } from '../../../core/services/estudiante.service';
 import { PostulanteService } from '../postulantes/postulante.service';
@@ -21,7 +21,7 @@ interface ModalidadGraduacion {
   templateUrl: './modalidad-graduacion.component.html',
   styleUrls: ['./modalidad-graduacion.component.scss'],
   standalone: true,
-  imports: [CommonModule, FormsModule, HeaderComponent],
+  imports: [CommonModule, FormsModule, HeaderComponent, RouterModule],
 })
 export class ModalidadGraduacionComponent implements OnInit {
   
@@ -487,6 +487,28 @@ export class ModalidadGraduacionComponent implements OnInit {
 
     // Navegar a la página de postulantes
     this.router.navigate(['/postulantes']);
+  }
+
+  // Navegar a Postulantes en modo "Ver inscripción" y pasar el estudiante en sessionStorage
+  verInscripcion() {
+    if (!this.estudiante) {
+      // Si no hay estudiante cargado, no tiene sentido entrar a ver
+      return;
+    }
+    // Si hay una inscripción actual, mapearla a un objeto de modalidad simple
+    const modalidad = this.inscripcionActual
+      ? { id: this.inscripcionActual.modalidad_id, nombre: this.inscripcionActual.nombre, descripcion: '', monto_arancel: '' }
+      : null;
+    const datosPostulacion = {
+      estudiante: this.estudiante,
+      modalidad: modalidad
+    };
+    try {
+      sessionStorage.setItem('datos_postulacion', JSON.stringify(datosPostulacion));
+    } catch {}
+    // Cerrar modal y navegar con query param ver=1 para activar el modo lectura
+    this.cerrarModal();
+    this.router.navigate(['/postulantes'], { queryParams: { ver: 1 } });
   }
 
   // --- Helpers de validación/sanitización ---

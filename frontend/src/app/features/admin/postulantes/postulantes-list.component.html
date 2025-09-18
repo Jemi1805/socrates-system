@@ -17,11 +17,12 @@
             <i class="bi bi-clipboard-check me-2"></i>
             Resumen de la inscripción
           </h5>
-          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="goBackToModalidades()">
+          <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/modalidad-graduacion']">
             <i class="bi bi-arrow-left me-1"></i>
             Volver
-          </button>
-        </div>
+          </a>
+          <div class="readonly-mask" *ngIf="viewInscripcion && !editAranceles"></div>
+    </div>
           <div class="row g-3">
             <div class="col-md-6"><label>Carrera:</label> {{ r.carrera || '-' }}</div>
             <div class="col-md-3"><label>Pensum:</label> {{ r.pensum || '-' }}</div>
@@ -39,7 +40,8 @@
                 <li *ngIf="r.es_cambio_plan">Homologación por cambio de plan de estudios</li>
                 <li *ngIf="!r.es_edu_regular && !r.es_tecnico_medio && !r.es_traspaso && !r.es_cambio_plan">Ninguno</li>
               </ul>
-            </div>
+              <div class="readonly-mask" *ngIf="viewInscripcion && !editConclusion"></div>
+      </div>
             <div class="col-12" *ngIf="(r.aranceles || []).length > 0">
               <div class="table-responsive">
                 <table class="table table-sm table-striped align-middle">
@@ -75,6 +77,7 @@
         </div>
       </ng-template>
     </div>
+    <div class="readonly-mask" *ngIf="viewInscripcion && !editBio"></div>
   </div>
 
   <div class="content-wrapper" *ngIf="!resumenVisible">
@@ -87,7 +90,11 @@
           Datos del estudiante
         </h3>
         <div class="d-flex align-items-center gap-2">
-          <button class="btn btn-sm btn-primary" *ngIf="!isEditing" (click)="iniciarEdicionBiograficos()">
+          <button class="btn btn-sm btn-primary" *ngIf="!isEditing && !viewInscripcion" (click)="iniciarEdicionBiograficos()">
+            <i class="bi bi-pencil-square me-1"></i>
+            Editar
+          </button>
+          <button class="btn btn-sm btn-primary" *ngIf="viewInscripcion && !editBio" (click)="iniciarEdicionBioCard()">
             <i class="bi bi-pencil-square me-1"></i>
             Editar
           </button>
@@ -195,6 +202,7 @@
             {{ pasoBiograficosCompletado ? 'Datos guardados' : 'Guardar y continuar inscripción' }}
           </button>
         </div>
+        <div class="readonly-mask" *ngIf="viewInscripcion && !editBio"></div>
       </div>
     </div>
 
@@ -205,12 +213,45 @@
           <i class="bi bi-journal-check me-2"></i>
           Datos del Bachillerato
         </h3>
-        <button class="btn btn-sm" (click)="toggleBachilleratoData()">
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-sm btn-primary" *ngIf="viewInscripcion && !editBach" (click)="iniciarEdicionBachCard()">
+            <i class="bi bi-pencil-square me-1"></i>
+            Editar
+          </button>
+          <button class="btn btn-sm" (click)="toggleBachilleratoData()">
           <i class="bi" [ngClass]="showBachilleratoData ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
-        </button>
+          </button>
+        </div>
       </div>
 
       <div class="bio-content" *ngIf="showBachilleratoData">
+        <!-- Resumen en modo lectura -->
+        <div *ngIf="viewInscripcion && !editBach" class="mb-2">
+          <div class="alert alert-secondary py-2">
+            <div class="d-flex flex-wrap gap-3 align-items-center">
+              <div>
+                <strong>Tipo:</strong>
+                <span class="badge bg-info-subtle text-info border">{{ tipoBachiller === 'extranjero' ? 'Extranjero' : 'Nacional' }}</span>
+              </div>
+              <ng-container *ngIf="tipoBachiller === 'nacional'; else bachExtranjero">
+                <div><strong>N° serie:</strong> {{ diplomaNacional?.nro_serie || postulanteActual?.nro_serie_titulo || '-' }}</div>
+                <div><strong>Emisión:</strong> {{ diplomaNacional?.emision || '-' }}</div>
+                <div><strong>Fecha emisión:</strong> {{ diplomaNacional?.fecha_emision || '-' }}</div>
+                <div><strong>Gestión:</strong> {{ diplomaNacional?.gestion_bachillerato || '-' }}</div>
+              </ng-container>
+              <ng-template #bachExtranjero>
+                <div><strong>N° resolución:</strong> {{ homologacionExtranjero?.nro_resolucion || postulanteActual?.nro_serie_titulo || '-' }}</div>
+                <div><strong>Fecha emisión:</strong> {{ homologacionExtranjero?.fecha_emision || '-' }}</div>
+                <div><strong>Grados/gestiones:</strong>
+                  <span *ngIf="(homologacionExtranjero?.grados_gestiones || []).length === 0">-</span>
+                  <span *ngFor="let gg of (homologacionExtranjero?.grados_gestiones || []); let i = index">
+                    {{ gg.grado }}/{{ gg.gestion }}<span *ngIf="i < (((homologacionExtranjero?.grados_gestiones || []).length) - 1)">, </span>
+                  </span>
+                </div>
+              </ng-template>
+            </div>
+          </div>
+        </div>
         <div class="bachiller-content">
           <div class="row g-3 align-items-end">
             <div class="col-md-4">
@@ -236,12 +277,12 @@
               <input
                 type="text"
                 class="form-control"
-                [(ngModel)]="postulanteActual.nro_serie_titulo"
+                [(ngModel)]="diplomaNacional.nro_serie"
                 placeholder="Ej. 123456"
                 style="text-transform: uppercase"
                 pattern='^[A-Z0-9\-\"°\s]+$'
                 title='Solo MAYÚSCULAS, números, guion -, " y °'
-                (input)="onSerieInput($event, postulanteActual, 'nro_serie_titulo', true)"
+                (input)="onSerieInput($event, diplomaNacional, 'nro_serie', true)"
               />
             </div>
             <div class="col-5">
@@ -279,12 +320,12 @@
               <input
                 type="text"
                 class="form-control"
-                [(ngModel)]="postulanteActual.nro_serie_titulo"
+                [(ngModel)]="homologacionExtranjero.nro_resolucion"
                 placeholder="Ej. RES-2023-001"
                 style="text-transform: uppercase"
                 pattern='^[A-Z0-9\-\"°\s]+$'
                 title='Solo MAYÚSCULAS, números, guion -, " y °'
-                (input)="onSerieInput($event, postulanteActual, 'nro_serie_titulo', true)"
+                (input)="onSerieInput($event, homologacionExtranjero, 'nro_resolucion', true)"
               />
             </div>
             <div class="col-md-3">
@@ -548,6 +589,13 @@
           <i class="bi bi-mortarboard me-2"></i>
           Datos de Inicio de Carrera
         </h3>
+        <div class="d-flex justify-content-end mb-2">
+          <button class="btn btn-sm btn-primary" *ngIf="viewInscripcion && !editInicio" (click)="iniciarEdicionInicioCard()">
+            <i class="bi bi-pencil-square me-1"></i>
+            Editar
+          </button>
+        </div>
+
         <div class="alert alert-info py-1 px-2 mb-2">
           <i class="bi bi-info-circle me-1"></i>
           Ingrese los datos de inicio de carrera del postulante.
@@ -555,7 +603,7 @@
         <div class="row g-3">
           <div class="col-md-7">
             <label class="form-label">Tipo de Regimen</label>
-            <select class="form-select">
+            <select class="form-select" [(ngModel)]="datosInicioCarrera.reg_ini_c">
               <option [ngValue]="null" disabled>Seleccione tipo de Regimen</option>
               <option [ngValue]="'semestral'">Semestral</option>
               <option [ngValue]="'anual'">Anual</option>
@@ -563,18 +611,26 @@
           </div>
           <div class="col-md-5">
             <label class="form-label">Gestión de Inicio</label>
-            <select class="form-select" [ngModel]="datosInicioCarrera.gestion_ini" (ngModelChange)="setGestionInicio($event)">
+            <select class="form-select" [(ngModel)]="datosInicioCarrera.gestion_ini" (ngModelChange)="setGestionInicio($event)">
               <option [ngValue]="''">Seleccione gestión</option>
               <option *ngFor="let g of gestionesOpciones" [ngValue]="g">{{ g }}</option>
             </select>
           </div>
         </div>
+        <div class="readonly-mask" *ngIf="viewInscripcion && !editInicio"></div>
       </div>
       <div class="conclusion-card">
         <h3 class="card-title">
           <i class="bi bi-mortarboard me-2"></i>
           Datos de Conclusión de Carrera
         </h3>
+        <div class="d-flex justify-content-end mb-2">
+          <button class="btn btn-sm btn-primary" *ngIf="viewInscripcion && !editConclusion" (click)="iniciarEdicionConclusionCard()">
+            <i class="bi bi-pencil-square me-1"></i>
+            Editar
+          </button>
+        </div>
+
         <div class="alert alert-info py-1 px-2 mb-2">
           <i class="bi bi-info-circle me-1"></i>
           Ingrese los datos de conclusión de carrera del postulante.
@@ -582,7 +638,7 @@
         <div class="row g-3">
           <div class="col-md-7">
             <label class="form-label">Tipo de Regimen</label>
-            <select class="form-select">
+            <select class="form-select" [(ngModel)]="datosConclusionCarrera.reg_con_c">
               <option [ngValue]="null" disabled>Seleccione tipo de Regimen</option>
               <option [ngValue]="'semestral'">Semestral</option>
               <option [ngValue]="'anual'">Anual</option>
@@ -590,7 +646,7 @@
           </div>
           <div class="col-md-5">
               <label class="form-label">Gestión de Conclusión</label>
-              <select class="form-select" [ngModel]="datosConclusionCarrera.gestion_fin" (ngModelChange)="setGestionFin($event)">
+              <select class="form-select" [(ngModel)]="datosConclusionCarrera.gestion_fin" (ngModelChange)="setGestionFin($event)">
                 <option [ngValue]="''">Seleccione gestión</option>
                 <option *ngFor="let g of gestionesConclusionOpciones" [ngValue]="g">{{ g }}</option>
               </select>
@@ -609,8 +665,15 @@
         Aranceles (Material Extra)
         <small class="text-muted" *ngIf="!loadingAranceles">Total: {{ totalAranceles }} </small>
       </h3>
+      <div class="d-flex justify-content-end mb-2">
+        <button class="btn btn-sm btn-primary" *ngIf="viewInscripcion && !editAranceles" (click)="iniciarEdicionArancelesCard()">
+          <i class="bi bi-pencil-square me-1"></i>
+          Editar
+        </button>
+      </div>
 
-      <div class="row g-2 align-items-end mb-2">
+      <!-- UI completa de selección (oculta en modo Ver no editable) -->
+      <div class="row g-2 align-items-end mb-2" *ngIf="!viewInscripcion || editAranceles">
         <div class="col-md-12">
           <div class="alert alert-info py-1 px-2 mb-0" *ngIf="!esNuevoPostulante">
             <i class="bi bi-info-circle me-1"></i>

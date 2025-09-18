@@ -18,4 +18,8 @@ export interface Postulante {
   gestion_fin: string;
   incrip_uni: boolean;
   nro_serie_titulo: string;
+  gestion_bachillerato: string;
+  emision: string;
+  fecha_emision: string;
+  tipo_bachiller: string;
 }

@@ -31,6 +31,7 @@ export class PostulanteService {
   private sgaUrl = `${this.baseUrl}/sga`; // Base para endpoints SGA
   private modalidadUrl = `${this.baseUrl}/modalidades`;
   private inscripcionesUrl = `${this.baseUrl}/inscripciones`;
+  private datosCarreraUrl = `${this.baseUrl}/datos_carrera`;
 
   constructor(private http: HttpClient) {}
 
@@ -45,6 +46,23 @@ export class PostulanteService {
 
   getById(id: number): Observable<Postulante> {
     return this.http.get<Postulante>(`${this.apiUrl}/${id}`);
+  }
+
+  // Endpoint composite para traer toda la inscripción en una sola llamada
+  getInscripcionByCodCeta(codCeta: number): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/${codCeta}/inscripcion`);
+  }
+
+  // --- Datos de Carrera (inicio/conclusión) ---
+  upsertDatosCarrera(payload: {
+    cod_ceta_est: number;
+    regimen_ini?: string | null;
+    regimen_fin?: string | null;
+    gestion_ini?: string | null;
+    gestion_fin?: string | null;
+    is_active?: boolean;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.datosCarreraUrl}/upsert`, payload);
   }
 
   create(postulante: Postulante): Observable<Postulante> {

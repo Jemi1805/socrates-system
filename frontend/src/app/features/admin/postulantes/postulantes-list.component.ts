@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { PostulanteService, DocumentoPostulante, ModalidadPostulante } from './postulante.service';
 import { Postulante } from './postulante.model';
@@ -58,7 +58,7 @@ interface Arancel {
   templateUrl: './postulantes-list.component.html',
   styleUrls: ['./postulantes-list.component.scss'],
   standalone: true,
-  imports: [CommonModule, FormsModule, HeaderComponent],
+  imports: [CommonModule, FormsModule, HeaderComponent, RouterModule],
 })
 export class PostulantesListComponent implements OnInit {
   postulantes: Postulante[] = [];
@@ -77,6 +77,8 @@ export class PostulantesListComponent implements OnInit {
   modalExitoVisible: boolean = false;
   // Resumen de inscripción
   resumenVisible: boolean = false;
+  // Modo de visualización de inscripción (solo lectura por defecto)
+  viewInscripcion: boolean = false;
   resumenInscripcion: {
     carrera: string | null;
     pensum: string | null;
@@ -103,6 +105,12 @@ export class PostulantesListComponent implements OnInit {
   esNuevoPostulante = false;
   // Modo de edición para Datos del estudiante (biográficos)
   isEditing = false;
+  // Edición por tarjeta cuando está en modo ver inscripción
+  editBio = false;
+  editBach = false;
+  editInicio = false;
+  editConclusion = false;
+  editAranceles = false;
   // Paso 1 completado: al guardar datos biográficos se habilitan las demás secciones
   pasoBiograficosCompletado = false;
 
@@ -236,7 +244,6 @@ export class PostulantesListComponent implements OnInit {
   // Opción 1: mostrar pocas opciones por defecto y permitir "ver todas"
   mostrarTodasGestiones = false;
   private readonly N_ULTIMAS = 20;
-
   private generarGestiones(desdeYear: number = 2006) {
     const ahora = new Date();
     let yearActual = ahora.getFullYear();
@@ -272,299 +279,478 @@ export class PostulantesListComponent implements OnInit {
     this.gestionesOpciones = opciones;
   }
 
-  private indiceGestion(gestion: string): number {
-    // Formato esperado: "1/AAAA" o "2/AAAA"
-    if (!gestion) return -1;
-    const m = gestion.toString().trim().match(/^(1|2)\/(\d{4})$/);
-    if (!m) return -1;
-    const sem = parseInt(m[1], 10); // 1 o 2
-    const year = parseInt(m[2], 10);
-    return year * 2 + (sem - 1);
+private indiceGestion(gestion: string): number {
+  // Formato esperado: "1/AAAA" o "2/AAAA"
+  if (!gestion) return -1;
+  const m = gestion.toString().trim().match(/^(1|2)\/(\d{4})$/);
+  if (!m) return -1;
+  const sem = parseInt(m[1], 10); // 1 o 2
+  const year = parseInt(m[2], 10);
+  return year * 2 + (sem - 1);
+}
+
+get gestionesConclusionOpciones(): string[] {
+  const ini = this.datosInicioCarrera.gestion_ini;
+  if (!ini) return this.gestionesOpciones;
+  const minIdx = this.indiceGestion(ini) + this.MIN_GESTIONES_DIF;
+  return this.gestionesOpciones.filter(g => this.indiceGestion(g) >= minIdx);
+}
+
+// Listas para UI (limitadas) segun toggle
+get gestionesOpcionesUI(): string[] {
+  if (this.mostrarTodasGestiones) return this.gestionesOpciones;
+  const arr = this.gestionesOpciones;
+  // Ahora la lista está en orden descendente, tomamos las primeras N
+  return arr.slice(0, this.N_ULTIMAS);
+}
+
+get gestionesConclusionOpcionesUI(): string[] {
+  const base = this.gestionesConclusionOpciones;
+  if (this.mostrarTodasGestiones) return base;
+  // Base también queda en orden descendente
+  return base.slice(0, this.N_ULTIMAS);
+}
+
+get gestionValida(): boolean {
+  const ini = this.datosInicioCarrera.gestion_ini;
+  const fin = this.datosConclusionCarrera.gestion_fin;
+  if (!ini || !fin) return true; // no validar hasta que ambos estén seleccionados
+  return this.indiceGestion(fin) >= this.indiceGestion(ini) + this.MIN_GESTIONES_DIF;
+}
+
+get gestionErrorMessage(): string | null {
+  const ini = this.datosInicioCarrera.gestion_ini;
+  const fin = this.datosConclusionCarrera.gestion_fin;
+  if (!ini || !fin) return null;
+  if (this.gestionValida) return null;
+  return `La gestión de conclusión debe ser mayor a la de inicio por al menos ${this.MIN_GESTIONES_DIF} gestiones.`;
+}
+
+// --- Validación integral de campos requeridos ---
+private isNonEmpty(v: any): boolean {
+  return v !== undefined && v !== null && String(v).toString().trim() !== '';
+}
+
+private validarCampos(): string[] {
+  const faltantes: string[] = [];
+
+  // Datos biográficos mínimos
+  const p = this.postulanteActual as any;
+  if (!this.isNonEmpty(p.nombres_est)) faltantes.push('Nombres');
+  if (!this.isNonEmpty(p.ap_pat)) faltantes.push('Apellido Paterno');
+  if (!this.isNonEmpty(p.ap_mat)) faltantes.push('Apellido Materno');
+  if (!this.isNonEmpty(p.ci)) faltantes.push('CI');
+  if (!this.isNonEmpty(p.carrera)) faltantes.push('Carrera');
+  if (!this.isNonEmpty(p.pensum)) faltantes.push('Pensum');
+  if (!this.isNonEmpty(p.fecha_nacimiento)) faltantes.push('Fecha de Nacimiento');
+  if (!this.isNonEmpty(p.lugar_nacimiento)) faltantes.push('Lugar de Nacimiento');
+  if (!this.isNonEmpty(p.procedencia)) faltantes.push('Procedencia');
+
+  // Bachillerato (según tipo)
+  if (this.tipoBachiller === 'nacional') {
+    if (!this.isNonEmpty(p.nro_serie_titulo)) faltantes.push('N° de Serie (Bachiller Nacional)');
+    if (!this.isNonEmpty(this.diplomaNacional.emision)) faltantes.push('Emisión (Bachiller Nacional)');
+    if (!this.isNonEmpty(this.diplomaNacional.fecha_emision)) faltantes.push('Fecha de Emisión (Bachiller Nacional)');
+    if (!this.isNonEmpty(this.diplomaNacional.gestion_bachillerato)) faltantes.push('Gestión de Bachillerato');
+  } else if (this.tipoBachiller === 'extranjero') {
+    // Nota: En HTML actual el Nro. Resolución se enlaza a postulanteActual.nro_serie_titulo.
+    // Para evitar falsos positivos, exigimos al menos la fecha y, si hubiese resolución en el modelo, validarla.
+    if (!this.isNonEmpty(this.homologacionExtranjero.fecha_emision)) faltantes.push('Fecha de Emisión (Bachiller Extranjero)');
   }
 
-  get gestionesConclusionOpciones(): string[] {
-    const ini = this.datosInicioCarrera.gestion_ini;
-    if (!ini) return this.gestionesOpciones;
-    const minIdx = this.indiceGestion(ini) + this.MIN_GESTIONES_DIF;
-    return this.gestionesOpciones.filter(g => this.indiceGestion(g) >= minIdx);
-  }
+  // Datos de Inicio/Conclusión (si el usuario los está usando)
+  if (!this.isNonEmpty(this.datosInicioCarrera.gestion_ini)) faltantes.push('Gestión de Inicio de Carrera');
+  if (!this.isNonEmpty(this.datosConclusionCarrera.gestion_fin)) faltantes.push('Gestión de Conclusión de Carrera');
+  if (this.gestionErrorMessage) faltantes.push(this.gestionErrorMessage);
 
-  // Listas para UI (limitadas) segun toggle
-  get gestionesOpcionesUI(): string[] {
-    if (this.mostrarTodasGestiones) return this.gestionesOpciones;
-    const arr = this.gestionesOpciones;
-    // Ahora la lista está en orden descendente, tomamos las primeras N
-    return arr.slice(0, this.N_ULTIMAS);
-  }
-
-  get gestionesConclusionOpcionesUI(): string[] {
-    const base = this.gestionesConclusionOpciones;
-    if (this.mostrarTodasGestiones) return base;
-    // Base también queda en orden descendente
-    return base.slice(0, this.N_ULTIMAS);
-  }
-
-  get gestionValida(): boolean {
-    const ini = this.datosInicioCarrera.gestion_ini;
-    const fin = this.datosConclusionCarrera.gestion_fin;
-    if (!ini || !fin) return true; // no validar hasta que ambos estén seleccionados
-    return this.indiceGestion(fin) >= this.indiceGestion(ini) + this.MIN_GESTIONES_DIF;
-  }
-
-  get gestionErrorMessage(): string | null {
-    const ini = this.datosInicioCarrera.gestion_ini;
-    const fin = this.datosConclusionCarrera.gestion_fin;
-    if (!ini || !fin) return null;
-    if (this.gestionValida) return null;
-    return `La gestión de conclusión debe ser mayor a la de inicio por al menos ${this.MIN_GESTIONES_DIF} gestiones.`;
-  }
-
-  // --- Validación integral de campos requeridos ---
-  private isNonEmpty(v: any): boolean {
-    return v !== undefined && v !== null && String(v).toString().trim() !== '';
-  }
-
-  private validarCampos(): string[] {
-    const faltantes: string[] = [];
-
-    // Datos biográficos mínimos
-    const p = this.postulanteActual as any;
-    if (!this.isNonEmpty(p.nombres_est)) faltantes.push('Nombres');
-    if (!this.isNonEmpty(p.ap_pat)) faltantes.push('Apellido Paterno');
-    if (!this.isNonEmpty(p.ap_mat)) faltantes.push('Apellido Materno');
-    if (!this.isNonEmpty(p.ci)) faltantes.push('CI');
-    if (!this.isNonEmpty(p.carrera)) faltantes.push('Carrera');
-    if (!this.isNonEmpty(p.pensum)) faltantes.push('Pensum');
-    if (!this.isNonEmpty(p.fecha_nacimiento)) faltantes.push('Fecha de Nacimiento');
-    if (!this.isNonEmpty(p.lugar_nacimiento)) faltantes.push('Lugar de Nacimiento');
-    if (!this.isNonEmpty(p.procedencia)) faltantes.push('Procedencia');
-
-    // Bachillerato (según tipo)
-    if (this.tipoBachiller === 'nacional') {
-      if (!this.isNonEmpty(p.nro_serie_titulo)) faltantes.push('N° de Serie (Bachiller Nacional)');
-      if (!this.isNonEmpty(this.diplomaNacional.emision)) faltantes.push('Emisión (Bachiller Nacional)');
-      if (!this.isNonEmpty(this.diplomaNacional.fecha_emision)) faltantes.push('Fecha de Emisión (Bachiller Nacional)');
-      if (!this.isNonEmpty(this.diplomaNacional.gestion_bachillerato)) faltantes.push('Gestión de Bachillerato');
-    } else if (this.tipoBachiller === 'extranjero') {
-      // Nota: En HTML actual el Nro. Resolución se enlaza a postulanteActual.nro_serie_titulo.
-      // Para evitar falsos positivos, exigimos al menos la fecha y, si hubiese resolución en el modelo, validarla.
-      if (!this.isNonEmpty(this.homologacionExtranjero.fecha_emision)) faltantes.push('Fecha de Emisión (Bachiller Extranjero)');
+  // Validación por opción seleccionada (solo valida si está seleccionada)
+  switch (this.selectedOpcion) {
+    case 'educacionRegular': {
+      const e = this.eduRegularData;
+      if (!this.isNonEmpty(e.serie_titulo_tm)) faltantes.push('Serie título (Educación Regular)');
+      if (!this.isNonEmpty(e.numero_titulo_tm)) faltantes.push('N° de Título (Educación Regular)');
+      if (!this.isNonEmpty(e.fecha_emision)) faltantes.push('Fecha de Emisión (Educación Regular)');
+      break;
     }
-
-    // Datos de Inicio/Conclusión (si el usuario los está usando)
-    if (!this.isNonEmpty(this.datosInicioCarrera.gestion_ini)) faltantes.push('Gestión de Inicio de Carrera');
-    if (!this.isNonEmpty(this.datosConclusionCarrera.gestion_fin)) faltantes.push('Gestión de Conclusión de Carrera');
-    if (this.gestionErrorMessage) faltantes.push(this.gestionErrorMessage);
-
-    // Validación por opción seleccionada (solo valida si está seleccionada)
-    switch (this.selectedOpcion) {
-      case 'educacionRegular': {
-        const e = this.eduRegularData;
-        if (!this.isNonEmpty(e.serie_titulo_tm)) faltantes.push('Serie título (Educación Regular)');
-        if (!this.isNonEmpty(e.numero_titulo_tm)) faltantes.push('N° de Título (Educación Regular)');
-        if (!this.isNonEmpty(e.fecha_emision)) faltantes.push('Fecha de Emisión (Educación Regular)');
-        break;
-      }
-      case 'tecnicoMedio': {
-        const t = this.tecnicoMedioData;
-        if (!this.isNonEmpty(t.serie_titulo_tm)) faltantes.push('Serie título (Técnico Medio)');
-        if (!this.isNonEmpty(t.numero_titulo_tm)) faltantes.push('N° de Título (Técnico Medio)');
-        if (!this.isNonEmpty(t.fecha_emision)) faltantes.push('Fecha de Emisión (Técnico Medio)');
-        break;
-      }
-      case 'traspasoInstituto': {
-        if (!this.isNonEmpty(this.traspasoData.instituto_origen)) faltantes.push('Instituto de origen (Traspaso)');
-        // Si el usuario añadió filas, exigir que estén completas
-        (this.traspasoData.grados_gestiones || []).forEach((gg, i) => {
-          if (this.isNonEmpty(gg.grado) || this.isNonEmpty(gg.gestion)) {
-            if (!this.isNonEmpty(gg.grado)) faltantes.push(`Grado #${i + 1} (Traspaso)`);
-            if (!this.isNonEmpty(gg.gestion)) faltantes.push(`Gestión #${i + 1} (Traspaso)`);
-          }
-        });
-        break;
-      }
-      case 'homologacionCambioPlan': {
-        if (!this.isNonEmpty(this.homoCambioPlanData.nro_resolucion_rectoral)) faltantes.push('N° de Resolución Rectoral (Cambio de plan)');
-        if (!this.isNonEmpty(this.homoCambioPlanData.fecha_emision)) faltantes.push('Fecha de Emisión (Cambio de plan)');
-        (this.homoCambioPlanData.grados_gestiones || []).forEach((gg, i) => {
-          if (this.isNonEmpty(gg.grado) || this.isNonEmpty(gg.gestion)) {
-            if (!this.isNonEmpty(gg.grado)) faltantes.push(`Grado #${i + 1} (Cambio de plan)`);
-            if (!this.isNonEmpty(gg.gestion)) faltantes.push(`Gestión #${i + 1} (Cambio de plan)`);
-          }
-        });
-        break;
-      }
-      default:
-        // Sin opción seleccionada, no validamos secciones específicas
-        break;
+    case 'tecnicoMedio': {
+      const t = this.tecnicoMedioData;
+      if (!this.isNonEmpty(t.serie_titulo_tm)) faltantes.push('Serie título (Técnico Medio)');
+      if (!this.isNonEmpty(t.numero_titulo_tm)) faltantes.push('N° de Título (Técnico Medio)');
+      if (!this.isNonEmpty(t.fecha_emision)) faltantes.push('Fecha de Emisión (Técnico Medio)');
+      break;
     }
-    // Aranceles: exigir al menos uno seleccionado para poder registrar
-    if (!Array.isArray(this.selectedAranceles) || this.selectedAranceles.length === 0) {
-      faltantes.push('Seleccione al menos un arancel');
+    case 'traspasoInstituto': {
+      if (!this.isNonEmpty(this.traspasoData.instituto_origen)) faltantes.push('Instituto de origen (Traspaso)');
+      // Si el usuario añadió filas, exigir que estén completas
+      (this.traspasoData.grados_gestiones || []).forEach((gg, i) => {
+        if (this.isNonEmpty(gg.grado) || this.isNonEmpty(gg.gestion)) {
+          if (!this.isNonEmpty(gg.grado)) faltantes.push(`Grado #${i + 1} (Traspaso)`);
+          if (!this.isNonEmpty(gg.gestion)) faltantes.push(`Gestión #${i + 1} (Traspaso)`);
+        }
+      });
+      break;
     }
-
-    return faltantes;
-  }
-
-  // --- Handlers para dropdown custom ---
-  setGestionInicio(g: string) {
-    this.datosInicioCarrera.gestion_ini = g;
-    // Si la conclusión ya no es válida con el nuevo inicio, resetearla
-    if (!this.gestionValida && this.datosConclusionCarrera.gestion_fin) {
-      this.datosConclusionCarrera.gestion_fin = '';
+    case 'homologacionCambioPlan': {
+      if (!this.isNonEmpty(this.homoCambioPlanData.nro_resolucion_rectoral)) faltantes.push('N° de Resolución Rectoral (Cambio de plan)');
+      if (!this.isNonEmpty(this.homoCambioPlanData.fecha_emision)) faltantes.push('Fecha de Emisión (Cambio de plan)');
+      (this.homoCambioPlanData.grados_gestiones || []).forEach((gg, i) => {
+        if (this.isNonEmpty(gg.grado) || this.isNonEmpty(gg.gestion)) {
+          if (!this.isNonEmpty(gg.grado)) faltantes.push(`Grado #${i + 1} (Cambio de plan)`);
+          if (!this.isNonEmpty(gg.gestion)) faltantes.push(`Gestión #${i + 1} (Cambio de plan)`);
+        }
+      });
+      break;
     }
+    default:
+      // Sin opción seleccionada, no validamos secciones específicas
+      break;
+  }
+  // Aranceles: exigir al menos uno seleccionado para poder registrar
+  if (!Array.isArray(this.selectedAranceles) || this.selectedAranceles.length === 0) {
+    faltantes.push('Seleccione al menos un arancel');
   }
 
-  setGestionFin(g: string) {
-    this.datosConclusionCarrera.gestion_fin = g;
+  return faltantes;
+}
+
+// --- Handlers para dropdown custom ---
+setGestionInicio(g: string) {
+  this.datosInicioCarrera.gestion_ini = g;
+  // Si la conclusión ya no es válida con el nuevo inicio, resetearla
+  if (!this.gestionValida && this.datosConclusionCarrera.gestion_fin) {
+    this.datosConclusionCarrera.gestion_fin = '';
   }
+}
 
-  get labelGestionInicio(): string {
-    return this.datosInicioCarrera.gestion_ini || 'Seleccione gestión';
+setGestionFin(g: string) {
+  this.datosConclusionCarrera.gestion_fin = g;
+}
+
+get labelGestionInicio(): string {
+  return this.datosInicioCarrera.gestion_ini || 'Seleccione gestión';
+}
+
+get labelGestionFin(): string {
+  return this.datosConclusionCarrera.gestion_fin || 'Seleccione gestión';
+}
+
+// --- Regímenes (dropdown custom) ---
+readonly regimenOptions: { value: 'semestral' | 'anual'; label: string }[] = [
+  { value: 'semestral', label: 'Semestral' },
+  { value: 'anual', label: 'Anual' },
+];
+
+setRegimenInicio(v: 'semestral' | 'anual') {
+  this.datosInicioCarrera.reg_ini_c = v;
+}
+
+setRegimenFin(v: 'semestral' | 'anual') {
+  this.datosConclusionCarrera.reg_con_c = v;
+}
+
+get labelRegimenInicio(): string {
+  const v = this.datosInicioCarrera.reg_ini_c as 'semestral' | 'anual' | undefined;
+  const found = this.regimenOptions.find(o => o.value === v);
+  return found?.label || 'Seleccione tipo de Régimen';
+}
+
+get labelRegimenFin(): string {
+  const v = this.datosConclusionCarrera.reg_con_c as 'semestral' | 'anual' | undefined;
+  const found = this.regimenOptions.find(o => o.value === v);
+  return found?.label || 'Seleccione tipo de Régimen';
+}
+
+// --- Gestión para registro manual de aranceles ---
+setNuevoArancelGestion(g: string) {
+  if (!this.nuevoArancel) return;
+  this.nuevoArancel.gestion = g;
+}
+
+get labelNuevoArancelGestion(): string {
+  return this.nuevoArancel?.gestion || 'Seleccione gestión';
+}
+
+constructor(private postulanteService: PostulanteService, private sgaService: SgaService, private router: Router, private route: ActivatedRoute) {}
+
+// Normalizador para Tipo de Bachiller: siempre 'Nacional' o 'Extranjero'
+private formatTipoBachiller(v: string | null | undefined): string | null {
+  if (!v) return null;
+  const s = v.toString().trim().toLowerCase();
+  if (s.startsWith('nac')) return 'Nacional';
+  if (s.startsWith('ext')) return 'Extranjero';
+  // Otros valores: capitalizar primera letra por defecto
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : null;
+}
+
+ngOnInit() {
+  this.cargarDatosPostulacion();
+  // Intentar traer el postulante desde BD para usar sus valores persistidos
+  this.cargarPostulanteDesdeBD();
+  // Asegurar carga de pensums aún si no hay datos en sessionStorage
+  this.cargarPensums();
+  // Cargar modalidades desde el backend
+  this.cargarModalidades();
+  // Generar lista de gestiones dinámicamente
+  this.generarGestiones();
+  // Si venimos desde el modal con query ver=1, activar modo Ver inscripción
+  const ver = this.route.snapshot.queryParamMap.get('ver');
+  if (ver === '1') {
+    this.entrarVerInscripcion();
   }
+}
 
-  get labelGestionFin(): string {
-    return this.datosConclusionCarrera.gestion_fin || 'Seleccione gestión';
+cargarDatosPostulacion() {
+  const datosPostulacion = sessionStorage.getItem('datos_postulacion');
+  if (datosPostulacion) {
+    const datos = JSON.parse(datosPostulacion);
+    this.estudiante = datos.estudiante;
+    this.modalidad = datos.modalidad;
+    this.esNuevoPostulante = false;
+    
+    // Pre-llenar el formulario con los datos del estudiante
+    if (this.estudiante) {
+      // Tomar nro_serie_titulo desde la respuesta directa o desde raw si fuese necesario
+      const raw = (this.estudiante as any)?.raw || {};
+      const serieDesdeRaw = raw['N° Serie Titulo de Bachiller'] || raw['N° Serie Título de Bachiller'] || raw['Nro Serie Titulo de Bachiller'] || '';
+      const nroSerieTitulo = (this.estudiante as any)?.nro_serie_titulo || (this.estudiante as any)?.nroSerieTitulo || serieDesdeRaw || '';
+
+      this.postulanteActual = {
+        cod_ceta: parseInt(this.estudiante.cod_ceta),
+        nombres_est: this.estudiante.nombres,
+        ap_pat: this.estudiante.ap_pat,
+        ap_mat: this.estudiante.ap_mat,
+        ci: this.estudiante.ci,
+        procedencia: this.estudiante.procedencia,
+        fecha_nacimiento: this.estudiante.fecha_nacimiento,
+        lugar_nacimiento: this.estudiante.lugar_nacimiento,
+        carrera: this.estudiante.carrera,
+        pensum: this.estudiante.pensum,
+        nro_serie_titulo: nroSerieTitulo,
+      };
+      // Diagnóstico
+      console.log('[BIO] Prefill SGA:', {
+        nro_serie_titulo: nroSerieTitulo,
+        procedencia: this.estudiante.procedencia,
+      });
+      // Si viene número de serie, asumimos Bachiller Nacional por defecto para mostrar el campo
+      if (!this.tipoBachiller && this.postulanteActual.nro_serie_titulo) {
+        this.tipoBachiller = 'nacional';
+      }
+      // Reasignar en el siguiente tick para asegurar que el input reciba el valor
+      if (nroSerieTitulo) {
+        setTimeout(() => {
+          this.postulanteActual.nro_serie_titulo = nroSerieTitulo;
+        }, 0);
+      }
+    }
+    if (this.estudiante?.cod_ceta) {
+      this.cargarArancelesMaterialExtra();
+      // Si ya hay modalidad seleccionada desde la navegación, no sobreescribirla con backend
+      if (!this.modalidad) {
+        this.cargarModalidadActual();
+      }
+      // Con cod_ceta conocido, sincronizar snapshot desde BD
+      this.cargarPostulanteDesdeBD();
+    }
+  } else {
+    // Si no hay datos en sessionStorage venimos de "Registrar postulante": habilitar selectores
+    this.esNuevoPostulante = true;
   }
+  // Nota: la carga de pensums se realiza en ngOnInit()
+  // Al iniciar SIEMPRE se requiere guardar biográficos antes de continuar
+  this.pasoBiograficosCompletado = false;
+}
 
-  // --- Regímenes (dropdown custom) ---
-  readonly regimenOptions: { value: 'semestral' | 'anual'; label: string }[] = [
-    { value: 'semestral', label: 'Semestral' },
-    { value: 'anual', label: 'Anual' },
-  ];
-
-  setRegimenInicio(v: 'semestral' | 'anual') {
-    this.datosInicioCarrera.reg_ini_c = v;
-  }
-
-  setRegimenFin(v: 'semestral' | 'anual') {
-    this.datosConclusionCarrera.reg_con_c = v;
-  }
-
-  get labelRegimenInicio(): string {
-    const v = this.datosInicioCarrera.reg_ini_c as 'semestral' | 'anual' | undefined;
-    const found = this.regimenOptions.find(o => o.value === v);
-    return found?.label || 'Seleccione tipo de Régimen';
-  }
-
-  get labelRegimenFin(): string {
-    const v = this.datosConclusionCarrera.reg_con_c as 'semestral' | 'anual' | undefined;
-    const found = this.regimenOptions.find(o => o.value === v);
-    return found?.label || 'Seleccione tipo de Régimen';
-  }
-
-  // --- Gestión para registro manual de aranceles ---
-  setNuevoArancelGestion(g: string) {
-    if (!this.nuevoArancel) return;
-    this.nuevoArancel.gestion = g;
-  }
-
-  get labelNuevoArancelGestion(): string {
-    return this.nuevoArancel?.gestion || 'Seleccione gestión';
-  }
-
-  constructor(private postulanteService: PostulanteService, private sgaService: SgaService, private router: Router) {}
-
-  // Normalizador para Tipo de Bachiller: siempre 'Nacional' o 'Extranjero'
-  private formatTipoBachiller(v: string | null | undefined): string | null {
-    if (!v) return null;
-    const s = v.toString().trim().toLowerCase();
-    if (s.startsWith('nac')) return 'Nacional';
-    if (s.startsWith('ext')) return 'Extranjero';
-    // Otros valores: capitalizar primera letra por defecto
-    return s ? s.charAt(0).toUpperCase() + s.slice(1) : null;
-  }
-
-  ngOnInit() {
-    this.cargarDatosPostulacion();
-    // Intentar traer el postulante desde BD para usar sus valores persistidos
-    this.cargarPostulanteDesdeBD();
-    // Asegurar carga de pensums aún si no hay datos en sessionStorage
-    this.cargarPensums();
-    // Cargar modalidades desde el backend
-    this.cargarModalidades();
-    // Generar lista de gestiones dinámicamente
-    this.generarGestiones();
-  }
-
-  cargarDatosPostulacion() {
-    const datosPostulacion = sessionStorage.getItem('datos_postulacion');
-    if (datosPostulacion) {
-      const datos = JSON.parse(datosPostulacion);
-      this.estudiante = datos.estudiante;
-      this.modalidad = datos.modalidad;
-      this.esNuevoPostulante = false;
-      
-      // Pre-llenar el formulario con los datos del estudiante
-      if (this.estudiante) {
-        // Tomar nro_serie_titulo desde la respuesta directa o desde raw si fuese necesario
-        const raw = (this.estudiante as any)?.raw || {};
-        const serieDesdeRaw = raw['N° Serie Titulo de Bachiller'] || raw['N° Serie Título de Bachiller'] || raw['Nro Serie Titulo de Bachiller'] || '';
-        const nroSerieTitulo = (this.estudiante as any)?.nro_serie_titulo || (this.estudiante as any)?.nroSerieTitulo || serieDesdeRaw || '';
-
-        this.postulanteActual = {
-          cod_ceta: parseInt(this.estudiante.cod_ceta),
-          nombres_est: this.estudiante.nombres,
-          ap_pat: this.estudiante.ap_pat,
-          ap_mat: this.estudiante.ap_mat,
-          ci: this.estudiante.ci,
-          procedencia: this.estudiante.procedencia,
-          fecha_nacimiento: this.estudiante.fecha_nacimiento,
-          lugar_nacimiento: this.estudiante.lugar_nacimiento,
-          carrera: this.estudiante.carrera,
-          pensum: this.estudiante.pensum,
-          nro_serie_titulo: nroSerieTitulo,
+// --- Cargar postulante desde BD para usar valores persistidos ---
+private cargarPostulanteDesdeBD() {
+  const cod = (this.postulanteActual?.cod_ceta || this.estudiante?.cod_ceta) as number | undefined;
+  if (!cod) return;
+  // Intentar primero el endpoint composite de inscripción
+  this.postulanteService.getInscripcionByCodCeta(cod).subscribe({
+    next: (p) => {
+      this.postulanteDesdeBD = p || null;
+      // Fusionar datos persistidos en el formulario actual para mostrar en modo lectura
+      if (p && typeof p === 'object') {
+        const src: any = p;
+        const dst: any = { ...this.postulanteActual };
+        const put = (k: string, v: any) => {
+          if (v !== undefined && v !== null && String(v).toString().trim() !== '') dst[k] = v;
         };
-        // Diagnóstico
-        console.log('[BIO] Prefill SGA:', {
-          nro_serie_titulo: nroSerieTitulo,
-          procedencia: this.estudiante.procedencia,
-        });
-        // Si viene número de serie, asumimos Bachiller Nacional por defecto para mostrar el campo
-        if (!this.tipoBachiller && this.postulanteActual.nro_serie_titulo) {
-          this.tipoBachiller = 'nacional';
+        put('cod_ceta', src.cod_ceta);
+        put('carrera', (src as any).carrera || (src as any).carrera_nombre);
+        put('pensum', src.pensum);
+        put('nombres_est', src.nombres_est);
+        put('ap_pat', src.ap_pat);
+        put('ap_mat', src.ap_mat);
+        put('ci', src.ci);
+        put('procedencia', (src as any).procedencia || (src as any).expedido);
+        put('fecha_nacimiento', (src as any).fecha_nacimiento);
+        put('lugar_nacimiento', src.lugar_nacimiento);
+        put('nro_serie_titulo', (src as any).nro_serie_titulo);
+        // Actualizar el modelo actual
+        this.postulanteActual = dst;
+        // Tipo de bachiller (si viene de BD) o inferido
+        let tb = ((src as any).tipo_bachiller || '').toString().trim().toLowerCase();
+        if (!tb) {
+          // Inferir por presencia de bloques en BD
+          if ((src as any).homologacion_extranjero) tb = 'extranjero';
+          else if ((src as any).diploma_bachiller || dst.nro_serie_titulo) tb = 'nacional';
         }
-        // Reasignar en el siguiente tick para asegurar que el input reciba el valor
-        if (nroSerieTitulo) {
-          setTimeout(() => {
-            this.postulanteActual.nro_serie_titulo = nroSerieTitulo;
-          }, 0);
+        if (tb) {
+          this.tipoBachiller = tb.startsWith('ext') ? 'extranjero' : 'nacional';
         }
-      }
-      if (this.estudiante?.cod_ceta) {
-        this.cargarArancelesMaterialExtra();
-        // Si ya hay modalidad seleccionada desde la navegación, no sobreescribirla con backend
-        if (!this.modalidad) {
-          this.cargarModalidadActual();
+        // Mapear datos de Bachillerato desde BD
+        if (this.tipoBachiller === 'nacional') {
+          const dn = (src as any).diploma_bachiller || {};
+          // Aliases comunes que suelen venir de BD
+          const nroSerie = (dn.nro_serie || dn.nro_serie_titulo || (src as any).nro_serie_titulo || dst.nro_serie_titulo || '').toString();
+          const emision = (dn.emision || dn.emisor || dn.entidad || (src as any).emision_bachiller || (src as any).emision || '').toString();
+          const fechaEmi = (dn.fecha_emision || dn.fecha || (src as any).fecha_emision_bachiller || (src as any).fecha_emision || '').toString();
+          const obs = (dn.observacion || dn.obs || (src as any).observacion_bachiller || '').toString();
+          const gestBach = (dn.gestion_bachillerato || dn.gestion || (src as any).gestion_bachillerato || '').toString();
+          this.diplomaNacional = {
+            nro_serie: nroSerie,
+            emision: emision,
+            fecha_emision: fechaEmi,
+            observacion: obs,
+            gestion_bachillerato: gestBach,
+          } as any;
+        } else if (this.tipoBachiller === 'extranjero') {
+          const he = (src as any).homologacion_extranjero || {};
+          const nroResol = (he.nro_resolucion || (src as any).nro_resolucion || dst.nro_serie_titulo || '').toString();
+          const fechaEmi = (he.fecha_emision || he.fecha || (src as any).fecha_emision_resolucion || '').toString();
+          const grados = Array.isArray(he.grados_gestiones) ? he.grados_gestiones.map((g: any) => ({
+            grado: (g?.grado || '').toString(),
+            gestion: (g?.gestion || '').toString(),
+          })) : [];
+          this.homologacionExtranjero = {
+            nro_resolucion: nroResol,
+            fecha_emision: fechaEmi,
+            grados_gestiones: grados,
+          } as any;
+          // Asegurar que el input (ligado a postulanteActual.nro_serie_titulo) muestre la resolución si no existe aún
+          if (!this.postulanteActual.nro_serie_titulo && this.homologacionExtranjero.nro_resolucion) {
+            this.postulanteActual.nro_serie_titulo = this.homologacionExtranjero.nro_resolucion;
+          }
         }
-        // Con cod_ceta conocido, sincronizar snapshot desde BD
-        this.cargarPostulanteDesdeBD();
-      }
-    } else {
-      // Si no hay datos en sessionStorage venimos de "Registrar postulante": habilitar selectores
-      this.esNuevoPostulante = true;
-    }
-    // Nota: la carga de pensums se realiza en ngOnInit()
-    // Al iniciar SIEMPRE se requiere guardar biográficos antes de continuar
-    this.pasoBiograficosCompletado = false;
-  }
 
-  // --- Cargar postulante desde BD para usar valores persistidos ---
-  private cargarPostulanteDesdeBD() {
-    const cod = (this.postulanteActual?.cod_ceta || this.estudiante?.cod_ceta) as number | undefined;
-    if (!cod) return;
-    this.postulanteService.getById(cod).subscribe({
-      next: (p) => {
-        this.postulanteDesdeBD = p || null;
-        // Si ya existe un resumen o está visible, reconstruirlo para usar datos de BD
-        if (this.resumenInscripcion || this.resumenVisible) {
-          this.construirResumenInscripcion();
+        // Mapear casos especiales si existen en BD
+        const regIni = ((src as any).reg_ini_c || (src as any).regimen_inicio || (src as any).regimen_ini || (src as any).regimen || '').toString().trim();
+        const gestIni = ((src as any).gestion_ini || (src as any).gestion_inicio || '').toString().trim();
+        const regFin = ((src as any).reg_con_c || (src as any).regimen_conclusion || (src as any).regimen_fin || '').toString().trim();
+        const gestFin = ((src as any).gestion_fin || (src as any).gestion_conclusion || '').toString().trim();
+
+        // Prefill de datos de carrera en el formulario
+        this.datosInicioCarrera.reg_ini_c = (regIni || '') as any;
+        this.datosInicioCarrera.gestion_ini = gestIni || '';
+        this.datosConclusionCarrera.reg_con_c = (regFin || '') as any;
+        this.datosConclusionCarrera.gestion_fin = gestFin || '';
+        const eduReg = (src as any).educacion_regular || (src as any).edu_regular || null;
+        const tecMed = (src as any).tecnico_medio || null;
+        const trasp = (src as any).traspaso_instituto || null;
+        const cambio = (src as any).homol_cambio_plan || (src as any).homologacion_cambio_plan || null;
+
+        // Resetear banderas y opción seleccionada
+        this.opciones.educacionRegular = false;
+        this.opciones.tecnicoMedio = false;
+        this.opciones.traspasoInstituto = false;
+        this.opciones.homologacionCambioPlan = false;
+        this.selectedOpcion = null;
+
+        if (eduReg) {
+          this.opciones.educacionRegular = true;
+          this.selectedOpcion = 'educacionRegular';
+          this.eduRegularData = {
+            serie_titulo_tm: (eduReg.serie_titulo_tm || '').toString(),
+            numero_titulo_tm: (eduReg.numero_titulo_tm || '').toString(),
+            fecha_emision: (eduReg.fecha_emision || '').toString(),
+          } as any;
+        } else if (tecMed) {
+          this.opciones.tecnicoMedio = true;
+          this.selectedOpcion = 'tecnicoMedio';
+          this.tecnicoMedioData = {
+            serie_titulo_tm: (tecMed.serie_titulo_tm || '').toString(),
+            numero_titulo_tm: (tecMed.numero_titulo_tm || '').toString(),
+            fecha_emision: (tecMed.fecha_emision || '').toString(),
+          } as any;
+        } else if (trasp) {
+          this.opciones.traspasoInstituto = true;
+          this.selectedOpcion = 'traspasoInstituto';
+          this.traspasoData = {
+            instituto_origen: (trasp.instituto_origen || '').toString(),
+            grados_gestiones: Array.isArray(trasp.grados_gestiones) ? trasp.grados_gestiones.map((g: any) => ({
+              grado: (g?.grado || '').toString(),
+              gestion: (g?.gestion || '').toString(),
+            })) : [],
+          } as any;
+        } else if (cambio) {
+          this.opciones.homologacionCambioPlan = true;
+          this.selectedOpcion = 'homologacionCambioPlan';
+          this.homoCambioPlanData = {
+            nro_resolucion_rectoral: (cambio.nro_resolucion_rectoral || cambio.nro_resolucion || '').toString(),
+            fecha_emision: (cambio.fecha_emision || '').toString(),
+            grados_gestiones: Array.isArray(cambio.grados_gestiones) ? cambio.grados_gestiones.map((g: any) => ({
+              grado: (g?.grado || '').toString(),
+              gestion: (g?.gestion || '').toString(),
+            })) : [],
+          } as any;
         }
-      },
-      error: (e) => {
-        console.warn('No se pudo cargar postulante desde BD:', e);
-        this.postulanteDesdeBD = null;
+        // Marcar biográficos como completados en modo Ver
+        this.pasoBiograficosCompletado = true;
+        this.isEditing = false;
+        this.showBiographicalData = true;
+        this.showBachilleratoData = true;
+        // Si la carrera/pensum cambió por datos de BD, recargar pensums para sincronizar select
+        this.cargarPensums();
+        // Cargar aranceles y modalidad asociados al CETA
+        this.cargarArancelesMaterialExtra();
+        this.cargarModalidadActual();
       }
+      // Si ya existe un resumen o está visible, reconstruirlo para usar datos de BD
+      if (this.resumenInscripcion || this.resumenVisible) {
+        this.construirResumenInscripcion();
+      }
+    },
+    error: (e) => {
+      console.warn('Composite /inscripcion no disponible, intento fallback getById:', e?.status || e);
+      // Fallback al endpoint simple si el composite aún no existe
+      this.postulanteService.getById(cod).subscribe({
+        next: (p2) => {
+          this.postulanteDesdeBD = p2 || null;
+          // Reusar el mismo flujo mapeando p2
+          const src: any = p2;
+          const dst: any = { ...this.postulanteActual };
+          const put = (k: string, v: any) => {
+            if (v !== undefined && v !== null && String(v).toString().trim() !== '') dst[k] = v;
+          };
+          put('cod_ceta', src?.cod_ceta);
+          put('carrera', (src as any)?.carrera || (src as any)?.carrera_nombre);
+          put('pensum', src?.pensum);
+          put('nombres_est', src?.nombres_est);
+          put('ap_pat', src?.ap_pat);
+          put('ap_mat', src?.ap_mat);
+          put('ci', src?.ci);
+          put('procedencia', (src as any)?.procedencia || (src as any)?.expedido);
+          put('fecha_nacimiento', (src as any)?.fecha_nacimiento);
+          put('lugar_nacimiento', src?.lugar_nacimiento);
+          put('nro_serie_titulo', (src as any)?.nro_serie_titulo);
+          this.postulanteActual = dst;
+          // Señales de vista
+          this.pasoBiograficosCompletado = true;
+          this.isEditing = false;
+          this.showBiographicalData = true;
+          this.showBachilleratoData = true;
+          // Dependientes
+          this.cargarPensums();
+          this.cargarArancelesMaterialExtra();
+          this.cargarModalidadActual();
+        },
+        error: (err2) => {
+          console.warn('Fallback getById también falló:', err2);
+          this.postulanteDesdeBD = null;
+        }
+      });
+    }
     });
   }
 
@@ -806,6 +992,98 @@ export class PostulantesListComponent implements OnInit {
       this.isEditing = false;
     }
   }
+
+  // --- Ver Inscripción (modo solo lectura con edición por tarjeta) ---
+  entrarVerInscripcion() {
+    this.viewInscripcion = true;
+    // Asegurar que todas las secciones sean visibles para revisar
+    this.pasoBiograficosCompletado = true;
+    this.showBiographicalData = true;
+    this.showBachilleratoData = true;
+    // Reset de flags de edición por tarjeta
+    this.editBio = false;
+    this.editBach = false;
+    this.editInicio = false;
+    this.editConclusion = false;
+    this.editAranceles = false;
+  }
+
+  salirVerInscripcion() {
+    this.viewInscripcion = false;
+    // Cerrar ediciones parciales si las hubiera
+    this.editBio = false;
+    this.editBach = false;
+    this.editInicio = false;
+    this.editConclusion = false;
+    this.editAranceles = false;
+  }
+
+  guardarCambiosVerInscripcion() {
+    // Guardado general. Persistimos biográficos y datos de carrera (datos_carrera)
+    const cod = this.postulanteActual.cod_ceta as number | undefined;
+    const guardarBio$ = cod
+      ? this.postulanteService.update(cod, this.postulanteActual as Postulante)
+      : this.postulanteService.create(this.postulanteActual as Postulante);
+
+    // Preparar payload de datos_carrera si el usuario ha seleccionado valores
+    const tieneCarrera = !!(this.datosInicioCarrera?.reg_ini_c || this.datosInicioCarrera?.gestion_ini || this.datosConclusionCarrera?.reg_con_c || this.datosConclusionCarrera?.gestion_fin);
+    const payloadCarrera = (cod && tieneCarrera) ? {
+      cod_ceta_est: cod,
+      regimen_ini: (this.datosInicioCarrera.reg_ini_c || '').toString().trim() || null,
+      regimen_fin: (this.datosConclusionCarrera.reg_con_c || '').toString().trim() || null,
+      gestion_ini: (this.datosInicioCarrera.gestion_ini || '').toString().trim() || null,
+      gestion_fin: (this.datosConclusionCarrera.gestion_fin || '').toString().trim() || null,
+      is_active: true,
+    } : null;
+
+    guardarBio$.subscribe({
+      next: (res) => {
+        // Si se generó cod_ceta al crear, recuperar y actualizar el payload de carrera
+        const generado = (res as any)?.cod_ceta as number | undefined;
+        const codFinal = generado || cod;
+        if (generado) this.postulanteActual.cod_ceta = generado;
+
+        if (payloadCarrera || (tieneCarrera && codFinal)) {
+          const body = payloadCarrera || {
+            cod_ceta_est: codFinal as number,
+            regimen_ini: (this.datosInicioCarrera.reg_ini_c || '').toString().trim() || null,
+            regimen_fin: (this.datosConclusionCarrera.reg_con_c || '').toString().trim() || null,
+            gestion_ini: (this.datosInicioCarrera.gestion_ini || '').toString().trim() || null,
+            gestion_fin: (this.datosConclusionCarrera.gestion_fin || '').toString().trim() || null,
+            is_active: true,
+          };
+          this.postulanteService.upsertDatosCarrera(body).subscribe({
+            next: () => {
+              this.cargarPostulantes();
+              this.salirVerInscripcion();
+            },
+            error: (e) => {
+              console.error('Error al guardar datos de carrera:', e);
+              alert('Datos biográficos guardados, pero no se pudo guardar inicio/conclusión de carrera.');
+            }
+          });
+        } else {
+          this.cargarPostulantes();
+          this.salirVerInscripcion();
+        }
+      },
+      error: () => {
+        alert('No se pudo guardar los cambios. Verifique e intente nuevamente.');
+      }
+    });
+  }
+
+  // Toggles de edición por tarjeta
+  iniciarEdicionBioCard() { this.editBio = true; }
+  finalizarEdicionBioCard() { this.editBio = false; }
+  iniciarEdicionBachCard() { this.editBach = true; }
+  finalizarEdicionBachCard() { this.editBach = false; }
+  iniciarEdicionInicioCard() { this.editInicio = true; }
+  finalizarEdicionInicioCard() { this.editInicio = false; }
+  iniciarEdicionConclusionCard() { this.editConclusion = true; }
+  finalizarEdicionConclusionCard() { this.editConclusion = false; }
+  iniciarEdicionArancelesCard() { this.editAranceles = true; }
+  finalizarEdicionArancelesCard() { this.editAranceles = false; }
 
   // Guardar datos biográficos y habilitar el resto de secciones
   guardarYContinuarInscripcion() {
@@ -1117,6 +1395,11 @@ export class PostulantesListComponent implements OnInit {
         this.aranceles = res?.data || [];
         this.totalAranceles = res?.total ?? this.aranceles.length;
         this.loadingAranceles = false;
+        // En modo Ver (y mientras no se edita la card), mostrar/considerar solo aranceles seleccionados/pagados
+        if (this.viewInscripcion && !this.editAranceles) {
+          this.selectedAranceles = this.aranceles.filter((a: any) => !!(a?.selected || a?.num_factura || a?.num_comprobante));
+          this.recalcularTotalSeleccionados();
+        }
         // Si no hay modalidad ya establecida (p. ej., desde sessionStorage), consultar al backend
         if (!this.modalidad) {
           this.cargarModalidadActual();

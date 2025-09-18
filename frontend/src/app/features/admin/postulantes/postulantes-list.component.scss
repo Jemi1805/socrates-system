@@ -327,6 +327,7 @@ input {
   backdrop-filter: blur(10px);
   padding: 1rem;
   overflow: hidden;
+  position: relative; // necesario para overlay de solo lectura
   
   .bio-header {
     display: flex;
@@ -584,6 +585,7 @@ input {
   box-shadow: $shadow;
   backdrop-filter: blur(10px);
   padding: 1rem;
+  position: relative; // para overlay de solo lectura
   
   .card-title {
     color: $text-dark-blue;
@@ -865,6 +867,16 @@ input {
 
 .form-card, .aranceles-card, .biographical-card, .modalidad-card, .docs-card {
   animation: fadeIn 0.5s ease-out;
+}
+
+// Overlay de solo lectura cuando viewInscripcion está activo y la card no está en edición
+.readonly-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(1px);
+  z-index: 50;
+  border-radius: inherit;
 }
 
 // Animación de carga
