@@ -143,10 +143,27 @@ export class PostulantesListComponent implements OnInit {
         this.totalAranceles = 0;
       }
       this.recalcularTotalSeleccionados();
+      this._dedupeSelectedAranceles();
     } else {
       // EXISTENTE (recuperado de SGA): mantener lista SGA cargada y solo marcar seleccionados según lo que hay en BD
       if (filtrados.length > 0) {
         this.aplicarSeleccionDesdeDB(filtrados);
+        // Además, asegurar que los aranceles de origen 'manual' en BD se vean aunque no vengan del SGA
+        const manuales = filtrados.filter((r: any) => String(r?.origen || '').toLowerCase() === 'manual');
+        if (manuales.length) {
+          const mapeados = this.mapArancelesEstToLista(manuales);
+          for (const m of mapeados) {
+            if (!this._existeArancelEnLista(m, this.aranceles)) {
+              this.aranceles.push(m);
+            }
+            if (!this.isArancelSeleccionado(m)) {
+              this.selectedAranceles.push(m);
+            }
+          }
+          this.totalAranceles = this.aranceles.length;
+          this.recalcularTotalSeleccionados();
+          this._dedupeSelectedAranceles();
+        }
       } else {
         // No hay registros en BD para este estudiante: limpiar selección, mantener SGA
         this.selectedAranceles = [];
@@ -1544,7 +1561,8 @@ private cargarPostulanteDesdeBD() {
     // En modo visualización y para postulante nuevo: evitar SGA y construir tabla directamente desde aranceles_est
     if (this.viewInscripcion && this.esNuevoPostulante && !this.editAranceles) {
       const cod = this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta;
-      this.postulanteService.getArancelesEstByCodCeta(cod as number, true).subscribe({
+      // Para nuevos: primero SIN filtro seleccionado (puede que aún no marquemos 'seleccionado')
+      this.postulanteService.getArancelesEstByCodCeta(cod as number, false).subscribe({
         next: (resp) => {
           let est = Array.isArray(resp?.data) ? resp.data : (Array.isArray(resp) ? resp : []);
           const aplicar = (arr: any[]) => {
@@ -1552,8 +1570,8 @@ private cargarPostulanteDesdeBD() {
             this.loadingAranceles = false;
           };
           if (!est || est.length === 0) {
-            // Reintentar sin filtro
-            this.postulanteService.getArancelesEstByCodCeta(cod as number, false).subscribe({
+            // Reintentar con 'seleccionado=1' por compatibilidad
+            this.postulanteService.getArancelesEstByCodCeta(cod as number, true).subscribe({
               next: (resp2) => {
                 est = Array.isArray(resp2?.data) ? resp2.data : (Array.isArray(resp2) ? resp2 : []);
                 aplicar(est || []);
@@ -1669,22 +1687,92 @@ private cargarPostulanteDesdeBD() {
 
   // Verifica si un arancel está seleccionado
   isArancelSeleccionado(a: any): boolean {
-    return this.selectedAranceles.includes(a);
+    // Comparar por claves de negocio: num_factura, num_comprobante o composite fecha|concepto|monto
+    return this._existeArancelEnLista(a, this.selectedAranceles);
+  }
+
+  // Detecta si un arancel ya existe en una lista, comparando por factura, recibo o por composite (fecha|concepto|monto)
+  private _existeArancelEnLista(item: any, lista: any[]): boolean {
+    const normStr = (v: any) => (v === undefined || v === null) ? '' : String(v).trim();
+    const normNum = (v: any) => {
+      const n = Number(v);
+      return isNaN(n) ? null : n;
+    };
+    const nf = normStr(item?.num_factura);
+    const nc = normStr(item?.num_comprobante);
+    const comp = [normStr(item?.fecha) || '', normStr(item?.concepto) || '', String(normNum(item?.monto) ?? '')].join('|');
+    for (const a of (lista || [])) {
+      const f = normStr(a?.num_factura);
+      const c = normStr(a?.num_comprobante);
+      const comp2 = [normStr(a?.fecha) || '', normStr(a?.concepto) || '', String(normNum(a?.monto) ?? '')].join('|');
+      const matchFactura = nf && nf !== '0' && nf === f;
+      const matchRecibo = nc && nc !== '0' && nc === c;
+      const matchComposite = comp && comp === comp2;
+      if (matchFactura || matchRecibo || matchComposite) return true;
+    }
+    return false;
   }
 
   onArancelToggle(a: any, checked: boolean) {
+    const noIgual = (x: any, y: any) => !this._existeArancelEnLista(y, [x]);
     if (checked) {
       if (!this.isArancelSeleccionado(a)) {
         this.selectedAranceles.push(a);
       }
     } else {
-      this.selectedAranceles = this.selectedAranceles.filter(x => x !== a);
+      // Remover por claves de negocio, no por referencia
+      const normStr = (v: any) => (v === undefined || v === null) ? '' : String(v).trim();
+      const normNum = (v: any) => {
+        const n = Number(v);
+        return isNaN(n) ? null : n;
+      };
+      const comp = [normStr(a?.fecha) || '', normStr(a?.concepto) || '', String(normNum(a?.monto) ?? '')].join('|');
+      const nf = normStr(a?.num_factura);
+      const nc = normStr(a?.num_comprobante);
+      this.selectedAranceles = (this.selectedAranceles || []).filter(s => {
+        const comp2 = [normStr(s?.fecha) || '', normStr(s?.concepto) || '', String(normNum(s?.monto) ?? '')].join('|');
+        const f2 = normStr(s?.num_factura);
+        const c2 = normStr(s?.num_comprobante);
+        const matchFactura = nf && nf !== '0' && nf === f2;
+        const matchRecibo = nc && nc !== '0' && nc === c2;
+        const matchComposite = comp && comp === comp2;
+        return !(matchFactura || matchRecibo || matchComposite);
+      });
     }
     this.recalcularTotalSeleccionados();
+    this._dedupeSelectedAranceles();
   }
 
   recalcularTotalSeleccionados() {
     this.totalArancelesSeleccionados = this.selectedAranceles.reduce((sum, x) => sum + this.toNumber(x?.monto), 0);
+  }
+
+  // Elimina duplicados lógicos en selectedAranceles por clave de negocio
+  private _dedupeSelectedAranceles() {
+    const normStr = (v: any) => (v === undefined || v === null) ? '' : String(v).trim();
+    const normNum = (v: any) => {
+      const n = Number(v);
+      return isNaN(n) ? null : n;
+    };
+    const keyOf = (a: any) => {
+      const f = normStr(a?.num_factura);
+      const c = normStr(a?.num_comprobante);
+      if (f && f !== '0') return `F#${f}`;
+      if (c && c !== '0') return `C#${c}`;
+      const comp = [normStr(a?.fecha) || '', normStr(a?.concepto) || '', String(normNum(a?.monto) ?? '')].join('|');
+      return `X#${comp}`;
+    };
+    const seen = new Set<string>();
+    const dedup: any[] = [];
+    for (const a of (this.selectedAranceles || [])) {
+      const k = keyOf(a);
+      if (!seen.has(k)) {
+        seen.add(k);
+        dedup.push(a);
+      }
+    }
+    this.selectedAranceles = dedup;
+    this.recalcularTotalSeleccionados();
   }
 
   // Normaliza una fecha a formato YYYY-MM-DD; si viene vacía o inválida devuelve null

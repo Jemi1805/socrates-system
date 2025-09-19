@@ -74,6 +74,8 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // 📚 CRUD API RESOURCES (protegidos)
+    // Listado filtrado para aranceles_est (evita conflicto de firma con CrudController@index)
+    Route::get('aranceles_est/list', [ArancelesEstController::class, 'list']);
     Route::apiResource('aranceles_est', ArancelesEstController::class);
     Route::apiResource('modalidad', ModalidadController::class);
     Route::apiResource('pract_ind', PractIndController::class);
