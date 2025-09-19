@@ -129,4 +129,17 @@ export class PostulanteService {
       { params }
     );
   }
+
+  // --- Aranceles guardados en Laravel (tabla aranceles_est) ---
+  getArancelesEstByCodCeta(codCeta: number | string, soloSeleccionados: boolean = true): Observable<any> {
+    const params: any = { cod_ceta_est: codCeta, cod_ceta: codCeta };
+    if (soloSeleccionados) params.seleccionado = 1;
+    return this.http.get<any>(`${this.baseUrl}/aranceles_est`, { params });
+  }
+
+  // --- Fallback simple: obtener inscrip_modalidad por cod_ceta_est (para aranceles_completos) ---
+  getInscripModalidadByCodCeta(codCeta: number | string): Observable<any> {
+    const params: any = { cod_ceta_est: codCeta };
+    return this.http.get<any>(`${this.baseUrl}/inscrip_modalidad`, { params });
+  }
 }

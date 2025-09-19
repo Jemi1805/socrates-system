@@ -111,6 +111,50 @@ export class PostulantesListComponent implements OnInit {
   editInicio = false;
   editConclusion = false;
   editAranceles = false;
+  // Seguimiento de cambios en modo visualización
+  hasChangesInView: boolean = false;
+  private markChangedInView() {
+    if (this.viewInscripcion) {
+      this.hasChangesInView = true;
+    }
+  }
+
+  private _aplicarArancelesEstEnVista(est: any[]) {
+    const listaEst = Array.isArray(est) ? est : [];
+    const cod = this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta;
+    // Filtrar por cod_ceta_est del estudiante actual
+    const filtrados = (listaEst || []).filter((r: any) => {
+      const rcod = (r?.cod_ceta_est ?? r?.cod_ceta ?? r?.codigo_ceta);
+      return rcod !== undefined && rcod !== null && String(rcod) === String(cod ?? '');
+    });
+
+    if (this.esNuevoPostulante) {
+      // NUEVO postulante: reemplazar la tabla con los registros en BD del estudiante
+      // Si el filtro no encontró coincidencias pero el backend devolvió filas, confiar en backend
+      const fuente = (filtrados.length > 0) ? filtrados : listaEst;
+      if (Array.isArray(fuente) && fuente.length > 0) {
+        const mapeados = this.mapArancelesEstToLista(fuente);
+        this.aranceles = mapeados;
+        this.selectedAranceles = [...mapeados];
+        this.totalAranceles = mapeados.length;
+      } else {
+        this.aranceles = [];
+        this.selectedAranceles = [];
+        this.totalAranceles = 0;
+      }
+      this.recalcularTotalSeleccionados();
+    } else {
+      // EXISTENTE (recuperado de SGA): mantener lista SGA cargada y solo marcar seleccionados según lo que hay en BD
+      if (filtrados.length > 0) {
+        this.aplicarSeleccionDesdeDB(filtrados);
+      } else {
+        // No hay registros en BD para este estudiante: limpiar selección, mantener SGA
+        this.selectedAranceles = [];
+        this.recalcularTotalSeleccionados();
+      }
+    }
+  }
+
   // Paso 1 completado: al guardar datos biográficos se habilitan las demás secciones
   pasoBiograficosCompletado = false;
 
@@ -587,8 +631,14 @@ private cargarPostulanteDesdeBD() {
         put('fecha_nacimiento', (src as any).fecha_nacimiento);
         put('lugar_nacimiento', src.lugar_nacimiento);
         put('nro_serie_titulo', (src as any).nro_serie_titulo);
-        // Actualizar el modelo actual
         this.postulanteActual = dst;
+        // Sincronizar estado de pago completo desde inscrip_modalidad.aranceles_completos
+        // Aceptar tanto booleanos como 0/1 o strings "0"/"1"
+        const pagoFlag = (src as any).aranceles_completos ?? (src as any).inscripcion?.aranceles_completos;
+        if (pagoFlag !== undefined && pagoFlag !== null) {
+          const v = (typeof pagoFlag === 'string') ? pagoFlag.trim() : pagoFlag;
+          this.pagoCompletoSeleccionados = v === true || v === 1 || v === '1';
+        }
         // Tipo de bachiller (si viene de BD) o inferido
         let tb = ((src as any).tipo_bachiller || '').toString().trim().toLowerCase();
         if (!tb) {
@@ -738,6 +788,12 @@ private cargarPostulanteDesdeBD() {
           put('lugar_nacimiento', src?.lugar_nacimiento);
           put('nro_serie_titulo', (src as any)?.nro_serie_titulo);
           this.postulanteActual = dst;
+          // Sincronizar estado de pago completo si viene disponible en el fallback
+          const pagoFlag2 = (src as any)?.aranceles_completos ?? (src as any)?.inscripcion?.aranceles_completos;
+          if (pagoFlag2 !== undefined && pagoFlag2 !== null) {
+            const v2 = (typeof pagoFlag2 === 'string') ? pagoFlag2.trim() : pagoFlag2;
+            this.pagoCompletoSeleccionados = v2 === true || v2 === 1 || v2 === '1';
+          }
           // Señales de vista
           this.pasoBiograficosCompletado = true;
           this.isEditing = false;
@@ -758,6 +814,62 @@ private cargarPostulanteDesdeBD() {
       });
     }
     });
+  }
+
+  // Mapea registros de aranceles_est (Laravel) al formato de la tabla de Material Extra
+  private mapArancelesEstToLista(items: any[]): any[] {
+    const normStr = (v: any) => (v === null || v === undefined) ? '' : String(v);
+    const normNum = (v: any) => {
+      const n = Number(v);
+      return isNaN(n) ? 0 : n;
+    };
+    return (items || []).map((r: any) => ({
+      gestion: normStr(r.gestion || ''),
+      fecha: this.normalizarFecha(r.fecha) || '',
+      concepto: normStr(r.concepto || r.descripcion || ''),
+      monto: normNum(r.monto || r.importe || 0),
+      num_factura: normStr(r.num_factura || ''),
+      num_comprobante: normStr(r.num_comprobante || ''),
+      razon: normStr(r.razon || ''),
+      nit: normStr(r.nit || ''),
+      selected: true,
+    }));
+  }
+
+  // Aplica selección en this.aranceles cruzando con registros de aranceles_est seleccionados
+  private aplicarSeleccionDesdeDB(arancelesEst: any[]) {
+    const normStr = (v: any) => (v === null || v === undefined) ? '' : String(v).trim();
+    const normNum = (v: any) => {
+      const n = Number(v);
+      return isNaN(n) ? null : n;
+    };
+    const normFecha = (v: any) => this.normalizarFecha(v);
+
+    // Construir índice de búsqueda rápida desde DB por claves fuertes
+    const idxFactura = new Set<string>(); // por num_factura
+    const idxRecibo = new Set<string>();  // por num_comprobante
+    const idxComposite = new Set<string>(); // por (fecha, concepto, monto)
+    for (const r of (arancelesEst || [])) {
+      const f = normStr(r.num_factura);
+      const c = normStr(r.num_comprobante);
+      if (f && f !== '0') idxFactura.add(f);
+      if (c && c !== '0') idxRecibo.add(c);
+      const comp = [normFecha(r.fecha) || '', normStr(r.concepto) || '', String(normNum(r.monto) ?? '')].join('|');
+      if (comp !== '||') idxComposite.add(comp);
+    }
+
+    // Marcar seleccionados en la lista SGA comparando por factura, recibo o composite
+    const seleccionados: any[] = [];
+    for (const a of (this.aranceles || [])) {
+      const f = normStr(a.num_factura);
+      const c = normStr(a.num_comprobante);
+      const comp = [normFecha(a.fecha) || '', normStr(a.concepto) || '', String(normNum(a.monto) ?? '')].join('|');
+      const match = (f && f !== '0' && idxFactura.has(f)) || (c && c !== '0' && idxRecibo.has(c)) || (!!comp && idxComposite.has(comp));
+      if (match) seleccionados.push(a);
+    }
+
+    this.selectedAranceles = seleccionados;
+    this.recalcularTotalSeleccionados();
   }
 
   // Intenta recuperar la modalidad desde sessionStorage (datos_postulacion)
@@ -840,6 +952,7 @@ private cargarPostulanteDesdeBD() {
           this.cancelar();
         });
     }
+    this.markChangedInView();
   }
 
   eliminar(id: number) {
@@ -1034,6 +1147,8 @@ private cargarPostulanteDesdeBD() {
     this.editInicio = false;
     this.editConclusion = false;
     this.editAranceles = false;
+    // Resetear marca de cambios en modo visualización
+    this.hasChangesInView = false;
   }
 
   guardarCambiosVerInscripcion() {
@@ -1103,7 +1218,7 @@ private cargarPostulanteDesdeBD() {
   iniciarEdicionArancelesCard() { this.editAranceles = true; }
   finalizarEdicionArancelesCard() { this.editAranceles = false; }
 
-  // Guardar datos biográficos y habilitar el resto de secciones
+  // --- Guardar datos biográficos y habilitar el resto de secciones
   guardarYContinuarInscripcion() {
     // Siempre persistimos en backend. Si no hay cod_ceta, el backend lo generará.
     const datosBio: any = {
@@ -1155,6 +1270,7 @@ private cargarPostulanteDesdeBD() {
     const clean = (input.value || '').replace(/\D+/g, '').slice(0, 9);
     input.value = clean;
     (this.postulanteActual as any).cod_ceta = clean ? parseInt(clean, 10) : undefined;
+    this.markChangedInView();
   }
 
   onNombreInput(campo: 'nombres_est' | 'ap_pat' | 'ap_mat', ev: Event) {
@@ -1163,6 +1279,7 @@ private cargarPostulanteDesdeBD() {
     clean = this.capitalizarPalabras(clean);
     input.value = clean;
     (this.postulanteActual as any)[campo] = clean;
+    this.markChangedInView();
   }
 
   onLugarNacimientoInput(ev: Event) {
@@ -1171,6 +1288,7 @@ private cargarPostulanteDesdeBD() {
     clean = this.capitalizarPalabras(clean);
     input.value = clean;
     this.postulanteActual.lugar_nacimiento = clean;
+    this.markChangedInView();
   }
 
   onProcedenciaInput(ev: Event) {
@@ -1187,6 +1305,7 @@ private cargarPostulanteDesdeBD() {
     }
     input.value = val;
     this.postulanteActual.procedencia = val;
+    this.markChangedInView();
   }
 
   // --- Validaciones específicas: CI y Complemento ---
@@ -1196,6 +1315,7 @@ private cargarPostulanteDesdeBD() {
     let clean = (input.value || '').replace(/\D+/g, '').slice(0, 9);
     input.value = clean;
     this.postulanteActual.ci = clean;
+    this.markChangedInView();
   }
 
   onComplementoInput(ev: Event) {
@@ -1218,6 +1338,7 @@ private cargarPostulanteDesdeBD() {
     }
     v = v.slice(0, 2);
     input.value = v;
+    this.markChangedInView();
   }
 
   // --- Sanitización de números de serie/resolución (front) ---
@@ -1235,6 +1356,7 @@ private cargarPostulanteDesdeBD() {
     if (target && typeof target === 'object') {
       target[prop] = clean;
     }
+    this.markChangedInView();
   }
 
   // --- Sanitización para 'gestión' (solo números y '/') ---
@@ -1283,6 +1405,7 @@ private cargarPostulanteDesdeBD() {
     const s = this.sanitizeRazonUpper(val);
     if (!this.nuevoArancel) this.nuevoArancel = {} as any;
     this.nuevoArancel.razon = s;
+    this.markChangedInView();
   }
 
   onFacturaInput(val: any) {
@@ -1292,6 +1415,7 @@ private cargarPostulanteDesdeBD() {
     if ((this.nuevoArancel.num_factura || '').length > 0) {
       this.nuevoArancel.num_comprobante = '';
     }
+    this.markChangedInView();
   }
 
   onReciboInput(val: any) {
@@ -1301,12 +1425,14 @@ private cargarPostulanteDesdeBD() {
     if ((this.nuevoArancel.num_comprobante || '').length > 0) {
       this.nuevoArancel.num_factura = '';
     }
+    this.markChangedInView();
   }
 
   onNitInput(val: any) {
     const d = this.sanitizeDigits(val);
     if (!this.nuevoArancel) this.nuevoArancel = {} as any;
     this.nuevoArancel.nit = d || '';
+    this.markChangedInView();
   }
 
   // Bloquea teclas que no sean dígitos, permite teclas de control (backspace, delete, arrows, tab)
@@ -1366,6 +1492,7 @@ private cargarPostulanteDesdeBD() {
     } else {
       this.selectedOpcion = null;
     }
+    this.markChangedInView();
   }
 
   clearOpcion() {
@@ -1414,6 +1541,38 @@ private cargarPostulanteDesdeBD() {
     // Limpiar selección previa al recargar
     this.selectedAranceles = [];
     this.totalArancelesSeleccionados = 0;
+    // En modo visualización y para postulante nuevo: evitar SGA y construir tabla directamente desde aranceles_est
+    if (this.viewInscripcion && this.esNuevoPostulante && !this.editAranceles) {
+      const cod = this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta;
+      this.postulanteService.getArancelesEstByCodCeta(cod as number, true).subscribe({
+        next: (resp) => {
+          let est = Array.isArray(resp?.data) ? resp.data : (Array.isArray(resp) ? resp : []);
+          const aplicar = (arr: any[]) => {
+            this._aplicarArancelesEstEnVista(arr || []);
+            this.loadingAranceles = false;
+          };
+          if (!est || est.length === 0) {
+            // Reintentar sin filtro
+            this.postulanteService.getArancelesEstByCodCeta(cod as number, false).subscribe({
+              next: (resp2) => {
+                est = Array.isArray(resp2?.data) ? resp2.data : (Array.isArray(resp2) ? resp2 : []);
+                aplicar(est || []);
+              },
+              error: () => {
+                aplicar([]);
+              }
+            });
+          } else {
+            aplicar(est);
+          }
+        },
+        error: () => {
+          this._aplicarArancelesEstEnVista([]);
+          this.loadingAranceles = false;
+        }
+      });
+      return;
+    }
     const carreraRaw = this.estudiante?.carrera || this.postulanteActual.carrera;
     const carrera = this.normalizarCarrera(carreraRaw || null) || undefined;
     this.postulanteService.getArancelesMaterialExtra(codCeta as number | string, carrera).subscribe({
@@ -1421,10 +1580,63 @@ private cargarPostulanteDesdeBD() {
         this.aranceles = res?.data || [];
         this.totalAranceles = res?.total ?? this.aranceles.length;
         this.loadingAranceles = false;
-        // En modo Ver (y mientras no se edita la card), mostrar/considerar solo aranceles seleccionados/pagados
+        // En modo Visualización (y mientras no se edita la card), cruzar con aranceles_est seleccionados en backend
         if (this.viewInscripcion && !this.editAranceles) {
-          this.selectedAranceles = this.aranceles.filter((a: any) => !!(a?.selected || a?.num_factura || a?.num_comprobante));
-          this.recalcularTotalSeleccionados();
+          const cod = this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta;
+          if (cod) {
+            // 1) Obtener aranceles_est seleccionados; si vienen vacíos, reintentar sin filtro
+            this.postulanteService.getArancelesEstByCodCeta(cod as number, true).subscribe({
+              next: (resp) => {
+                let est = Array.isArray(resp?.data) ? resp.data : (Array.isArray(resp) ? resp : []);
+                if (!est || est.length === 0) {
+                  // Reintentar sin filtro
+                  this.postulanteService.getArancelesEstByCodCeta(cod as number, false).subscribe({
+                    next: (resp2) => {
+                      est = Array.isArray(resp2?.data) ? resp2.data : (Array.isArray(resp2) ? resp2 : []);
+                      this._aplicarArancelesEstEnVista(est);
+                    },
+                    error: () => {
+                      this._aplicarArancelesEstEnVista([]);
+                    }
+                  });
+                } else {
+                  this._aplicarArancelesEstEnVista(est);
+                }
+              },
+              error: () => {
+                // Fallback: si falla, mantener vacía la selección (no asumir nada)
+                this.selectedAranceles = [];
+                this.recalcularTotalSeleccionados();
+              }
+            });
+            // También sincronizar el estado 'pago completo' desde el composite por si no se ha cargado aún
+            this.postulanteService.getInscripcionByCodCeta(Number(cod)).subscribe({
+              next: (p) => {
+                const flag = (p as any)?.aranceles_completos ?? (p as any)?.inscripcion?.aranceles_completos;
+                if (flag !== undefined && flag !== null) {
+                  const v = (typeof flag === 'string') ? flag.trim() : flag;
+                  this.pagoCompletoSeleccionados = v === true || v === 1 || v === '1';
+                }
+              },
+              error: () => {
+                // Fallback: consultar directamente inscrip_modalidad por cod_ceta_est
+                this.postulanteService.getInscripModalidadByCodCeta(Number(cod)).subscribe({
+                  next: (list) => {
+                    const rows = Array.isArray(list?.data) ? list.data : (Array.isArray(list) ? list : []);
+                    if (rows && rows.length) {
+                      const r = rows[0];
+                      const flag2 = (r as any)?.aranceles_completos;
+                      if (flag2 !== undefined && flag2 !== null) {
+                        const v2 = (typeof flag2 === 'string') ? flag2.trim() : flag2;
+                        this.pagoCompletoSeleccionados = v2 === true || v2 === 1 || v2 === '1';
+                      }
+                    }
+                  },
+                  error: () => {}
+                });
+              }
+            });
+          }
         }
         // Si no hay modalidad ya establecida (p. ej., desde sessionStorage), consultar al backend
         if (!this.modalidad) {
@@ -1432,15 +1644,30 @@ private cargarPostulanteDesdeBD() {
         }
       },
       error: (err) => {
-        console.error('Error al cargar aranceles:', err);
-        this.aranceles = [];
-        this.totalAranceles = 0;
-        this.loadingAranceles = false;
+        console.error('Error al cargar aranceles SGA, fallback a aranceles_est:', err);
+        // Fallback: intentar poblar desde aranceles_est incluso si no es postulante nuevo
+        const cod = this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta;
+        if (cod) {
+          this.postulanteService.getArancelesEstByCodCeta(cod as number, false).subscribe({
+            next: (resp2) => {
+              const est = Array.isArray(resp2?.data) ? resp2.data : (Array.isArray(resp2) ? resp2 : []);
+              this._aplicarArancelesEstEnVista(est || []);
+              this.loadingAranceles = false;
+            },
+            error: () => {
+              this._aplicarArancelesEstEnVista([]);
+              this.loadingAranceles = false;
+            }
+          });
+        } else {
+          this._aplicarArancelesEstEnVista([]);
+          this.loadingAranceles = false;
+        }
       }
     });
   }
 
-  // --- Selección de aranceles y total ---
+  // Verifica si un arancel está seleccionado
   isArancelSeleccionado(a: any): boolean {
     return this.selectedAranceles.includes(a);
   }
@@ -1846,6 +2073,7 @@ private cargarPostulanteDesdeBD() {
     this.pagoCompletoSeleccionados = value;
     // Propagar a cada ítem seleccionado (si tiene campo pagado)
     this.selectedAranceles = this.selectedAranceles.map(a => ({ ...a, pagado: value }));
+    this.markChangedInView();
   }
 
   private toNumber(val: any): number {

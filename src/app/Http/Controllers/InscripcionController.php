@@ -62,20 +62,20 @@ class InscripcionController extends Controller
         $gradosTrasp = [];
         if ($trasp) {
             // Intentar ambas FK comunes
-            $gradosTrasp = (Schema::hasTable('grados_trasp')
+            $colTrasp = Schema::hasTable('grados_trasp')
                 ? DB::table('grados_trasp')
                     ->where(function ($q) use ($trasp) {
                         $q->where('traspasos_instituto_id', $trasp->id)
                           ->orWhere('traspaso_id', $trasp->id);
                     })
                     ->get()
-                : collect())
-                ->map(function ($g) {
-                    return [
-                        'grado' => isset($g->grado) ? $g->grado : null,
-                        'gestion' => isset($g->gestion) ? $g->gestion : null,
-                    ];
-                })->values()->toArray();
+                : collect();
+            $gradosTrasp = $colTrasp->map(function ($g) {
+                return [
+                    'grado' => isset($g->grado) ? $g->grado : null,
+                    'gestion' => isset($g->gestion) ? $g->gestion : null,
+                ];
+            })->values()->toArray();
         }
 
         // Homologación por Cambio de Plan y sus grados
@@ -84,6 +84,13 @@ class InscripcionController extends Controller
         $cp = null;
         $gradosCp = [];
         // if ($cp) { ... }
+
+        // Inscripción de modalidad (para recuperar aranceles_completos y estado)
+        $insRow = Schema::hasTable('inscrip_modalidad')
+            ? DB::table('inscrip_modalidad')->where('cod_ceta_est', (int) $cod_ceta)->orderByDesc('updated_at')->first()
+            : null;
+        $arancelesCompletos = $insRow && isset($insRow->aranceles_completos) ? (bool)$insRow->aranceles_completos : null;
+        $estadoInscripcion = $insRow && isset($insRow->estado) ? $insRow->estado : null;
 
         // Armar payload conforme al mapeo del FE
         $payload = [
@@ -145,6 +152,10 @@ class InscripcionController extends Controller
                 'fecha_emision' => null,
                 'grados_gestiones' => $gradosCp,
             ] : null,
+
+            // Indicadores de inscripción
+            'aranceles_completos' => $arancelesCompletos,
+            'estado' => $estadoInscripcion,
         ];
 
             return response()->json($payload);
