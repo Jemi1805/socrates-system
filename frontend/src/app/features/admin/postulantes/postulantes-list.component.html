@@ -90,11 +90,7 @@
           Datos del estudiante
         </h3>
         <div class="d-flex align-items-center gap-2">
-          <button class="btn btn-sm btn-primary" *ngIf="!isEditing && !viewInscripcion" (click)="iniciarEdicionBiograficos()">
-            <i class="bi bi-pencil-square me-1"></i>
-            Editar
-          </button>
-          <button class="btn btn-sm btn-primary" *ngIf="viewInscripcion && !editBio" (click)="iniciarEdicionBioCard()">
+          <button class="btn btn-sm btn-primary" *ngIf="!isEditing || viewInscripcion" (click)="iniciarEdicionBiograficos()">
             <i class="bi bi-pencil-square me-1"></i>
             Editar
           </button>
@@ -202,7 +198,6 @@
             {{ pasoBiograficosCompletado ? 'Datos guardados' : 'Guardar y continuar inscripción' }}
           </button>
         </div>
-        <div class="readonly-mask" *ngIf="viewInscripcion && !editBio"></div>
       </div>
     </div>
 
@@ -226,32 +221,6 @@
 
       <div class="bio-content" *ngIf="showBachilleratoData">
         <!-- Resumen en modo lectura -->
-        <div *ngIf="viewInscripcion && !editBach" class="mb-2">
-          <div class="alert alert-secondary py-2">
-            <div class="d-flex flex-wrap gap-3 align-items-center">
-              <div>
-                <strong>Tipo:</strong>
-                <span class="badge bg-info-subtle text-info border">{{ tipoBachiller === 'extranjero' ? 'Extranjero' : 'Nacional' }}</span>
-              </div>
-              <ng-container *ngIf="tipoBachiller === 'nacional'; else bachExtranjero">
-                <div><strong>N° serie:</strong> {{ diplomaNacional?.nro_serie || postulanteActual?.nro_serie_titulo || '-' }}</div>
-                <div><strong>Emisión:</strong> {{ diplomaNacional?.emision || '-' }}</div>
-                <div><strong>Fecha emisión:</strong> {{ diplomaNacional?.fecha_emision || '-' }}</div>
-                <div><strong>Gestión:</strong> {{ diplomaNacional?.gestion_bachillerato || '-' }}</div>
-              </ng-container>
-              <ng-template #bachExtranjero>
-                <div><strong>N° resolución:</strong> {{ homologacionExtranjero?.nro_resolucion || postulanteActual?.nro_serie_titulo || '-' }}</div>
-                <div><strong>Fecha emisión:</strong> {{ homologacionExtranjero?.fecha_emision || '-' }}</div>
-                <div><strong>Grados/gestiones:</strong>
-                  <span *ngIf="(homologacionExtranjero?.grados_gestiones || []).length === 0">-</span>
-                  <span *ngFor="let gg of (homologacionExtranjero?.grados_gestiones || []); let i = index">
-                    {{ gg.grado }}/{{ gg.gestion }}<span *ngIf="i < (((homologacionExtranjero?.grados_gestiones || []).length) - 1)">, </span>
-                  </span>
-                </div>
-              </ng-template>
-            </div>
-          </div>
-        </div>
         <div class="bachiller-content">
           <div class="row g-3 align-items-end">
             <div class="col-md-4">
@@ -260,7 +229,7 @@
                 <i class="bi bi-info-circle me-1"></i>
                 Seleccione el tipo de bachiller que posee el postulante.
               </div>
-              <select class="form-select" [(ngModel)]="tipoBachiller" (ngModelChange)="onTipoBachillerChange($event)">
+              <select class="form-select" [(ngModel)]="tipoBachiller" (ngModelChange)="onTipoBachillerChange($event)" required [disabled]="viewInscripcion && !editBach">
                 <option [ngValue]="null" disabled>Seleccione tipo de Bachiller</option>
                 <option [ngValue]="'nacional'">Bachiller Nacional</option>
                 <option [ngValue]="'extranjero'">Bachiller Extranjero</option>
@@ -283,15 +252,16 @@
                 pattern='^[A-Z0-9\-\"°\s]+$'
                 title='Solo MAYÚSCULAS, números, guion -, " y °'
                 (input)="onSerieInput($event, diplomaNacional, 'nro_serie', true)"
+                [disabled]="viewInscripcion && !editBach"
               />
             </div>
             <div class="col-5">
               <label class="form-label">Emisión</label>
-              <input type="text" class="form-control" [(ngModel)]="diplomaNacional.emision" placeholder="Ej: Universidad Mayor de San Simón" />
+              <input type="text" class="form-control" [(ngModel)]="diplomaNacional.emision" placeholder="Ej: Universidad Mayor de San Simón" [disabled]="viewInscripcion && !editBach"/>
             </div>
             <div class="col-md-2">
               <label class="form-label">Fecha de Emisión</label>
-              <input type="date" class="form-control" [(ngModel)]="diplomaNacional.fecha_emision" />
+              <input type="date" class="form-control" [(ngModel)]="diplomaNacional.fecha_emision" [disabled]="viewInscripcion && !editBach"/>
             </div>
             <div class="col-2">
               <label class="form-label">Gestión de Bachillerato</label>
@@ -303,11 +273,12 @@
                 pattern='^[0-9/]+$'
                 title='Solo números y /'
                 (input)="onGestionInput($event, diplomaNacional, 'gestion_bachillerato')"
+                [disabled]="viewInscripcion && !editBach"
               />
             </div>
             <div class="col-12">
               <label class="form-label">Observación</label>
-              <textarea rows="2" class="form-control" [(ngModel)]="diplomaNacional.observacion" placeholder="Observaciones"></textarea>
+              <textarea rows="2" class="form-control" [(ngModel)]="diplomaNacional.observacion" placeholder="Observaciones" [disabled]="viewInscripcion && !editBach"></textarea>
             </div>
           </div>
         </div>
@@ -326,11 +297,12 @@
                 pattern='^[A-Z0-9\-\"°\s]+$'
                 title='Solo MAYÚSCULAS, números, guion -, " y °'
                 (input)="onSerieInput($event, homologacionExtranjero, 'nro_resolucion', true)"
+                [disabled]="viewInscripcion && !editBach"
               />
             </div>
             <div class="col-md-3">
               <label class="form-label">Fecha de Emisión</label>
-              <input type="date" class="form-control" [(ngModel)]="homologacionExtranjero.fecha_emision" />
+              <input type="date" class="form-control" [(ngModel)]="homologacionExtranjero.fecha_emision" [disabled]="viewInscripcion && !editBach"/>
             </div>
           </div>
           <div class="mt-3">
@@ -338,7 +310,7 @@
             <div class="d-flex flex-column gap-2">
               <div class="row g-2 align-items-end" *ngFor="let gg of homologacionExtranjero.grados_gestiones; let i = index">
                 <div class="col-md-3">
-                  <input type="text" class="form-control" [(ngModel)]="gg.grado" placeholder="Grado (p. ej., 1ro, 2do)" />
+                  <input type="text" class="form-control" [(ngModel)]="gg.grado" placeholder="Grado (p. ej., 1ro, 2do)" [disabled]="viewInscripcion && !editBach"/>
                 </div>
                 <div class="col-md-3">
                   <input
@@ -349,6 +321,7 @@
                     pattern='^[0-9/]+$'
                     title='Solo números y /'
                     (input)="onGestionInput($event, gg, 'gestion')"
+                    [disabled]="viewInscripcion && !editBach"
                   />
                 </div>
                 <div class="col-md-2">
@@ -362,7 +335,7 @@
                   <i class="bi bi-info-circle me-1"></i>
                   Agrega las gestiones y grados cursados.
                 </div>
-                <button class="btn btn-outline-primary btn-sm" (click)="agregarGradoGestion()">
+                <button class="btn btn-outline-primary btn-sm" (click)="agregarGradoGestion()" [disabled]="viewInscripcion && !editBach">
                   <i class="bi bi-plus-lg me-1"></i>
                   Agregar grado/gestión
                 </button>
@@ -381,30 +354,30 @@
           <div class="row g-2">
             <div class="col-md-6">
               <div class="form-check">
-                <input class="form-check-input" type="radio" name="transitabilidad" id="optEduReg" [(ngModel)]="selectedOpcion" value="educacionRegular" (change)="onOpcionToggle('educacionRegular', true)" [disabled]="isOpcionDisabled('educacionRegular')" />
+                <input class="form-check-input" type="radio" name="transitabilidad" id="optEduReg" [(ngModel)]="selectedOpcion" value="educacionRegular" (change)="onOpcionToggle('educacionRegular', true)" [disabled]="isOpcionDisabled('educacionRegular')" [disabled]="viewInscripcion && !editBach"/>
                 <label class="form-check-label" for="optEduReg">Transitabilidad de Educación Regular</label>
               </div>
             </div>
             <div class="col-md-6">
               <div class="form-check">
-                <input class="form-check-input" type="radio" name="transitabilidad" id="optTecMed" [(ngModel)]="selectedOpcion" value="tecnicoMedio" (change)="onOpcionToggle('tecnicoMedio', true)" [disabled]="isOpcionDisabled('tecnicoMedio')" />
+                <input class="form-check-input" type="radio" name="transitabilidad" id="optTecMed" [(ngModel)]="selectedOpcion" value="tecnicoMedio" (change)="onOpcionToggle('tecnicoMedio', true)" [disabled]="isOpcionDisabled('tecnicoMedio')" [disabled]="viewInscripcion && !editBach"/>
                 <label class="form-check-label" for="optTecMed">Transitabilidad de nivel técnico medio</label>
               </div>
             </div>
             <div class="col-md-6">
               <div class="form-check">
-                <input class="form-check-input" type="radio" name="transitabilidad" id="optTraspaso" [(ngModel)]="selectedOpcion" value="traspasoInstituto" (change)="onOpcionToggle('traspasoInstituto', true)" [disabled]="isOpcionDisabled('traspasoInstituto')" />
+                <input class="form-check-input" type="radio" name="transitabilidad" id="optTraspaso" [(ngModel)]="selectedOpcion" value="traspasoInstituto" (change)="onOpcionToggle('traspasoInstituto', true)" [disabled]="isOpcionDisabled('traspasoInstituto')" [disabled]="viewInscripcion && !editBach"/>
                 <label class="form-check-label" for="optTraspaso">Traspaso de instituto</label>
               </div>
             </div>
             <div class="col-md-6">
               <div class="form-check">
-                <input class="form-check-input" type="radio" name="transitabilidad" id="optHomoPlan" [(ngModel)]="selectedOpcion" value="homologacionCambioPlan" (change)="onOpcionToggle('homologacionCambioPlan', true)" [disabled]="isOpcionDisabled('homologacionCambioPlan')" />
+                <input class="form-check-input" type="radio" name="transitabilidad" id="optHomoPlan" [(ngModel)]="selectedOpcion" value="homologacionCambioPlan" (change)="onOpcionToggle('homologacionCambioPlan', true)" [disabled]="isOpcionDisabled('homologacionCambioPlan')" [disabled]="viewInscripcion && !editBach"/>
                 <label class="form-check-label" for="optHomoPlan">Homologación por cambio de plan de estudios</label>
               </div>
             </div>
           </div>
-          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearOpcion()" [disabled]="!selectedOpcion">
+          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearOpcion()" [disabled]="!selectedOpcion" [disabled]="viewInscripcion && !editBach">
             Quitar selección
           </button>
         </div>
@@ -424,6 +397,7 @@
                 pattern='^[A-Z0-9\-\"°\s]+$'
                 title='Solo MAYÚSCULAS, números, guion -, " y °'
                 (input)="onSerieInput($event, eduRegularData, 'serie_titulo_tm', true)"
+                [disabled]="viewInscripcion && !editBach"
               />
             </div>
             <div class="col-md-4">
@@ -437,11 +411,12 @@
                 pattern='^[A-Z0-9\-\"°\s]+$'
                 title='Solo MAYÚSCULAS, números, guion -, " y °'
                 (input)="onSerieInput($event, eduRegularData, 'numero_titulo_tm', true)"
+                [disabled]="viewInscripcion && !editBach"
               />
             </div>
             <div class="col-md-4">
               <label class="form-label">Fecha de emisión</label>
-              <input type="date" class="form-control" [(ngModel)]="eduRegularData.fecha_emision" />
+              <input type="date" class="form-control" [(ngModel)]="eduRegularData.fecha_emision" [disabled]="viewInscripcion && !editBach"/>
             </div>
           </div>
         </div>
@@ -460,6 +435,7 @@
                 pattern='^[A-Z0-9\-\"°\s]+$'
                 title='Solo MAYÚSCULAS, números, guion -, " y °'
                 (input)="onSerieInput($event, tecnicoMedioData, 'serie_titulo_tm', true)"
+                [disabled]="viewInscripcion && !editBach"
               />
             </div>
             <div class="col-md-4">
@@ -473,11 +449,12 @@
                 pattern='^[A-Z0-9\-\"°\s]+$'
                 title='Solo MAYÚSCULAS, números, guion -, " y °'
                 (input)="onSerieInput($event, tecnicoMedioData, 'numero_titulo_tm', true)"
+                [disabled]="viewInscripcion && !editBach"
               />
             </div>
             <div class="col-md-4">
               <label class="form-label">Fecha de emisión</label>
-              <input type="date" class="form-control" [(ngModel)]="tecnicoMedioData.fecha_emision" />
+              <input type="date" class="form-control" [(ngModel)]="tecnicoMedioData.fecha_emision" [disabled]="viewInscripcion && !editBach"/>
             </div>
           </div>
         </div>
@@ -487,7 +464,7 @@
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label">Instituto de origen</label>
-              <input type="text" class="form-control" [(ngModel)]="traspasoData.instituto_origen" placeholder="Nombre del Instituto" />
+              <input type="text" class="form-control" [(ngModel)]="traspasoData.instituto_origen" placeholder="Nombre del Instituto" [disabled]="viewInscripcion && !editBach"/>
             </div>
           </div>
           <div class="mt-3">
@@ -495,7 +472,7 @@
             <div class="d-flex flex-column gap-2">
               <div class="row g-2 align-items-end" *ngFor="let gg of traspasoData.grados_gestiones; let i = index">
                 <div class="col-md-3">
-                  <input type="text" class="form-control" [(ngModel)]="gg.grado" placeholder="Grado (p. ej., 1ro, 2do)" />
+                  <input type="text" class="form-control" [(ngModel)]="gg.grado" placeholder="Grado (p. ej., 1ro, 2do)" [disabled]="viewInscripcion && !editBach"/>
                 </div>
                 <div class="col-md-3">
                   <input
@@ -506,10 +483,11 @@
                     pattern='^[0-9/]+$'
                     title='Solo números y /'
                     (input)="onGestionInput($event, gg, 'gestion')"
+                    [disabled]="viewInscripcion && !editBach"
                   />
                 </div>
                 <div class="col-md-2">
-                  <button class="btn btn-outline-danger w-100" (click)="eliminarGradoGestionTraspaso(i)">
+                  <button class="btn btn-outline-danger w-100" (click)="eliminarGradoGestionTraspaso(i)" [disabled]="viewInscripcion && !editBach">
                     <i class="bi bi-trash"></i>
                   </button>
                 </div>
@@ -519,7 +497,7 @@
                   <i class="bi bi-info-circle me-1"></i>
                   Agrega las gestiones y grados cursados.
                 </div>
-                <button class="btn btn-outline-primary btn-sm" (click)="agregarGradoGestionTraspaso()">
+                <button class="btn btn-outline-primary btn-sm" (click)="agregarGradoGestionTraspaso()" [disabled]="viewInscripcion && !editBach">
                   <i class="bi bi-plus-lg me-1"></i>
                   Agregar grado/gestión
                 </button>
@@ -542,11 +520,12 @@
                 pattern='^[A-Z0-9\-\"°\s]+$'
                 title='Solo MAYÚSCULAS, números, guion -, " y °'
                 (input)="onSerieInput($event, homoCambioPlanData, 'nro_resolucion_rectoral', true)"
+                [disabled]="viewInscripcion && !editBach"
               />
             </div>
             <div class="col-md-3">
               <label class="form-label">Fecha de emisión</label>
-              <input type="date" class="form-control" [(ngModel)]="homoCambioPlanData.fecha_emision" />
+              <input type="date" class="form-control" [(ngModel)]="homoCambioPlanData.fecha_emision" [disabled]="viewInscripcion && !editBach"/>
             </div>
           </div>
           <div class="mt-3">
@@ -554,13 +533,13 @@
             <div class="d-flex flex-column gap-2">
               <div class="row g-2 align-items-end" *ngFor="let gg of homoCambioPlanData.grados_gestiones; let i = index">
                 <div class="col-md-3">
-                  <input type="text" class="form-control" [(ngModel)]="gg.grado" placeholder="Grado (p. ej., 1ro, 2do)" />
+                  <input type="text" class="form-control" [(ngModel)]="gg.grado" placeholder="Grado (p. ej., 1ro, 2do)" [disabled]="viewInscripcion && !editBach"/>
                 </div>
                 <div class="col-md-3">
-                  <input type="text" class="form-control" [(ngModel)]="gg.gestion" placeholder="Gestión (p. ej., 2018)" />
+                  <input type="text" class="form-control" [(ngModel)]="gg.gestion" placeholder="Gestión (p. ej., 2018)" [disabled]="viewInscripcion && !editBach"/>
                 </div>
                 <div class="col-md-2">
-                  <button class="btn btn-outline-danger w-100" (click)="eliminarGradoGestionCambioPlan(i)">
+                  <button class="btn btn-outline-danger w-100" (click)="eliminarGradoGestionCambioPlan(i)" [disabled]="viewInscripcion && !editBach">
                     <i class="bi bi-trash"></i>
                   </button>
                 </div>
@@ -570,7 +549,7 @@
                   <i class="bi bi-info-circle me-1"></i>
                   Agrega las gestiones y grados cursados.
                 </div>
-                <button class="btn btn-outline-primary btn-sm" (click)="agregarGradoGestionCambioPlan()">
+                <button class="btn btn-outline-primary btn-sm" (click)="agregarGradoGestionCambioPlan()" [disabled]="viewInscripcion && !editBach">
                   <i class="bi bi-plus-lg me-1"></i>
                   Agregar grado/gestión
                 </button>
@@ -585,15 +564,17 @@
     <div class="datos-carrera-container" *ngIf="pasoBiograficosCompletado">
       <!-- Selección de modalidad -->
       <div class="inicio-card">
-        <h3 class="card-title">
-          <i class="bi bi-mortarboard me-2"></i>
-          Datos de Inicio de Carrera
-        </h3>
-        <div class="d-flex justify-content-end mb-2">
-          <button class="btn btn-sm btn-primary" *ngIf="viewInscripcion && !editInicio" (click)="iniciarEdicionInicioCard()">
-            <i class="bi bi-pencil-square me-1"></i>
-            Editar
-          </button>
+        <div class="bio-header">
+          <h3>
+            <i class="bi bi-mortarboard me-2"></i>
+            Datos de Inicio de Carrera
+          </h3>
+          <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-sm btn-primary" *ngIf="viewInscripcion && !editInicio" (click)="iniciarEdicionInicioCard()">
+              <i class="bi bi-pencil-square me-1"></i>
+              Editar
+            </button>
+          </div>
         </div>
 
         <div class="alert alert-info py-1 px-2 mb-2">
@@ -603,7 +584,7 @@
         <div class="row g-3">
           <div class="col-md-7">
             <label class="form-label">Tipo de Regimen</label>
-            <select class="form-select" [(ngModel)]="datosInicioCarrera.reg_ini_c">
+            <select class="form-select" [(ngModel)]="datosInicioCarrera.reg_ini_c" [disabled]="viewInscripcion && !editInicio">
               <option [ngValue]="null" disabled>Seleccione tipo de Regimen</option>
               <option [ngValue]="'semestral'">Semestral</option>
               <option [ngValue]="'anual'">Anual</option>
@@ -611,24 +592,25 @@
           </div>
           <div class="col-md-5">
             <label class="form-label">Gestión de Inicio</label>
-            <select class="form-select" [(ngModel)]="datosInicioCarrera.gestion_ini" (ngModelChange)="setGestionInicio($event)">
+            <select class="form-select" [(ngModel)]="datosInicioCarrera.gestion_ini" (ngModelChange)="setGestionInicio($event)" [disabled]="viewInscripcion && !editInicio">
               <option [ngValue]="''">Seleccione gestión</option>
               <option *ngFor="let g of gestionesOpciones" [ngValue]="g">{{ g }}</option>
             </select>
           </div>
         </div>
-        <div class="readonly-mask" *ngIf="viewInscripcion && !editInicio"></div>
       </div>
       <div class="conclusion-card">
-        <h3 class="card-title">
-          <i class="bi bi-mortarboard me-2"></i>
-          Datos de Conclusión de Carrera
-        </h3>
-        <div class="d-flex justify-content-end mb-2">
-          <button class="btn btn-sm btn-primary" *ngIf="viewInscripcion && !editConclusion" (click)="iniciarEdicionConclusionCard()">
-            <i class="bi bi-pencil-square me-1"></i>
-            Editar
-          </button>
+        <div class="bio-header">
+          <h3>
+            <i class="bi bi-mortarboard me-2"></i>
+            Datos de Conclusión de Carrera
+          </h3>
+          <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-sm btn-primary" *ngIf="viewInscripcion && !editConclusion" (click)="iniciarEdicionConclusionCard()">
+              <i class="bi bi-pencil-square me-1"></i>
+              Editar
+            </button>
+          </div>
         </div>
 
         <div class="alert alert-info py-1 px-2 mb-2">
@@ -638,7 +620,7 @@
         <div class="row g-3">
           <div class="col-md-7">
             <label class="form-label">Tipo de Regimen</label>
-            <select class="form-select" [(ngModel)]="datosConclusionCarrera.reg_con_c">
+            <select class="form-select" [(ngModel)]="datosConclusionCarrera.reg_con_c" [disabled]="viewInscripcion && !editConclusion">
               <option [ngValue]="null" disabled>Seleccione tipo de Regimen</option>
               <option [ngValue]="'semestral'">Semestral</option>
               <option [ngValue]="'anual'">Anual</option>
@@ -646,7 +628,7 @@
           </div>
           <div class="col-md-5">
               <label class="form-label">Gestión de Conclusión</label>
-              <select class="form-select" [(ngModel)]="datosConclusionCarrera.gestion_fin" (ngModelChange)="setGestionFin($event)">
+              <select class="form-select" [(ngModel)]="datosConclusionCarrera.gestion_fin" (ngModelChange)="setGestionFin($event)" [disabled]="viewInscripcion && !editConclusion">
                 <option [ngValue]="''">Seleccione gestión</option>
                 <option *ngFor="let g of gestionesConclusionOpciones" [ngValue]="g">{{ g }}</option>
               </select>
@@ -660,16 +642,18 @@
 
     <!-- Aranceles (Material Extra) -->
     <div class="aranceles-card" *ngIf="pasoBiograficosCompletado">
-      <h3 class="card-title">
-        <i class="bi bi-receipt me-2"></i>
-        Aranceles (Material Extra)
-        <small class="text-muted" *ngIf="!loadingAranceles">Total: {{ totalAranceles }} </small>
-      </h3>
-      <div class="d-flex justify-content-end mb-2">
-        <button class="btn btn-sm btn-primary" *ngIf="viewInscripcion && !editAranceles" (click)="iniciarEdicionArancelesCard()">
-          <i class="bi bi-pencil-square me-1"></i>
-          Editar
-        </button>
+      <div class="bio-header">
+        <h3>
+          <i class="bi bi-receipt me-2"></i>
+          Aranceles (Material Extra)
+          <small class="text-muted" *ngIf="!loadingAranceles">Total: {{ totalAranceles }} </small>
+        </h3>
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-sm btn-primary" *ngIf="viewInscripcion && !editAranceles" (click)="iniciarEdicionArancelesCard()">
+            <i class="bi bi-pencil-square me-1"></i>
+            Editar
+          </button>
+        </div>
       </div>
 
       <!-- UI completa de selección (oculta en modo Ver no editable) -->

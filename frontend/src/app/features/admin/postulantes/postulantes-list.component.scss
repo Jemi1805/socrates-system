@@ -252,11 +252,11 @@ $transition: all 0.3s ease;
   transition: all 0.3s ease;
 
   &:hover {
-  color: white !important;
+  color: white;
   background-color: #4C9DBD;
 
     .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
-        color: white !important;
+        color: white;
     }
   }
   
@@ -274,7 +274,7 @@ $transition: all 0.3s ease;
     color: white;
 
     .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
-        color: white !important;
+        color: white;
     }
 
     &:hover {
@@ -873,8 +873,6 @@ input {
 .readonly-mask {
   position: absolute;
   inset: 0;
-  background: rgba(255,255,255,0.6);
-  backdrop-filter: blur(1px);
   z-index: 50;
   border-radius: inherit;
 }

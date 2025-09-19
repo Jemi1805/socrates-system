@@ -213,3 +213,46 @@ body {
 .card-body {
     padding: 0 !important;
 }
+
+.bio-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  border-bottom: #4C9DBD solid 2px;
+  
+  h3 {
+    margin: 0;
+    color: $text-dark-blue;
+    font-size: 1.3rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+  }
+  
+  .btn-primary{
+    color: $primary-color !important;
+  }
+  
+  .btn {
+    padding: 0.25rem 0.5rem !important;
+    background: transparent !important;
+    border: none !important;
+    
+    &:hover {
+      background: $light-gray !important;
+
+      .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+        color: $primary-color !important;
+    }
+    }
+    
+    i {
+      font-size: 1.2rem;
+    }
+
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+      color: $primary-color !important;
+    }
+  }
+}

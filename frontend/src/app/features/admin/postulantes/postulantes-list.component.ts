@@ -704,7 +704,10 @@ private cargarPostulanteDesdeBD() {
         this.cargarPensums();
         // Cargar aranceles y modalidad asociados al CETA
         this.cargarArancelesMaterialExtra();
-        this.cargarModalidadActual();
+        // Importante: no sobreescribir la modalidad si ya vino desde sessionStorage
+        if (!this.modalidad) {
+          this.cargarModalidadActual();
+        }
       }
       // Si ya existe un resumen o está visible, reconstruirlo para usar datos de BD
       if (this.resumenInscripcion || this.resumenVisible) {
@@ -743,7 +746,10 @@ private cargarPostulanteDesdeBD() {
           // Dependientes
           this.cargarPensums();
           this.cargarArancelesMaterialExtra();
-          this.cargarModalidadActual();
+          // Importante: no sobreescribir la modalidad si ya vino desde sessionStorage
+          if (!this.modalidad) {
+            this.cargarModalidadActual();
+          }
         },
         error: (err2) => {
           console.warn('Fallback getById también falló:', err2);
@@ -752,6 +758,18 @@ private cargarPostulanteDesdeBD() {
       });
     }
     });
+  }
+
+  // Intenta recuperar la modalidad desde sessionStorage (datos_postulacion)
+  private recuperarModalidadDeSession() {
+    try {
+      const raw = sessionStorage.getItem('datos_postulacion');
+      if (!raw) return;
+      const datos = JSON.parse(raw);
+      if (datos && datos.modalidad && !this.modalidad) {
+        this.modalidad = datos.modalidad;
+      }
+    } catch {}
   }
 
   // --- Pensums ---
@@ -905,7 +923,7 @@ private cargarPostulanteDesdeBD() {
   cargarModalidadActual() {
     const codCeta = this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta;
     if (!codCeta) return;
-    this.postulanteService.getModalidadPostulante(codCeta as number).subscribe({
+    this.postulanteService.getModalidadPostulante(Number(codCeta)).subscribe({
       next: (res: any) => {
         const mod = res?.modalidad || null;
         if (mod) {
@@ -1115,6 +1133,14 @@ private cargarPostulanteDesdeBD() {
         // Importante: conservar esNuevoPostulante = true para mostrar formulario de aranceles manuales
         this.pasoBiograficosCompletado = true;
         this.showRegistrarInscripcion = true;
+        // Si aún no hay modalidad establecida (por ejemplo, si no vino desde sessionStorage),
+        // primero intentar recuperar de sessionStorage y luego cargar del backend
+        if (!this.modalidad) {
+          this.recuperarModalidadDeSession();
+          if (!this.modalidad) {
+            this.cargarModalidadActual();
+          }
+        }
       },
       error: (err) => {
         console.error('Error al guardar datos biográficos:', err);
