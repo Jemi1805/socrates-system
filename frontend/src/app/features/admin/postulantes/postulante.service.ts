@@ -32,6 +32,9 @@ export class PostulanteService {
   private modalidadUrl = `${this.baseUrl}/modalidades`;
   private inscripcionesUrl = `${this.baseUrl}/inscripciones`;
   private datosCarreraUrl = `${this.baseUrl}/datos_carrera`;
+  private transitabilidadEduRegUrl = `${this.baseUrl}/transitabilidad_edu_reg`;
+  private transitabilidadInstTecUrl = `${this.baseUrl}/transitabilidad_inst_tec`;
+  private diplomaBachillerUrl = `${this.baseUrl}/diploma_bachiller`;
 
   constructor(private http: HttpClient) {}
 
@@ -63,6 +66,45 @@ export class PostulanteService {
     is_active?: boolean;
   }): Observable<any> {
     return this.http.post<any>(`${this.datosCarreraUrl}/upsert`, payload);
+  }
+
+  // --- Transitabilidad Educación Regular ---
+  saveTransitabilidadEduReg(payload: {
+    cod_ceta_est: number;
+    serie_titulo_tm?: string | null;
+    numero_titulo_tm?: string | null;
+    fecha_emision?: string | null;
+    observacion?: string | null;
+  }): Observable<any> {
+    // apiResource disponible en backend, usar POST para crear/actualizar según lógica del servidor
+    return this.http.post<any>(`${this.transitabilidadEduRegUrl}`, payload);
+  }
+
+  // --- Transitabilidad Instituto Técnico (opcional) ---
+  saveTransitabilidadInstTec(payload: {
+    cod_ceta_est: number;
+    serie_titulo_tm?: string | null;
+    numero_titulo_tm?: string | null;
+    fecha_emision?: string | null;
+    observacion?: string | null;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.transitabilidadInstTecUrl}`, payload);
+  }
+
+  // --- Diploma de Bachiller ---
+  saveDiplomaBachiller(payload: {
+    cod_ceta_est: number;
+    tipo_bachiller: 'nacional' | 'extranjero';
+    nro_serie_titulo?: string | null;
+    emision?: string | null;
+    fecha_emision?: string | null;
+    observacion?: string | null;
+    gestion_bachillerato?: string | number | null;
+    nro_resolucion?: string | null;
+    fecha_resolucion?: string | null;
+    is_active?: boolean;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.diplomaBachillerUrl}/upsert`, payload);
   }
 
   create(postulante: Postulante): Observable<Postulante> {

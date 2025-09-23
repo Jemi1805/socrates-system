@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { forkJoin, of } from 'rxjs';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { PostulanteService, DocumentoPostulante, ModalidadPostulante } from './postulante.service';
@@ -99,6 +100,11 @@ export class PostulantesListComponent implements OnInit {
   
   // Control del modal
   modalVisible = false;
+  // Modal de cambios guardados y lista de cambios
+  modalCambiosVisible: boolean = false;
+  cambiosRealizados: Array<{ campo: string; anterior: any; nuevo: any }> = [];
+  // Modal de confirmación para guardar cambios (botón global)
+  modalConfirmGuardarVisible: boolean = false;
   showBiographicalData = true;
   showBachilleratoData = true;
   // Nuevo registro: habilita selects de carrera y pensum
@@ -117,6 +123,18 @@ export class PostulantesListComponent implements OnInit {
     if (this.viewInscripcion) {
       this.hasChangesInView = true;
     }
+  }
+
+  // --- Confirmación de guardado global ---
+  abrirModalConfirmarGuardar() {
+    this.modalConfirmGuardarVisible = true;
+  }
+  cerrarModalConfirmarGuardar() {
+    this.modalConfirmGuardarVisible = false;
+  }
+  confirmarGuardarCambiosVerInscripcion() {
+    this.modalConfirmGuardarVisible = false;
+    this.guardarCambiosVerInscripcion();
   }
 
   private _aplicarArancelesEstEnVista(est: any[]) {
@@ -481,10 +499,12 @@ setGestionInicio(g: string) {
   if (!this.gestionValida && this.datosConclusionCarrera.gestion_fin) {
     this.datosConclusionCarrera.gestion_fin = '';
   }
+  this.markChangedInView();
 }
 
 setGestionFin(g: string) {
   this.datosConclusionCarrera.gestion_fin = g;
+  this.markChangedInView();
 }
 
 get labelGestionInicio(): string {
@@ -503,10 +523,12 @@ readonly regimenOptions: { value: 'semestral' | 'anual'; label: string }[] = [
 
 setRegimenInicio(v: 'semestral' | 'anual') {
   this.datosInicioCarrera.reg_ini_c = v;
+  this.markChangedInView();
 }
 
 setRegimenFin(v: 'semestral' | 'anual') {
   this.datosConclusionCarrera.reg_con_c = v;
+  this.markChangedInView();
 }
 
 get labelRegimenInicio(): string {
@@ -525,6 +547,7 @@ get labelRegimenFin(): string {
 setNuevoArancelGestion(g: string) {
   if (!this.nuevoArancel) return;
   this.nuevoArancel.gestion = g;
+  this.markChangedInView();
 }
 
 get labelNuevoArancelGestion(): string {
@@ -596,6 +619,17 @@ cargarDatosPostulacion() {
       // Si viene número de serie, asumimos Bachiller Nacional por defecto para mostrar el campo
       if (!this.tipoBachiller && this.postulanteActual.nro_serie_titulo) {
         this.tipoBachiller = 'nacional';
+      }
+      
+      // Si el tipo de bachiller es 'extranjero', prellenar nro_resolucion con el nro_serie_titulo del SGA
+      if (this.tipoBachiller === 'extranjero' && nroSerieTitulo) {
+        this.homologacionExtranjero.nro_resolucion = nroSerieTitulo;
+        // También aseguramos que postulanteActual.nro_serie_titulo tenga el valor para el input
+        this.postulanteActual.nro_serie_titulo = nroSerieTitulo;
+        console.log('[BIO] Prefill SGA - Homologación Extranjero:', {
+          nro_resolucion: nroSerieTitulo,
+          tipoBachiller: this.tipoBachiller
+        });
       }
       // Reasignar en el siguiente tick para asegurar que el input reciba el valor
       if (nroSerieTitulo) {
@@ -684,6 +718,7 @@ private cargarPostulanteDesdeBD() {
           } as any;
         } else if (this.tipoBachiller === 'extranjero') {
           const he = (src as any).homologacion_extranjero || {};
+          // Priorizar datos de BD, pero si no hay, usar el nro_serie_titulo del SGA
           const nroResol = (he.nro_resolucion || (src as any).nro_resolucion || dst.nro_serie_titulo || '').toString();
           const fechaEmi = (he.fecha_emision || he.fecha || (src as any).fecha_emision_resolucion || '').toString();
           const grados = Array.isArray(he.grados_gestiones) ? he.grados_gestiones.map((g: any) => ({
@@ -695,9 +730,21 @@ private cargarPostulanteDesdeBD() {
             fecha_emision: fechaEmi,
             grados_gestiones: grados,
           } as any;
-          // Asegurar que el input (ligado a postulanteActual.nro_serie_titulo) muestre la resolución si no existe aún
+          // Asegurar que el input (ligado a postulanteActual.nro_serie_titulo) muestre la resolución
+          // Si no hay nro_resolucion en homologacionExtranjero pero hay nro_serie_titulo en dst, usarlo
           if (!this.postulanteActual.nro_serie_titulo && this.homologacionExtranjero.nro_resolucion) {
             this.postulanteActual.nro_serie_titulo = this.homologacionExtranjero.nro_resolucion;
+          }
+          // Si homologacionExtranjero.nro_resolucion está vacío pero hay nro_serie_titulo en dst, asignarlo
+          if (!this.homologacionExtranjero.nro_resolucion && dst.nro_serie_titulo) {
+            this.homologacionExtranjero.nro_resolucion = dst.nro_serie_titulo.toString();
+            if (!this.postulanteActual.nro_serie_titulo) {
+              this.postulanteActual.nro_serie_titulo = dst.nro_serie_titulo.toString();
+            }
+            console.log('[BD] Prefill SGA - Homologación Extranjero desde nro_serie_titulo:', {
+              nro_resolucion: dst.nro_serie_titulo,
+              tipoBachiller: this.tipoBachiller
+            });
           }
         }
 
@@ -1169,6 +1216,10 @@ private cargarPostulanteDesdeBD() {
   }
 
   guardarCambiosVerInscripcion() {
+    // Asegurar snapshot para poder mostrar diferencias aunque no haya entrado por los botones "Editar"
+    if (!this._snapshotAntes) {
+      this.prepararSnapshotAntesDeEditar();
+    }
     // Guardado general. Persistimos biográficos y datos de carrera (datos_carrera)
     const cod = this.postulanteActual.cod_ceta as number | undefined;
     const guardarBio$ = cod
@@ -1176,45 +1227,69 @@ private cargarPostulanteDesdeBD() {
       : this.postulanteService.create(this.postulanteActual as Postulante);
 
     // Preparar payload de datos_carrera si el usuario ha seleccionado valores
-    const tieneCarrera = !!(this.datosInicioCarrera?.reg_ini_c || this.datosInicioCarrera?.gestion_ini || this.datosConclusionCarrera?.reg_con_c || this.datosConclusionCarrera?.gestion_fin);
-    const payloadCarrera = (cod && tieneCarrera) ? {
-      cod_ceta_est: cod,
-      regimen_ini: (this.datosInicioCarrera.reg_ini_c || '').toString().trim() || null,
-      regimen_fin: (this.datosConclusionCarrera.reg_con_c || '').toString().trim() || null,
-      gestion_ini: (this.datosInicioCarrera.gestion_ini || '').toString().trim() || null,
-      gestion_fin: (this.datosConclusionCarrera.gestion_fin || '').toString().trim() || null,
-      is_active: true,
-    } : null;
-
     guardarBio$.subscribe({
       next: (res) => {
-        // Si se generó cod_ceta al crear, recuperar y actualizar el payload de carrera
-        const generado = (res as any)?.cod_ceta as number | undefined;
-        const codFinal = generado || cod;
-        if (generado) this.postulanteActual.cod_ceta = generado;
-
-        if (payloadCarrera || (tieneCarrera && codFinal)) {
-          const body = payloadCarrera || {
-            cod_ceta_est: codFinal as number,
+        const codFinal = Number(cod || (res as any)?.cod_ceta || (this.postulanteActual?.cod_ceta as any)) || undefined;
+        // Preparar guardados secundarios después de conocer codFinal
+        const saves: any[] = [];
+        const tieneCarrera = !!(this.datosInicioCarrera?.reg_ini_c || this.datosInicioCarrera?.gestion_ini || this.datosConclusionCarrera?.reg_con_c || this.datosConclusionCarrera?.gestion_fin);
+        if (codFinal && tieneCarrera) {
+          const payloadCarrera = {
+            cod_ceta_est: codFinal,
             regimen_ini: (this.datosInicioCarrera.reg_ini_c || '').toString().trim() || null,
             regimen_fin: (this.datosConclusionCarrera.reg_con_c || '').toString().trim() || null,
             gestion_ini: (this.datosInicioCarrera.gestion_ini || '').toString().trim() || null,
             gestion_fin: (this.datosConclusionCarrera.gestion_fin || '').toString().trim() || null,
             is_active: true,
           };
-          this.postulanteService.upsertDatosCarrera(body).subscribe({
+          saves.push(this.postulanteService.upsertDatosCarrera(payloadCarrera));
+        }
+        if (codFinal && this.selectedOpcion === 'educacionRegular') {
+          const serieTM = (this.eduRegularData?.serie_titulo_tm || '').toString().trim();
+          const numeroTM = (this.eduRegularData?.numero_titulo_tm || '').toString().trim();
+          const fechaTM = this.normalizarFecha(this.eduRegularData?.fecha_emision);
+          const hayDatosEduReg = !!(serieTM || numeroTM || fechaTM);
+          if (hayDatosEduReg) {
+            const payloadEduReg = {
+              cod_ceta_est: codFinal,
+              serie_titulo_tm: serieTM || null,
+              numero_titulo_tm: numeroTM || null,
+              fecha_emision: fechaTM,
+              observacion: null,
+            };
+            saves.push(this.postulanteService.saveTransitabilidadEduReg(payloadEduReg));
+          }
+        }
+        if (saves.length) {
+          forkJoin(saves).subscribe({
             next: () => {
               this.cargarPostulantes();
-              this.salirVerInscripcion();
+              // Resetear flags de edición y mostrar modal de cambios
+              this.editBio = false;
+              this.editBach = false;
+              this.editInicio = false;
+              this.editConclusion = false;
+              this.editAranceles = false;
+              this.hasChangesInView = false;
+              const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual());
+              this.mostrarModalCambios(cambios);
             },
-            error: (e) => {
-              console.error('Error al guardar datos de carrera:', e);
-              alert('Datos biográficos guardados, pero no se pudo guardar inicio/conclusión de carrera.');
+            error: (e: any) => {
+              console.error('Error en guardados secundarios:', e);
+              alert('Datos biográficos guardados, pero hubo un error al guardar datos adicionales (inicio/conclusión o transitabilidad).');
             }
           });
         } else {
+          // No hay guardados secundarios, proceder directo
           this.cargarPostulantes();
-          this.salirVerInscripcion();
+          this.editBio = false;
+          this.editBach = false;
+          this.editInicio = false;
+          this.editConclusion = false;
+          this.editAranceles = false;
+          this.hasChangesInView = false;
+          const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual());
+          this.mostrarModalCambios(cambios);
         }
       },
       error: () => {
@@ -1224,16 +1299,230 @@ private cargarPostulanteDesdeBD() {
   }
 
   // Toggles de edición por tarjeta
-  iniciarEdicionBioCard() { this.editBio = true; }
+  iniciarEdicionBioCard() { this.prepararSnapshotAntesDeEditar(); this.editBio = true; }
   finalizarEdicionBioCard() { this.editBio = false; }
-  iniciarEdicionBachCard() { this.editBach = true; }
+  iniciarEdicionBachCard() { this.prepararSnapshotAntesDeEditar(); this.editBach = true; }
   finalizarEdicionBachCard() { this.editBach = false; }
-  iniciarEdicionInicioCard() { this.editInicio = true; }
+  iniciarEdicionInicioCard() { this.prepararSnapshotAntesDeEditar(); this.editInicio = true; }
   finalizarEdicionInicioCard() { this.editInicio = false; }
-  iniciarEdicionConclusionCard() { this.editConclusion = true; }
+  iniciarEdicionConclusionCard() { this.prepararSnapshotAntesDeEditar(); this.editConclusion = true; }
   finalizarEdicionConclusionCard() { this.editConclusion = false; }
-  iniciarEdicionArancelesCard() { this.editAranceles = true; }
+  iniciarEdicionArancelesCard() { this.prepararSnapshotAntesDeEditar(); this.editAranceles = true; }
   finalizarEdicionArancelesCard() { this.editAranceles = false; }
+
+  // --- Guardados por tarjeta ---
+  cancelarEdicionBioCard() { this.editBio = false; }
+  cancelarEdicionBachCard() { this.editBach = false; }
+  cancelarEdicionInicioCard() { this.editInicio = false; }
+  cancelarEdicionConclusionCard() { this.editConclusion = false; }
+  cancelarEdicionArancelesCard() { this.editAranceles = false; }
+
+  guardarBioCard() {
+    if (!this._snapshotAntes) this.prepararSnapshotAntesDeEditar();
+    // Mapear bachiller extranjero en biográficos si aplica (campo nro_serie_titulo)
+    if (this.tipoBachiller === 'extranjero') {
+      const nro = (this.homologacionExtranjero?.nro_resolucion || '').toString().trim();
+      if (nro) {
+        (this.postulanteActual as any).nro_serie_titulo = nro;
+      }
+    }
+    const cod = this.postulanteActual.cod_ceta as number | undefined;
+    const req$ = cod
+      ? this.postulanteService.update(cod, this.postulanteActual as Postulante)
+      : this.postulanteService.create(this.postulanteActual as Postulante);
+    req$.subscribe({
+      next: () => {
+        // Calcular cambios con el estado actual en memoria antes de refrescar
+        const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual());
+        this.mostrarModalCambios(cambios);
+        // Reset de flags y refresco
+        this.editBio = false;
+        this.hasChangesInView = false;
+        this.cargarPostulantes();
+      },
+      error: (e) => {
+        console.error('Error al guardar biográficos:', e);
+        alert('No se pudo guardar los datos biográficos. Verifique e intente nuevamente.');
+      }
+    });
+  }
+
+  guardarBachCard() {
+    if (!this._snapshotAntes) this.prepararSnapshotAntesDeEditar();
+    // Guardar biográficos (incluye nro_serie_titulo si extranjero)
+    if (this.tipoBachiller === 'extranjero') {
+      const nro = (this.homologacionExtranjero?.nro_resolucion || '').toString().trim();
+      if (nro) {
+        (this.postulanteActual as any).nro_serie_titulo = nro;
+      }
+    }
+    const cod = this.postulanteActual.cod_ceta as number | undefined;
+    const req$ = cod
+      ? this.postulanteService.update(cod, this.postulanteActual as Postulante)
+      : this.postulanteService.create(this.postulanteActual as Postulante);
+    req$.subscribe({
+      next: (res) => {
+        const codFinal = Number(cod || (res as any)?.cod_ceta || (this.postulanteActual?.cod_ceta as any)) || undefined;
+        const saves: any[] = [];
+        // 1) Diploma de Bachiller
+        if (codFinal) {
+          // Detectar datos ingresados para nacional/extranjero
+          const dn = this.diplomaNacional || ({} as any);
+          const he = this.homologacionExtranjero || ({} as any);
+          const hasNacional = !!(
+            (dn.nro_serie || '').toString().trim() ||
+            (dn.emision || '').toString().trim() ||
+            this.normalizarFecha(dn.fecha_emision) ||
+            (dn.observacion || '').toString().trim() ||
+            (dn.gestion_bachillerato || '').toString().trim()
+          );
+          const hasExtranjero = !!(
+            (he.nro_resolucion || '').toString().trim() ||
+            this.normalizarFecha(he.fecha_emision)
+          );
+          // Si no hay tipo explícito, inferir por los datos ingresados
+          let tipo = this.tipoBachiller as 'nacional' | 'extranjero' | null;
+          if (!tipo) {
+            if (hasExtranjero && !hasNacional) tipo = 'extranjero';
+            else if (hasNacional && !hasExtranjero) tipo = 'nacional';
+          }
+          // Si no hay ningún dato de diploma, omitir guardado
+          if (!tipo && !hasNacional && !hasExtranjero) {
+            console.log('[GuardarBach] Sin datos de diploma, omitiendo upsert.');
+          } else if (tipo) {
+            const payloadDiploma: any = {
+              cod_ceta_est: codFinal,
+              tipo_bachiller: tipo,
+              is_active: true,
+            };
+            if (tipo === 'nacional') {
+              payloadDiploma.nro_serie_titulo = (this.diplomaNacional?.nro_serie || '').toString().trim() || null;
+              payloadDiploma.emision = (this.diplomaNacional?.emision || '').toString().trim() || null;
+              payloadDiploma.fecha_emision = this.normalizarFecha(this.diplomaNacional?.fecha_emision);
+              payloadDiploma.gestion_bachillerato = (this.diplomaNacional?.gestion_bachillerato || '').toString().trim() || null;
+              payloadDiploma.observacion = (this.diplomaNacional?.observacion || '').toString().trim() || null;
+            } else if (tipo === 'extranjero') {
+              payloadDiploma.nro_resolucion = (this.homologacionExtranjero?.nro_resolucion || '').toString().trim() || null;
+              // El campo del formulario se llama fecha_emision, pero en modelo es fecha_resolucion
+              payloadDiploma.fecha_resolucion = this.normalizarFecha(this.homologacionExtranjero?.fecha_emision);
+            }
+            console.log('[GuardarBach] Enviando diploma_bachiller/upsert:', payloadDiploma);
+            saves.push(this.postulanteService.saveDiplomaBachiller(payloadDiploma));
+          } else {
+            console.warn('[GuardarBach] No se pudo inferir tipo_bachiller a partir de los datos.');
+          }
+        }
+        if (codFinal && this.selectedOpcion === 'educacionRegular') {
+          const payloadEduReg = {
+            cod_ceta_est: codFinal,
+            serie_titulo_tm: (this.eduRegularData?.serie_titulo_tm || '').toString().trim() || null,
+            numero_titulo_tm: (this.eduRegularData?.numero_titulo_tm || '').toString().trim() || null,
+            fecha_emision: this.normalizarFecha(this.eduRegularData?.fecha_emision),
+            observacion: null,
+          };
+          saves.push(this.postulanteService.saveTransitabilidadEduReg(payloadEduReg));
+        }
+        const afterSuccess = () => {
+          // Calcular cambios reales con snapshot previo y actual (incluye campos detallados de diploma)
+          const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual()) || [];
+          this.mostrarModalCambios(cambios as any[]);
+          // Reset y refresco
+          this.editBach = false;
+          this.hasChangesInView = false;
+          this.cargarPostulantes();
+        };
+        if (saves.length) {
+          forkJoin(saves).subscribe({
+            next: afterSuccess,
+            error: (e: any) => {
+              console.error('Error al guardar datos adicionales (diploma/transitabilidad):', e);
+              const backendMsg = (e?.error && (e.error.message || e.error.error || JSON.stringify(e.error))) || e?.message || 'Error desconocido';
+              alert('No se pudo guardar todos los datos de bachillerato. Detalle: ' + backendMsg);
+              // Mantener modo edición para permitir corregir
+              this.editBach = true;
+              this.hasChangesInView = true;
+            }
+          });
+        } else {
+          afterSuccess();
+        }
+      },
+      error: (e) => {
+        console.error('Error al guardar bachillerato/biográficos:', e);
+        alert('No se pudo guardar los datos de bachillerato. Verifique e intente nuevamente.');
+      }
+    });
+  }
+
+  guardarInicioCard() {
+    if (!this._snapshotAntes) this.prepararSnapshotAntesDeEditar();
+    const cod = Number(this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta) || null;
+    if (!cod) {
+      alert('No hay código CETA para guardar datos de inicio. Guarde biográficos primero.');
+      return;
+    }
+    const payload = {
+      cod_ceta_est: cod,
+      regimen_ini: (this.datosInicioCarrera.reg_ini_c || '').toString().trim() || null,
+      regimen_fin: (this.datosConclusionCarrera.reg_con_c || '').toString().trim() || null,
+      gestion_ini: (this.datosInicioCarrera.gestion_ini || '').toString().trim() || null,
+      gestion_fin: (this.datosConclusionCarrera.gestion_fin || '').toString().trim() || null,
+      is_active: true,
+    };
+    this.postulanteService.upsertDatosCarrera(payload).subscribe({
+      next: () => {
+        const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual());
+        this.mostrarModalCambios(cambios);
+        this.editInicio = false;
+        this.hasChangesInView = false;
+        this.cargarPostulantes();
+      },
+      error: (e) => {
+        console.error('Error al guardar inicio de carrera:', e);
+        alert('No se pudo guardar los datos de inicio de carrera.');
+      }
+    });
+  }
+
+  guardarConclusionCard() {
+    if (!this._snapshotAntes) this.prepararSnapshotAntesDeEditar();
+    const cod = Number(this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta) || null;
+    if (!cod) {
+      alert('No hay código CETA para guardar datos de conclusión. Guarde biográficos primero.');
+      return;
+    }
+    const payload = {
+      cod_ceta_est: cod,
+      regimen_ini: (this.datosInicioCarrera.reg_ini_c || '').toString().trim() || null,
+      regimen_fin: (this.datosConclusionCarrera.reg_con_c || '').toString().trim() || null,
+      gestion_ini: (this.datosInicioCarrera.gestion_ini || '').toString().trim() || null,
+      gestion_fin: (this.datosConclusionCarrera.gestion_fin || '').toString().trim() || null,
+      is_active: true,
+    };
+    this.postulanteService.upsertDatosCarrera(payload).subscribe({
+      next: () => {
+        const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual());
+        this.mostrarModalCambios(cambios);
+        this.editConclusion = false;
+        this.hasChangesInView = false;
+        this.cargarPostulantes();
+      },
+      error: (e) => {
+        console.error('Error al guardar conclusión de carrera:', e);
+        alert('No se pudo guardar los datos de conclusión de carrera.');
+      }
+    });
+  }
+
+  guardarArancelesCard() {
+    if (!this._snapshotAntes) this.prepararSnapshotAntesDeEditar();
+    // TODO: persistencia específica de aranceles seleccionados si se requiere guardar en esta etapa
+    // Por ahora, mostrar modal de cambios (conteo/total) y salir de edición
+    this.editAranceles = false;
+    this.hasChangesInView = false;
+    const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual());
+    this.mostrarModalCambios(cambios);
+  }
 
   // --- Guardar datos biográficos y habilitar el resto de secciones
   guardarYContinuarInscripcion() {
@@ -1390,6 +1679,7 @@ private cargarPostulanteDesdeBD() {
     if (target && typeof target === 'object') {
       target[prop] = clean;
     }
+    this.markChangedInView();
   }
 
   private sanitizarNombre(v: string): string {
@@ -1483,6 +1773,14 @@ private cargarPostulanteDesdeBD() {
         this.selectedOpcion = null;
       }
     }
+    // Prefill inmediato según selección y valor proveniente del SGA
+    const serieSGA = (this.postulanteActual?.nro_serie_titulo || '').toString().trim();
+    if (tipo === 'extranjero' && serieSGA) {
+      this.homologacionExtranjero.nro_resolucion = serieSGA;
+    } else if (tipo === 'nacional' && serieSGA) {
+      this.diplomaNacional.nro_serie = serieSGA;
+    }
+    this.markChangedInView();
   }
 
   isOpcionDisabled(opcion: 'educacionRegular' | 'tecnicoMedio' | 'traspasoInstituto' | 'homologacionCambioPlan'): boolean {
@@ -1806,6 +2104,113 @@ private cargarPostulanteDesdeBD() {
       return `${y}-${mo}-${dd}`;
     }
     return null;
+  }
+
+  // --- Snapshot y resumen de cambios ---
+  private _snapshotAntes: any = null;
+
+  private getSnapshotActual() {
+    return {
+      // Biográficos
+      nombres_est: this.postulanteActual.nombres_est ?? null,
+      ap_pat: this.postulanteActual.ap_pat ?? null,
+      ap_mat: this.postulanteActual.ap_mat ?? null,
+      ci: this.postulanteActual.ci ?? null,
+      procedencia: (this.postulanteActual as any).procedencia ?? null,
+      fecha_nacimiento: this.postulanteActual.fecha_nacimiento ?? null,
+      lugar_nacimiento: this.postulanteActual.lugar_nacimiento ?? null,
+      carrera: (this.postulanteActual.carrera as any) ?? (this.carreraNormalizada as any) ?? null,
+      pensum: this.postulanteActual.pensum ?? null,
+      // Bachiller
+      tipo_bachiller: this.tipoBachiller ?? null,
+      nro_serie_titulo: (this.tipoBachiller === 'extranjero'
+        ? (this.homologacionExtranjero?.nro_resolucion ?? (this.postulanteActual as any).nro_serie_titulo ?? null)
+        : ((this.postulanteActual as any).nro_serie_titulo ?? null)
+      ),
+      // Diploma (detallado) para detectar cambios reales
+      diploma_emision: (this.tipoBachiller === 'nacional') ? (this.diplomaNacional?.emision ?? null) : null,
+      diploma_fecha_emision: (this.tipoBachiller === 'nacional') ? (this.normalizarFecha(this.diplomaNacional?.fecha_emision) ?? null) : null,
+      diploma_gestion_bachillerato: (this.tipoBachiller === 'nacional') ? ((this.diplomaNacional?.gestion_bachillerato ?? null) as any) : null,
+      diploma_observacion: (this.tipoBachiller === 'nacional') ? (this.diplomaNacional?.observacion ?? null) : null,
+      diploma_nro_resolucion: (this.tipoBachiller === 'extranjero') ? (this.homologacionExtranjero?.nro_resolucion ?? null) : null,
+      diploma_fecha_resolucion: (this.tipoBachiller === 'extranjero') ? (this.normalizarFecha(this.homologacionExtranjero?.fecha_emision) ?? null) : null,
+      // Inicio/Conclusión
+      reg_ini_c: this.datosInicioCarrera.reg_ini_c ?? null,
+      gestion_ini: this.datosInicioCarrera.gestion_ini ?? null,
+      reg_con_c: this.datosConclusionCarrera.reg_con_c ?? null,
+      gestion_fin: this.datosConclusionCarrera.gestion_fin ?? null,
+      // Modalidad y Aranceles (resumen)
+      modalidad_id: this.modalidad?.id ?? null,
+      modalidad_nombre: this.modalidad?.nombre ?? null,
+      aranceles_count: (this.selectedAranceles || []).length,
+      aranceles_total: this.totalArancelesSeleccionados ?? 0,
+    };
+  }
+
+  private normalizarValor(v: any): string {
+    if (v === undefined || v === null) return '';
+    return String(v).trim();
+  }
+
+  private compararSnapshots(prev: any, curr: any): Array<{ campo: string; anterior: any; nuevo: any }> {
+    if (!prev) return [];
+    const etiquetas: Record<string, string> = {
+      nombres_est: 'Nombres',
+      ap_pat: 'Apellido Paterno',
+      ap_mat: 'Apellido Materno',
+      ci: 'CI',
+      procedencia: 'Procedencia',
+      fecha_nacimiento: 'Fecha de Nacimiento',
+      lugar_nacimiento: 'Lugar de Nacimiento',
+      carrera: 'Carrera',
+      pensum: 'Pensum',
+      tipo_bachiller: 'Tipo de Bachiller',
+      nro_serie_titulo: 'N° Serie/Resolución',
+      diploma_emision: 'diploma.emision',
+      diploma_fecha_emision: 'diploma.fecha_emision',
+      diploma_gestion_bachillerato: 'diploma.gestion_bachillerato',
+      diploma_observacion: 'diploma.observacion',
+      diploma_nro_resolucion: 'diploma.nro_resolucion',
+      diploma_fecha_resolucion: 'diploma.fecha_resolucion',
+      reg_ini_c: 'Régimen Inicio',
+      gestion_ini: 'Gestión Inicio',
+      reg_con_c: 'Régimen Conclusión',
+      gestion_fin: 'Gestión Conclusión',
+      modalidad_id: 'Modalidad (ID)',
+      modalidad_nombre: 'Modalidad',
+      aranceles_count: 'Aranceles seleccionados',
+      aranceles_total: 'Total Aranceles',
+    };
+    const cambios: Array<{ campo: string; anterior: any; nuevo: any }> = [];
+    Object.keys(prev).forEach((k) => {
+      const a = this.normalizarValor(prev[k]);
+      const n = this.normalizarValor(curr[k]);
+      if (a !== n) {
+        cambios.push({ campo: etiquetas[k] || k, anterior: prev[k] ?? '', nuevo: curr[k] ?? '' });
+      }
+    });
+    return cambios;
+  }
+
+  private prepararSnapshotAntesDeEditar() {
+    this._snapshotAntes = this.getSnapshotActual();
+  }
+
+  private mostrarModalCambios(cambios: Array<{ campo: string; anterior: any; nuevo: any }>) {
+    this.cambiosRealizados = cambios || [];
+    this.modalCambiosVisible = true;
+  }
+
+  cerrarModalCambios() {
+    this.modalCambiosVisible = false;
+    // Construir y mostrar el resumen de inscripción en la parte superior
+    this.construirResumenInscripcion();
+    this.resumenVisible = true;
+    try {
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 0);
+    } catch (e) {}
   }
 
   // --- Resumen de inscripción ---

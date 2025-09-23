@@ -10,6 +10,10 @@ class DiplomaBachiller extends Model
     use HasFactory;
 
     protected $table = 'diploma_bachiller';
+    // La tabla usa cod_ceta_est como clave primaria (no 'id')
+    protected $primaryKey = 'cod_ceta_est';
+    public $incrementing = false;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'cod_ceta_est',

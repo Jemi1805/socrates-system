@@ -12,16 +12,16 @@
     <div class="mt-3">
       <ng-container *ngIf="resumenInscripcion as r; else resumenVacioTplTop">
       <div class="card">
-        <div class="card-title">
+        <div class="card-title" style="position: relative;">
           <h5 class="mb-0">
             <i class="bi bi-clipboard-check me-2"></i>
             Resumen de la inscripción
           </h5>
-          <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/modalidad-graduacion']">
+          <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/modalidad-graduacion']" style="position: relative; z-index: 1061; pointer-events: auto;">
             <i class="bi bi-arrow-left me-1"></i>
             Volver
           </a>
-          <div class="readonly-mask" *ngIf="viewInscripcion && !editAranceles"></div>
+          
     </div>
           <div class="row g-3">
             <div class="col-md-6"><label>Carrera:</label> {{ r.carrera || '-' }}</div>
@@ -40,7 +40,7 @@
                 <li *ngIf="r.es_cambio_plan">Homologación por cambio de plan de estudios</li>
                 <li *ngIf="!r.es_edu_regular && !r.es_tecnico_medio && !r.es_traspaso && !r.es_cambio_plan">Ninguno</li>
               </ul>
-              <div class="readonly-mask" *ngIf="viewInscripcion && !editConclusion"></div>
+              
       </div>
             <div class="col-12" *ngIf="(r.aranceles || []).length > 0">
               <div class="table-responsive">
@@ -77,7 +77,6 @@
         </div>
       </ng-template>
     </div>
-    <div class="readonly-mask" *ngIf="viewInscripcion && !editBio"></div>
   </div>
 
   <div class="content-wrapper" *ngIf="!resumenVisible">
@@ -90,10 +89,29 @@
           Datos del estudiante
         </h3>
         <div class="d-flex align-items-center gap-2">
-          <button class="btn btn-sm btn-primary" *ngIf="!isEditing || viewInscripcion" (click)="iniciarEdicionBiograficos()">
-            <i class="bi bi-pencil-square me-1"></i>
-            Editar
-          </button>
+          <!-- Ver inscripción: editar/guardar/cancelar por tarjeta -->
+          <ng-container *ngIf="viewInscripcion; else nuevoEditTpl">
+            <button class="btn btn-sm btn-primary" *ngIf="!editBio" (click)="iniciarEdicionBioCard()">
+              <i class="bi bi-pencil-square me-1"></i>
+              Editar
+            </button>
+            <div class="d-flex gap-2" *ngIf="editBio">
+              <button class="btn btn-sm btn-success" (click)="guardarBioCard()">
+                <i class="bi bi-save me-1"></i>
+                Guardar cambios
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" (click)="cancelarEdicionBioCard()">
+                <i class="bi bi-x-circle me-1"></i>
+                Cancelar
+              </button>
+            </div>
+          </ng-container>
+          <ng-template #nuevoEditTpl>
+            <button class="btn btn-sm btn-primary" *ngIf="!isEditing" (click)="iniciarEdicionBiograficos()">
+              <i class="bi bi-pencil-square me-1"></i>
+              Editar
+            </button>
+          </ng-template>
           <button class="btn btn-sm" (click)="toggleBiographicalData()">
             <i class="bi" [ngClass]="showBiographicalData ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
           </button>
@@ -139,17 +157,17 @@
         <div class="bio-row">
           <div class="bio-item">
             <span class="form-label">Nombres:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.nombres_est" name="nombres" placeholder="Ingrese Nombres" required [disabled]="!isEditing && !esNuevoPostulante"
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.nombres_est" name="nombres" placeholder="Ingrese Nombres" required [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)"
                    (input)="onNombreInput('nombres_est', $event)" />
           </div>
           <div class="bio-item">
             <span class="form-label">Apellido Paterno:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_pat" name="ap_pat" placeholder="Ingrese Apellido Paterno" required [disabled]="!isEditing && !esNuevoPostulante"
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_pat" name="ap_pat" placeholder="Ingrese Apellido Paterno" required [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)"
                    (input)="onNombreInput('ap_pat', $event)" />
           </div>
           <div class="bio-item">
             <span class="form-label">Apellido Materno:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_mat" name="ap_mat" placeholder="Ingrese Apellido Materno" required [disabled]="!isEditing && !esNuevoPostulante"
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_mat" name="ap_mat" placeholder="Ingrese Apellido Materno" required [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)"
                    (input)="onNombreInput('ap_mat', $event)" />
           </div>
         </div>
@@ -157,11 +175,11 @@
         <div class="row g-1">
           <div class="col-md-2">
             <span class="form-label">Fecha de Nacimiento:</span>
-            <input type="date" class="form-control" [(ngModel)]="postulanteActual.fecha_nacimiento" name="fecha_nacimiento" placeholder="Ingrese Fecha de Nacimiento" required [disabled]="!isEditing && !esNuevoPostulante" />
+            <input type="date" class="form-control" [(ngModel)]="postulanteActual.fecha_nacimiento" name="fecha_nacimiento" placeholder="Ingrese Fecha de Nacimiento" required [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)" />
           </div>
           <div class="col-md-3">
             <span class="form-label">Lugar de Nacimiento:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.lugar_nacimiento" name="lugar_nacimiento" placeholder="Ingrese Lugar de Nacimiento" required [disabled]="!isEditing && !esNuevoPostulante"
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.lugar_nacimiento" name="lugar_nacimiento" placeholder="Ingrese Lugar de Nacimiento" required [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)"
                    (input)="onLugarNacimientoInput($event)" />
           </div>
           <div class="col-auto">
@@ -172,23 +190,23 @@
                    inputmode="numeric" minlength="8" maxlength="9"
                    pattern="^\\d{8,9}$"
                    (input)="onCiInput($event)"
-                   [disabled]="!isEditing && !esNuevoPostulante" />
+                   [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)" />
           </div>
           <!-- Separador visual entre CI y Complemento -->
-          <div *ngIf="esNuevoPostulante || isEditing" class="col-auto d-flex align-items-end justify-content-center">
+          <div *ngIf="esNuevoPostulante || isEditing || (viewInscripcion && editBio)" class="col-auto d-flex align-items-end justify-content-center">
             <span class="px-1 pb-2">-</span>
           </div>
-          <div *ngIf="esNuevoPostulante || isEditing" class="col-auto">
+          <div *ngIf="esNuevoPostulante || isEditing || (viewInscripcion && editBio)" class="col-auto">
             <span class="form-label">Complemento:</span>
             <input type="text" class="form-control" name="complemento" [(ngModel)]="postulanteActual.complemento"
                    placeholder="Ej.: 1A"
                    inputmode="text" maxlength="2" pattern="^[0-9][A-Z]$"
                    (input)="onComplementoInput($event)"
-                   required [disabled]="!isEditing && !esNuevoPostulante" />
+                   required [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)" />
           </div>
           <div class="col">
             <span class="form-label">Procedencia:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.procedencia" name="procedencia" placeholder="Ej: Cochabamba" required [disabled]="!isEditing && !esNuevoPostulante"
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.procedencia" name="procedencia" placeholder="Ej: Cochabamba" required [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)"
                    (input)="onProcedenciaInput($event)" />
           </div>
         </div>
@@ -213,6 +231,16 @@
             <i class="bi bi-pencil-square me-1"></i>
             Editar
           </button>
+          <div class="d-flex gap-2" *ngIf="viewInscripcion && editBach">
+            <button class="btn btn-sm btn-success" (click)="guardarBachCard()">
+              <i class="bi bi-save me-1"></i>
+              Guardar cambios
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" (click)="cancelarEdicionBachCard()">
+              <i class="bi bi-x-circle me-1"></i>
+              Cancelar
+            </button>
+          </div>
           <button class="btn btn-sm" (click)="toggleBachilleratoData()">
           <i class="bi" [ngClass]="showBachilleratoData ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
           </button>
@@ -574,6 +602,16 @@
               <i class="bi bi-pencil-square me-1"></i>
               Editar
             </button>
+            <div class="d-flex gap-2" *ngIf="viewInscripcion && editInicio">
+              <button class="btn btn-sm btn-success" (click)="guardarInicioCard()">
+                <i class="bi bi-save me-1"></i>
+                Guardar cambios
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" (click)="cancelarEdicionInicioCard()">
+                <i class="bi bi-x-circle me-1"></i>
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
 
@@ -610,6 +648,16 @@
               <i class="bi bi-pencil-square me-1"></i>
               Editar
             </button>
+            <div class="d-flex gap-2" *ngIf="viewInscripcion && editConclusion">
+              <button class="btn btn-sm btn-success" (click)="guardarConclusionCard()">
+                <i class="bi bi-save me-1"></i>
+                Guardar cambios
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" (click)="cancelarEdicionConclusionCard()">
+                <i class="bi bi-x-circle me-1"></i>
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
 
@@ -653,6 +701,16 @@
             <i class="bi bi-pencil-square me-1"></i>
             Editar
           </button>
+          <div class="d-flex gap-2" *ngIf="viewInscripcion && editAranceles">
+            <button class="btn btn-sm btn-success" (click)="guardarArancelesCard()">
+              <i class="bi bi-save me-1"></i>
+              Guardar cambios
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" (click)="cancelarEdicionArancelesCard()">
+              <i class="bi bi-x-circle me-1"></i>
+              Cancelar
+            </button>
+          </div>
         </div>
       </div>
 
@@ -954,13 +1012,7 @@
   
   <!-- Acciones al final en modo visualización -->
   <div class="mt-3 d-flex justify-content-start gap-2" *ngIf="viewInscripcion">
-    <button *ngIf="editBio || editBach || editInicio || editConclusion || editAranceles"
-            type="button" class="btn btn-success" (click)="guardarCambiosVerInscripcion()">
-      <i class="bi bi-save me-1"></i>
-      Guardar cambios
-    </button>
-    <button *ngIf="!(editBio || editBach || editInicio || editConclusion || editAranceles)"
-            type="button" class="btn btn-success" (click)="goBackToModalidades()">
+    <button type="button" class="btn btn-success" (click)="goBackToModalidades()">
       <i class="bi bi-x-circle me-1"></i>
       Cerrar visualización
     </button>
@@ -1104,4 +1156,48 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- Modal de Cambios Guardados (global, al final para evitar clipping) -->
+<div *ngIf="modalCambiosVisible">
+  <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalCambiosLabel">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header py-2">
+          <h5 class="modal-title" id="modalCambiosLabel">
+            <i class="bi bi-clipboard-check text-success me-2"></i>
+            Cambios guardados
+          </h5>
+          <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="cerrarModalCambios()"></button>
+        </div>
+        <div class="modal-body">
+          <div *ngIf="(cambiosRealizados || []).length === 0" class="alert alert-info py-2">
+            No se detectaron cambios respecto a la información anterior.
+          </div>
+          <div class="table-responsive" *ngIf="(cambiosRealizados || []).length > 0">
+            <table class="table table-sm table-striped align-middle">
+              <thead>
+                <tr>
+                  <th>Campo</th>
+                  <th>Anterior</th>
+                  <th>Nuevo</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let c of cambiosRealizados">
+                  <td>{{ c.campo }}</td>
+                  <td>{{ c.anterior || '-' }}</td>
+                  <td>{{ c.nuevo || '-' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-success btn-sm" (click)="cerrarModalCambios()">Aceptar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop fade show" (click)="cerrarModalCambios()"></div>
 </div>
