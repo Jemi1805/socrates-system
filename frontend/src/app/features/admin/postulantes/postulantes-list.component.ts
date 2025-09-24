@@ -134,6 +134,11 @@ export class PostulantesListComponent implements OnInit {
       const n = Number(v);
       return isNaN(n) ? null : n;
     };
+    // Priorizar ID si existe (id proveniente de BD o arancel_id en UI)
+    const id = (item && (item.id ?? item.arancel_id));
+    if (id !== undefined && id !== null && String(id).trim() !== '') {
+      return `ID#${String(id).trim()}`;
+    }
     const f = normStr(item?.num_factura);
     const c = normStr(item?.num_comprobante);
     if (f && f !== '0') return `F#${f}`;
@@ -1697,12 +1702,118 @@ private cargarPostulanteDesdeBD() {
 
   guardarArancelesCard() {
     if (!this._snapshotAntes) this.prepararSnapshotAntesDeEditar();
-    // TODO: persistencia específica de aranceles seleccionados si se requiere guardar en esta etapa
-    // Por ahora, mostrar modal de cambios (conteo/total) y salir de edición
-    this.editAranceles = false;
-    this.hasChangesInView = false;
-    const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual());
-    this.mostrarModalCambios(cambios);
+    const cod = this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta;
+    if (!cod) {
+      alert('No hay código CETA. Guarde biográficos primero.');
+      return;
+    }
+
+    // Preparar un resumen de cambios específico de aranceles para el modal
+    const antesCount = (this._snapshotAntes as any)?.aranceles_count ?? this.selectedAranceles.length;
+    const antesTotal = (this._snapshotAntes as any)?.aranceles_total ?? (this.selectedAranceles || []).reduce((s, a) => s + (Number(a?.monto) || 0), 0);
+    const ahoraCount = (this.selectedAranceles || []).length;
+    const ahoraTotal = (this.selectedAranceles || []).reduce((s, a) => s + (Number(a?.monto) || 0), 0);
+    const cambiosResumen: Array<{ campo: string; anterior: any; nuevo: any }> = [];
+    if (antesCount !== ahoraCount) cambiosResumen.push({ campo: 'Aranceles seleccionados', anterior: antesCount, nuevo: ahoraCount });
+    if (antesTotal !== ahoraTotal) cambiosResumen.push({ campo: 'Total Aranceles', anterior: antesTotal, nuevo: ahoraTotal });
+
+    // Primero obtener qué filas están seleccionadas en BD para poder desmarcarlas con ID cuando corresponda
+    this.postulanteService.getArancelesEstByCodCeta(cod as number, true).subscribe({
+      next: (resp) => {
+        const dbSel: any[] = Array.isArray(resp?.data) ? resp.data : (Array.isArray(resp) ? resp : []);
+        const normStr = (v: any) => (v === undefined || v === null) ? '' : String(v).trim();
+        const normNum = (v: any) => { const n = Number(v); return isNaN(n) ? null : n; };
+        const normFecha = (v: any) => this.normalizarFecha(v);
+        const keyOf = (o: any) => this.arancelKey(o);
+        const compositeKey = (o: any) => `X#${[normFecha(o?.fecha) || '', normStr(o?.concepto) || '', String(normNum(o?.monto) ?? '')].join('|')}`;
+        const facturaKey = (o: any) => { const f = normStr(o?.num_factura); return (f && f !== '0') ? `F#${f}` : null; };
+        const reciboKey = (o: any) => { const c = normStr(o?.num_comprobante); return (c && c !== '0') ? `C#${c}` : null; };
+        const dbIndex: Map<string, any> = new Map();
+        for (const r of dbSel) {
+          const kId = keyOf(r); // ID#id si existe, o fallback
+          dbIndex.set(kId, r);
+          const kF = facturaKey(r); if (kF) dbIndex.set(kF, r);
+          const kC = reciboKey(r); if (kC) dbIndex.set(kC, r);
+          const kX = compositeKey(r); dbIndex.set(kX, r);
+        }
+
+        const isSel = (a: any) => this.isArancelSeleccionado(a);
+        const inscId = this.inscripModalidadIdActual || null;
+        const buildPayload = (a: any, seleccionado: number) => {
+          const fecha = this.normalizarFecha(a.fecha);
+          const prev = { ...a };
+          const p: any = {
+            cod_ceta_est: Number(cod),
+            gestion: a.gestion || null,
+            fecha: fecha || null,
+            concepto: a.concepto || null,
+            monto: (a.monto ?? null),
+            num_factura: (a.num_factura || null),
+            num_comprobante: (a.num_comprobante || null),
+            razon: (a.razon || null),
+            nit: (a.nit || null),
+            seleccionado,
+            origen: (a.origen || 'sga'),
+          };
+          // Estado de pago: usa flag de la fila o el conmutador global "Pago completo"
+          const pagadoFlag = !!(a?.pagado || this.pagoCompletoSeleccionados);
+          p.pagado = pagadoFlag ? 1 : 0;
+          p.fecha_pago = pagadoFlag ? (fecha || null) : null;
+          if (inscId) p.inscrip_modalidad_id = inscId;
+          // prev_* para asegurar UPDATE y no INSERT
+          p.prev_num_factura = (prev.num_factura ?? null);
+          p.prev_num_comprobante = (prev.num_comprobante ?? null);
+          p.prev_fecha = fecha || null;
+          p.prev_concepto = a.concepto || null;
+          p.prev_monto = (a.monto ?? null);
+          return p;
+        };
+
+        const ops: Array<any> = [];
+        for (const a of (this.aranceles || [])) {
+          const key = keyOf(a);
+          const selFlag = isSel(a) ? 1 : 0;
+          // Siempre realizar upsert para fijar el estado en BD (evita que no se actualice por falta de ID)
+          const upsertPayload = buildPayload(a, selFlag);
+          console.debug('[Aranceles][Save] Upsert payload:', upsertPayload);
+          if (selFlag === 1) {
+            // Selección: crear/actualizar
+            ops.push(this.postulanteService.upsertArancelEst(upsertPayload));
+          } else {
+            // Deselección: eliminar si existe en BD
+            const dbRow = dbIndex.get(key);
+            if (dbRow && dbRow.id != null) {
+              console.debug('[Aranceles][Save] Delete ID:', dbRow.id);
+              ops.push(this.postulanteService.deleteArancelEst(dbRow.id));
+            }
+          }
+        }
+
+        forkJoin(ops.length ? ops : [of(null)]).subscribe({
+          next: () => {
+            // Refrescar desde backend para asegurar consistencia de selección
+            this.cargarArancelesMaterialExtra();
+            this.editAranceles = false;
+            this.hasChangesInView = false;
+            // Mostrar resumen específico si existe; si no hay diferencias, mostrar el comparador general
+            if (cambiosResumen.length) {
+              this.mostrarModalCambios(cambiosResumen);
+            } else {
+              const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual());
+              this.mostrarModalCambios(cambios);
+            }
+          },
+          error: (e) => {
+            console.error('Error al guardar selección de aranceles:', e);
+            alert('No se pudo guardar la selección de aranceles. Intente nuevamente.');
+          }
+        });
+      },
+      error: (e) => {
+        console.error('No se pudieron obtener aranceles seleccionados desde BD:', e);
+        alert('No se pudo sincronizar la selección de aranceles desde BD.');
+      }
+    });
   }
 
   // --- Guardar datos biográficos y habilitar el resto de secciones

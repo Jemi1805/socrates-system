@@ -264,6 +264,10 @@ export class PostulanteService {
     return this.http.put<any>(`${this.baseUrl}/aranceles_est/${id}`, payload);
   }
 
+  deleteArancelEst(id: number | string): Observable<any> {
+    return this.http.delete<any>(`${this.baseUrl}/aranceles_est/${id}`);
+  }
+
   // --- Fallback simple: obtener inscrip_modalidad por cod_ceta_est (para aranceles_completos) ---
   getInscripModalidadByCodCeta(codCeta: number | string): Observable<any> {
     const params: any = { cod_ceta_est: codCeta };
