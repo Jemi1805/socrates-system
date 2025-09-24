@@ -696,12 +696,13 @@
           Aranceles (Material Extra)
           <small class="text-muted" *ngIf="!loadingAranceles">Total: {{ totalAranceles }} </small>
         </h3>
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2" *ngIf="viewInscripcion">
           <button class="btn btn-sm btn-primary" *ngIf="viewInscripcion && !editAranceles" (click)="iniciarEdicionArancelesCard()">
             <i class="bi bi-pencil-square me-1"></i>
             Editar
           </button>
-          <div class="d-flex gap-2" *ngIf="viewInscripcion && editAranceles">
+          <!-- Ocultar los botones del header mientras se edita una fila específica -->
+          <div class="d-flex gap-2" *ngIf="viewInscripcion && editAranceles && editingArancelIndex === null">
             <button class="btn btn-sm btn-success" (click)="guardarArancelesCard()">
               <i class="bi bi-save me-1"></i>
               Guardar cambios
@@ -732,8 +733,10 @@
         </div>
       </div>
 
-      <!-- Registro manual de aranceles (solo para nuevo postulante) -->
-      <div class="manual-arancel my-3 border rounded" *ngIf="esNuevoPostulante">
+      <!-- Registro manual de aranceles
+           - En ver-inscripción: mostrar solo en edición y si permiteEdicionArancelesEnVista (nuevo postulante o CETA inicia con 9)
+           - Fuera de ver-inscripción: siempre visible -->
+      <div class="manual-arancel my-3 border rounded" *ngIf="!viewInscripcion || (viewInscripcion && editAranceles && permiteEdicionArancelesEnVista)">
         <div class="row g-2">
           <div class="col-md-2">
             <label class="form-label">Gestión</label>
@@ -827,7 +830,7 @@
                   <i class="bi bi-save me-1"></i>
                   Guardar cambios
                 </button>
-                <button type="button" class="btn btn-outline-secondary" (click)="cancelarEdicionArancelManual()">
+                <button type="button" class="btn btn-outline-secondary" (click)="cancelarEdicionManualYCard()">
                   <i class="bi bi-x-circle me-1"></i>
                   Cancelar
                 </button>
@@ -860,7 +863,6 @@
               <th>Recibo</th>
               <th>Razón Social/NIT</th>
               <th class="text-center">Sel</th>
-              <th *ngIf="esNuevoPostulante">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -879,7 +881,12 @@
                 <ng-template #razonNitVacio>-</ng-template>
               </td>
               <td class="text-center">
-                <input type="checkbox" [checked]="isArancelSeleccionado(a)" (change)="onArancelToggle(a, $any($event.target).checked)" [disabled]="viewInscripcion && !editAranceles" />
+                <div class="d-inline-flex align-items-center gap-2">
+                  <input type="checkbox" [checked]="isArancelSeleccionado(a)" (change)="onArancelToggle(a, $any($event.target).checked)" [disabled]="viewInscripcion && !editAranceles" />
+                  <button class="btn btn-sm btn-outline-secondary" title="Editar" *ngIf="viewInscripcion && editAranceles && permiteEdicionArancelesEnVista" (click)="editarArancelManual(a, i)">
+                    <i class="bi bi-pencil-square"></i>
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -956,7 +963,7 @@
                 <td>{{ (a.num_factura && a.num_factura !== '0') ? a.num_factura : '' }}</td>
                 <td>{{ (a.num_comprobante && a.num_comprobante !== '0') ? a.num_comprobante : '' }}</td>
                 <td class="text-end">{{ a.monto || '-' }}</td>
-                <td *ngIf="esNuevoPostulante" class="text-center">
+                <td *ngIf="esNuevoPostulante || (viewInscripcion && editAranceles)" class="text-center">
                   <button class="btn btn-sm btn-outline-secondary" title="Editar" *ngIf="a.origen === 'manual'" (click)="editarArancelManual(a, i)">
                     <i class="bi bi-pencil-square"></i>
                   </button>

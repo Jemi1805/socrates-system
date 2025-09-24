@@ -75,8 +75,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // 📚 CRUD API RESOURCES (protegidos)
     // Listado filtrado para aranceles_est (evita conflicto de firma con CrudController@index)
-    Route::get('aranceles_est/list', [ArancelesEstController::class, 'list']);
+    Route::get('aranceles_est/list', [ArancelesEstController::class, 'listar']);
     Route::apiResource('aranceles_est', ArancelesEstController::class);
+    Route::post('aranceles_est/upsert_by_cod', [ArancelesEstController::class, 'upsertByCod']);
     Route::apiResource('modalidad', ModalidadController::class);
     Route::apiResource('pract_ind', PractIndController::class);
     Route::apiResource('proyecto', ProyectoController::class);
@@ -167,7 +168,9 @@ Route::get('traspasos_instituto/get_by_cod', [TraspasosInstitutoController::clas
 Route::get('res_homol_cp/get_by_cod', [ResHomolCpController::class, 'getByCodCeta']);
 
 // Diagnóstico: rutas públicas temporales
-Route::get('ping_public', fn() => response()->json(['ok' => true]));
+Route::get('ping_public', function () {
+    return response()->json(['ok' => true]);
+});
 
 // Endpoints públicos alternativos (evitar cualquier colisión con rutas previas bajo auth)
 Route::prefix('public')->group(function () {

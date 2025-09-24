@@ -16,7 +16,17 @@ class ArancelesEst extends Model
         'concepto',
         'monto',
         'pagado',
-        'fecha_pago'
+        'fecha_pago',
+        // Campos adicionales usados por el registro manual desde frontend
+        'seleccionado',
+        'origen',
+        'gestion',
+        'fecha',
+        'num_factura',
+        'num_comprobante',
+        'razon',
+        'nit',
+        'inscrip_modalidad_id',
     ];
     
     protected $casts = [

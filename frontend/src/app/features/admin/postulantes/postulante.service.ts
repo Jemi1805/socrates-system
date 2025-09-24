@@ -229,6 +229,41 @@ export class PostulanteService {
     return this.http.get<any>(`${this.baseUrl}/aranceles_est/list`, { params });
   }
 
+  upsertArancelEst(payload: {
+    cod_ceta_est: number | string;
+    gestion?: string | null;
+    fecha?: string | null;
+    concepto?: string | null;
+    monto?: number | null;
+    num_factura?: string | null;
+    num_comprobante?: string | null;
+    razon?: string | null;
+    nit?: string | null;
+    seleccionado?: boolean | number;
+    origen?: string | null;
+  }): Observable<any> {
+    // Upsert robusto en backend: actualiza si existe, crea si no
+    return this.http.post<any>(`${this.baseUrl}/aranceles_est/upsert_by_cod`, payload);
+  }
+
+  updateArancelEst(id: number | string, payload: {
+    cod_ceta_est?: number | string;
+    gestion?: string | null;
+    fecha?: string | null;
+    concepto?: string | null;
+    monto?: number | null;
+    num_factura?: string | null;
+    num_comprobante?: string | null;
+    razon?: string | null;
+    nit?: string | null;
+    seleccionado?: boolean | number;
+    origen?: string | null;
+    pagado?: boolean | number | null;
+    fecha_pago?: string | null;
+  }): Observable<any> {
+    return this.http.put<any>(`${this.baseUrl}/aranceles_est/${id}`, payload);
+  }
+
   // --- Fallback simple: obtener inscrip_modalidad por cod_ceta_est (para aranceles_completos) ---
   getInscripModalidadByCodCeta(codCeta: number | string): Observable<any> {
     const params: any = { cod_ceta_est: codCeta };

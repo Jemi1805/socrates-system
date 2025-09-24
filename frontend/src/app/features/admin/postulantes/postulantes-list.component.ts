@@ -117,12 +117,29 @@ export class PostulantesListComponent implements OnInit {
   editInicio = false;
   editConclusion = false;
   editAranceles = false;
+  // Muestra el formulario de nuevo arancel manual durante la edición en modo visualización
+  showManualArancelesEnEdicion = false;
   // Seguimiento de cambios en modo visualización
   hasChangesInView: boolean = false;
   private markChangedInView() {
     if (this.viewInscripcion) {
       this.hasChangesInView = true;
     }
+  }
+
+  // Clave estable para identificar un arancel (factura, recibo o composite fecha|concepto|monto)
+  private arancelKey(item: any): string {
+    const normStr = (v: any) => (v === undefined || v === null) ? '' : String(v).trim();
+    const normNum = (v: any) => {
+      const n = Number(v);
+      return isNaN(n) ? null : n;
+    };
+    const f = normStr(item?.num_factura);
+    const c = normStr(item?.num_comprobante);
+    if (f && f !== '0') return `F#${f}`;
+    if (c && c !== '0') return `C#${c}`;
+    const comp = [normStr(item?.fecha) || '', normStr(item?.concepto) || '', String(normNum(item?.monto) ?? '')].join('|');
+    return `X#${comp}`;
   }
 
   // --- Confirmación de guardado global ---
@@ -201,8 +218,14 @@ export class PostulantesListComponent implements OnInit {
   totalArancelesSeleccionados = 0;
   // Estado de pago para los aranceles seleccionados (conmutador Pago completo / Con deuda)
   pagoCompletoSeleccionados = false;
+  // inscrip_modalidad vigente (para asociar aranceles_est)
+  private inscripModalidadIdActual: number | null = null;
   // Edición de arancel manual
   editingArancelIndex: number | null = null;
+  editingArancelId: number | null = null;
+  // Contexto de edición: clave estable e índice en la tabla principal
+  private editingArancelKey: string | null = null;
+  private editingArancelIndexTabla: number | null = null;
   // Registro manual de aranceles
   nuevoArancel: {
     gestion: string;
@@ -373,6 +396,14 @@ get gestionesConclusionOpciones(): string[] {
   if (!ini) return this.gestionesOpciones;
   const minIdx = this.indiceGestion(ini) + this.MIN_GESTIONES_DIF;
   return this.gestionesOpciones.filter(g => this.indiceGestion(g) >= minIdx);
+}
+
+get permiteEdicionArancelesEnVista(): boolean {
+  // En ver inscripción, permitir edición manual SOLO si el CETA es temporal (empieza con '9').
+  const cod: any = (this.postulanteActual?.cod_ceta ?? this.estudiante?.cod_ceta);
+  const codStr = (cod !== undefined && cod !== null) ? String(cod) : '';
+  const empiezaCon9 = codStr.startsWith('9');
+  return !!(this.viewInscripcion && empiezaCon9);
 }
 
 // Listas para UI (limitadas) segun toggle
@@ -933,6 +964,8 @@ private cargarPostulanteDesdeBD() {
       return isNaN(n) ? 0 : n;
     };
     return (items || []).map((r: any) => ({
+      arancel_id: (r && r.id != null) ? Number(r.id) : null,
+      inscrip_modalidad_id: (r && r.inscrip_modalidad_id != null) ? Number(r.inscrip_modalidad_id) : null,
       gestion: normStr(r.gestion || ''),
       fecha: this.normalizarFecha(r.fecha) || '',
       concepto: normStr(r.concepto || r.descripcion || ''),
@@ -1246,6 +1279,7 @@ private cargarPostulanteDesdeBD() {
     this.editInicio = false;
     this.editConclusion = false;
     this.editAranceles = false;
+    this.showManualArancelesEnEdicion = false;
   }
 
   salirVerInscripcion() {
@@ -1369,15 +1403,22 @@ private cargarPostulanteDesdeBD() {
   finalizarEdicionInicioCard() { this.editInicio = false; }
   iniciarEdicionConclusionCard() { this.prepararSnapshotAntesDeEditar(); this.editConclusion = true; }
   finalizarEdicionConclusionCard() { this.editConclusion = false; }
-  iniciarEdicionArancelesCard() { this.prepararSnapshotAntesDeEditar(); this.editAranceles = true; }
-  finalizarEdicionArancelesCard() { this.editAranceles = false; }
+  iniciarEdicionArancelesCard() {
+    this.prepararSnapshotAntesDeEditar();
+    this.editAranceles = true;
+    // Si estamos visualizando una inscripción, habilitar el formulario de arancel manual temporalmente
+    if (this.viewInscripcion) {
+      this.showManualArancelesEnEdicion = true;
+    }
+  }
+  finalizarEdicionArancelesCard() { this.editAranceles = false; this.showManualArancelesEnEdicion = false; }
 
   // --- Guardados por tarjeta ---
   cancelarEdicionBioCard() { this.editBio = false; }
   cancelarEdicionBachCard() { this.editBach = false; }
   cancelarEdicionInicioCard() { this.editInicio = false; }
   cancelarEdicionConclusionCard() { this.editConclusion = false; }
-  cancelarEdicionArancelesCard() { this.editAranceles = false; }
+  cancelarEdicionArancelesCard() { this.editAranceles = false; this.showManualArancelesEnEdicion = false; }
 
   guardarBioCard() {
     if (!this._snapshotAntes) this.prepararSnapshotAntesDeEditar();
@@ -2650,52 +2691,153 @@ private cargarPostulanteDesdeBD() {
   // --- Arancel manual: agregar a seleccionados ---
   agregarArancelManual() {
     this.arancelManualError = null;
-    if (!this.esNuevoPostulante) {
-      this.arancelManualError = 'El registro manual de arancel solo está disponible para nuevos postulantes.';
+    // Permitir registro manual:
+    // - Siempre fuera de ver-inscripción (flujo de registro)
+    // - En ver-inscripción: solo si la card está en edición y permiteEdicionArancelesEnVista (cod CETA inicia con '9')
+    const puedeManual = (!this.viewInscripcion) || (this.viewInscripcion && this.editAranceles && this.permiteEdicionArancelesEnVista);
+    if (!puedeManual) {
+      this.arancelManualError = 'El registro manual de arancel solo está disponible en edición para inscripciones nuevas (CETA inicia con 9).';
       return;
     }
+    // if (!this.esNuevoPostulante) {
+    //   this.arancelManualError = 'El registro manual de arancel solo está disponible para nuevos postulantes.';
+    //   return;
+    // }
     const montoNum = this.toNumber(this.nuevoArancel.monto);
     if (!this.nuevoArancel.concepto || montoNum <= 0) {
       this.arancelManualError = 'Ingrese al menos Concepto y un Monto válido (> 0).';
       return;
     }
-    const item: any = {
+    const cod = Number(this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta) || null;
+    if (!cod) {
+      this.arancelManualError = 'No hay código CETA. Guarde biográficos primero.';
+      return;
+    }
+
+    const nuevoItem: any = {
       gestion: (this.nuevoArancel.gestion || '').toString(),
-      fecha: this.nuevoArancel.fecha || '',
-      concepto: this.nuevoArancel.concepto,
+      fecha: this.normalizarFecha(this.nuevoArancel.fecha),
+      concepto: (this.nuevoArancel.concepto || '').toString(),
       monto: montoNum,
       num_factura: (this.nuevoArancel.num_factura || '').toString(),
       num_comprobante: (this.nuevoArancel.num_comprobante || '').toString(),
-      razon: this.nuevoArancel.razon || '',
+      razon: (this.nuevoArancel.razon || '').toString(),
       nit: (this.nuevoArancel.nit || '').toString(),
       origen: 'manual',
       pagado: true,
     };
-    if (this.editingArancelIndex !== null && this.editingArancelIndex >= 0 && this.editingArancelIndex < this.selectedAranceles.length) {
-      // Guardar cambios sobre el ítem existente
-      this.selectedAranceles[this.editingArancelIndex] = { ...this.selectedAranceles[this.editingArancelIndex], ...item };
-      this.editingArancelIndex = null;
-    } else {
-      // Añadir directamente a seleccionados para reflejar pago manual
-      this.selectedAranceles.push(item);
-    }
-    this.recalcularTotalSeleccionados();
-    // Limpiar formulario
-    this.nuevoArancel = {
-      gestion: '',
-      fecha: '',
-      concepto: '',
-      monto: '',
-      num_factura: '',
-      num_comprobante: '',
-      razon: '',
-      nit: ''
+
+    const prevItem = (this.editingArancelIndex !== null && this.editingArancelIndex >= 0 && this.editingArancelIndex < this.selectedAranceles.length)
+      ? { ...this.selectedAranceles[this.editingArancelIndex] }
+      : null;
+
+    const payload = {
+      cod_ceta_est: cod,
+      gestion: nuevoItem.gestion || null,
+      fecha: nuevoItem.fecha || null,
+      concepto: nuevoItem.concepto || null,
+      monto: nuevoItem.monto ?? null,
+      num_factura: nuevoItem.num_factura || null,
+      num_comprobante: nuevoItem.num_comprobante || null,
+      razon: nuevoItem.razon || null,
+      nit: nuevoItem.nit || null,
+      pagado: nuevoItem.pagado ? 1 : 0,
+      fecha_pago: nuevoItem.pagado ? (nuevoItem.fecha || null) : null,
+      seleccionado: 1,
+      origen: 'manual',
     };
+
+    // Asociar inscrip_modalidad_id si está disponible
+    const inscId = this.inscripModalidadIdActual || (prevItem && (prevItem as any).inscrip_modalidad_id) || null;
+    if (inscId) (payload as any).inscrip_modalidad_id = inscId;
+
+    // Incluir valores previos para upsert robusto en backend
+    if (prevItem) {
+      (payload as any).prev_num_factura = (prevItem as any).num_factura ?? null;
+      (payload as any).prev_num_comprobante = (prevItem as any).num_comprobante ?? null;
+      (payload as any).prev_fecha = (prevItem as any).fecha ?? null;
+      (payload as any).prev_concepto = (prevItem as any).concepto ?? null;
+      (payload as any).prev_monto = (prevItem as any).monto ?? null;
+    }
+
+    this.postulanteService.upsertArancelEst(payload).subscribe({
+      next: (res: any) => {
+        // Actualizar tablas en memoria
+        if (this.editingArancelIndex !== null && this.editingArancelIndex >= 0 && this.editingArancelIndex < this.selectedAranceles.length) {
+          const updated: any = { ...this.selectedAranceles[this.editingArancelIndex], ...nuevoItem };
+          if (res && res.id != null) updated.arancel_id = Number(res.id);
+          if (res && res.inscrip_modalidad_id != null) updated.inscrip_modalidad_id = Number(res.inscrip_modalidad_id);
+          this.selectedAranceles[this.editingArancelIndex] = updated;
+          // Si existe en la tabla principal, actualizarlo también
+          if (this.aranceles && this.aranceles[this.editingArancelIndex]) {
+            const upd2: any = { ...this.aranceles[this.editingArancelIndex], ...nuevoItem };
+            if (res && res.id != null) upd2.arancel_id = Number(res.id);
+            if (res && res.inscrip_modalidad_id != null) upd2.inscrip_modalidad_id = Number(res.inscrip_modalidad_id);
+            this.aranceles[this.editingArancelIndex] = upd2;
+          }
+        } else {
+          const created: any = { ...nuevoItem };
+          if (res && res.id != null) created.arancel_id = Number(res.id);
+          if (res && res.inscrip_modalidad_id != null) created.inscrip_modalidad_id = Number(res.inscrip_modalidad_id);
+          this.selectedAranceles.push(created);
+          // Añadir a tabla principal si no existe por composite
+          if (!this._existeArancelEnLista(created, this.aranceles)) {
+            this.aranceles.push(created);
+            this.totalAranceles = this.aranceles.length;
+          }
+        }
+        this.recalcularTotalSeleccionados();
+        this._dedupeSelectedAranceles();
+
+        // Construir lista de cambios específica de arancel
+        const cambios: Array<{ campo: string; anterior: any; nuevo: any }> = [];
+        const etiquetas: Record<string, string> = {
+          gestion: 'Arancel.gestion',
+          fecha: 'Arancel.fecha',
+          concepto: 'Arancel.concepto',
+          monto: 'Arancel.monto',
+          num_factura: 'Arancel.factura',
+          num_comprobante: 'Arancel.recibo',
+          razon: 'Arancel.razon_social',
+          nit: 'Arancel.nit',
+        };
+        const campos = Object.keys(etiquetas);
+        for (const k of campos) {
+          const a = prevItem ? (prevItem as any)[k] ?? '' : '';
+          const n = (nuevoItem as any)[k] ?? '';
+          if (String(a) !== String(n)) {
+            cambios.push({ campo: etiquetas[k], anterior: a, nuevo: n });
+          }
+        }
+
+        // Mostrar modal de cambios como en otros cards
+        this.mostrarModalCambios(cambios);
+
+        // Limpiar formulario y estado de edición
+        this.editingArancelIndex = null;
+        this.editingArancelId = null;
+        this.editingArancelKey = null;
+        this.editingArancelIndexTabla = null;
+        this.nuevoArancel = {
+          gestion: '', fecha: '', concepto: '', monto: '', num_factura: '', num_comprobante: '', razon: '', nit: ''
+        };
+        },
+        error: (e) => {
+          console.error('No se pudo guardar el arancel manual:', e);
+          this.arancelManualError = 'No se pudo guardar el arancel. Intente nuevamente.';
+        }
+      });
   }
 
   editarArancelManual(item: any, index: number) {
-    if (!this.esNuevoPostulante) return;
-    // Prefill del formulario con los datos del ítem manual
+    // Si estás en ver inscripción y no está en edición la tarjeta, activarla para mostrar el formulario
+    if (this.viewInscripcion && !this.editAranceles && this.permiteEdicionArancelesEnVista) {
+      this.iniciarEdicionArancelesCard();
+    }
+    const puedeManual = this.esNuevoPostulante || (this.viewInscripcion && this.editAranceles && this.permiteEdicionArancelesEnVista);
+    if (!puedeManual) return;
+  
+    // Prefill del formulario con los datos del ítem (tu lógica existente):
     this.nuevoArancel = {
       gestion: (item?.gestion || '').toString(),
       fecha: item?.fecha || '',
@@ -2707,6 +2849,9 @@ private cargarPostulanteDesdeBD() {
       nit: (item?.nit || '').toString(),
     };
     this.editingArancelIndex = index;
+    this.editingArancelId = (item && item.arancel_id != null) ? Number(item.arancel_id) : null;
+    this.editingArancelIndexTabla = index;
+    this.editingArancelKey = this.arancelKey(item);
   }
 
   cancelarEdicionArancelManual() {
@@ -2721,6 +2866,27 @@ private cargarPostulanteDesdeBD() {
       razon: '',
       nit: ''
     };
+  }
+
+  // Cancelar edición de una fila y salir de modo edición de la tarjeta
+  cancelarEdicionManualYCard() {
+    this.editingArancelIndex = null;
+    this.editingArancelId = null;
+    this.editingArancelKey = null;
+    this.editingArancelIndexTabla = null;
+    this.arancelManualError = null;
+    this.nuevoArancel = {
+      gestion: '',
+      fecha: '',
+      concepto: '',
+      monto: '',
+      num_factura: '',
+      num_comprobante: '',
+      razon: '',
+      nit: ''
+    };
+    this.showManualArancelesEnEdicion = false;
+    this.editAranceles = false;
   }
 
   // Acciones de aranceles seleccionados
