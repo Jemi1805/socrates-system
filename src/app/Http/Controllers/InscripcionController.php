@@ -98,26 +98,52 @@ class InscripcionController extends Controller
             })->values()->toArray();
         }
 
-        // Homologación por Cambio de Plan (res_homol_cp) y sus grados, vinculados por cod_ceta_est
-        $cp = Schema::hasTable('res_homol_cp')
-            ? DB::table('res_homol_cp')
+        // Homologación por Cambio de Plan y sus grados, soportando tablas alternativas
+        $cp = null;
+        $cpTable = null;
+        if (Schema::hasTable('res_homol_cp')) {
+            $cpTable = 'res_homol_cp';
+            $cp = DB::table('res_homol_cp')
                 ->where('cod_ceta_est', (int) $cod_ceta)
                 ->orderByDesc('updated_at')
-                ->first()
-            : null;
+                ->first();
+        }
+        if (!$cp && Schema::hasTable('homologacion_cambio_plan')) {
+            $cpTable = 'homologacion_cambio_plan';
+            $cp = DB::table('homologacion_cambio_plan')
+                ->where('cod_ceta_est', (int) $cod_ceta)
+                ->orderByDesc('updated_at')
+                ->first();
+        }
         $gradosCp = [];
-        if ($cp && Schema::hasTable('grados_homol_cp')) {
-            $gradosCp = DB::table('grados_homol_cp')
-                ->where('homol_cp_id', $cp->id)
-                ->get()
-                ->map(function ($g) {
-                    return [
-                        'grado' => isset($g->grado) ? $g->grado : null,
-                        'gestion' => isset($g->gestion) ? $g->gestion : null,
-                    ];
-                })
-                ->values()
-                ->toArray();
+        if ($cp) {
+            // Detectar tabla de grados disponible
+            $gradosTbl = null;
+            if (Schema::hasTable('grados_homol_cp')) {
+                $gradosTbl = 'grados_homol_cp';
+            } elseif (Schema::hasTable('grados_homologacion_cp')) {
+                $gradosTbl = 'grados_homologacion_cp';
+            }
+            if ($gradosTbl) {
+                // Detectar columna FK disponible
+                $fkCol = null;
+                foreach (['homol_cp_id', 'homologacion_cp_id', 'homologacion_cambio_plan_id'] as $cand) {
+                    if (Schema::hasColumn($gradosTbl, $cand)) { $fkCol = $cand; break; }
+                }
+                if ($fkCol) {
+                    $gradosCp = DB::table($gradosTbl)
+                        ->where($fkCol, $cp->id)
+                        ->get()
+                        ->map(function ($g) {
+                            return [
+                                'grado' => isset($g->grado) ? $g->grado : null,
+                                'gestion' => isset($g->gestion) ? $g->gestion : null,
+                            ];
+                        })
+                        ->values()
+                        ->toArray();
+                }
+            }
         }
 
         // Inscripción de modalidad (para recuperar aranceles_completos y estado)
@@ -183,7 +209,12 @@ class InscripcionController extends Controller
             ] : null,
 
             'homol_cambio_plan' => $cp ? [
-                'nro_resolucion_rectoral' => isset($cp->nro_resolucion_rectoral) ? $cp->nro_resolucion_rectoral : (isset($cp->nro_res) ? $cp->nro_res : null),
+                // Mapear distintos posibles nombres de columna de número de resolución
+                'nro_resolucion_rectoral' => isset($cp->nro_resolucion_rectoral)
+                    ? $cp->nro_resolucion_rectoral
+                    : (isset($cp->nro_resolucion)
+                        ? $cp->nro_resolucion
+                        : (isset($cp->nro_res) ? $cp->nro_res : null)),
                 'fecha_emision' => isset($cp->fecha_emision) ? $cp->fecha_emision : null,
                 'grados_gestiones' => $gradosCp,
             ] : null,

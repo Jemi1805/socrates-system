@@ -30,37 +30,93 @@ class ResHomolCpController extends CrudController
             'grados_cursados' => 'nullable|string|max:255',
             'gestiones_cursadas' => 'nullable|string|max:255',
             'observacion' => 'nullable|string',
+            'grados_gestiones' => 'nullable|array',
+            'grados_gestiones.*.grado' => 'nullable|string|max:255',
+            'grados_gestiones.*.gestion' => 'nullable|string|max:50',
         ]);
-        $payload = [
-            'cod_ceta_est' => $data['cod_ceta_est'],
-        ];
-        if (DB::getSchemaBuilder()->hasColumn('res_homol_cp', 'nro_res')) {
+        // Determinar tabla principal disponible
+        $tbl = null;
+        if (DB::getSchemaBuilder()->hasTable('res_homol_cp')) {
+            $tbl = 'res_homol_cp';
+        } elseif (DB::getSchemaBuilder()->hasTable('homologacion_cambio_plan')) {
+            $tbl = 'homologacion_cambio_plan';
+        } else {
+            return response()->json(['success' => true, 'data' => null, 'notice' => 'homologacion table not found (noop)']);
+        }
+
+        // Armar payload según columnas disponibles en la tabla seleccionada
+        $payload = ['cod_ceta_est' => $data['cod_ceta_est']];
+        if (DB::getSchemaBuilder()->hasColumn($tbl, 'nro_res')) {
             $payload['nro_res'] = isset($data['nro_resolucion']) ? $data['nro_resolucion'] : null;
         }
-        if (DB::getSchemaBuilder()->hasColumn('res_homol_cp', 'fecha_emision')) {
+        if (DB::getSchemaBuilder()->hasColumn($tbl, 'nro_resolucion')) {
+            $payload['nro_resolucion'] = isset($data['nro_resolucion']) ? $data['nro_resolucion'] : null;
+        }
+        if (DB::getSchemaBuilder()->hasColumn($tbl, 'nro_resolucion_rectoral')) {
+            $payload['nro_resolucion_rectoral'] = isset($data['nro_resolucion']) ? $data['nro_resolucion'] : null;
+        }
+        if (DB::getSchemaBuilder()->hasColumn($tbl, 'fecha_emision')) {
             $payload['fecha_emision'] = isset($data['fecha_emision']) ? $data['fecha_emision'] : null;
         }
-        if (DB::getSchemaBuilder()->hasColumn('res_homol_cp', 'grados_cursados')) {
+        if (DB::getSchemaBuilder()->hasColumn($tbl, 'grados_cursados')) {
             $payload['grados_cursados'] = isset($data['grados_cursados']) ? $data['grados_cursados'] : null;
         }
-        if (DB::getSchemaBuilder()->hasColumn('res_homol_cp', 'gestiones_cursadas')) {
+        if (DB::getSchemaBuilder()->hasColumn($tbl, 'gestiones_cursadas')) {
             $payload['gestiones_cursadas'] = isset($data['gestiones_cursadas']) ? $data['gestiones_cursadas'] : null;
         }
-        if (DB::getSchemaBuilder()->hasColumn('res_homol_cp', 'observacion')) {
+        if (DB::getSchemaBuilder()->hasColumn($tbl, 'observacion')) {
             $payload['observacion'] = isset($data['observacion']) ? $data['observacion'] : null;
         }
-        if (DB::getSchemaBuilder()->hasColumn('res_homol_cp', 'is_active')) {
+        if (DB::getSchemaBuilder()->hasColumn($tbl, 'is_active')) {
             $payload['is_active'] = true;
         }
-        // Upsert por cod_ceta_est (la tabla puede no tener PK numérica estándar)
-        $exists = DB::table('res_homol_cp')->where('cod_ceta_est', $data['cod_ceta_est'])->first();
+
+        // Upsert por cod_ceta_est
+        $builder = DB::table($tbl);
+        $exists = $builder->where('cod_ceta_est', $data['cod_ceta_est'])->first();
         if ($exists) {
-            DB::table('res_homol_cp')->where('cod_ceta_est', $data['cod_ceta_est'])->update(array_merge($payload, ['updated_at' => now()]));
-            $saved = DB::table('res_homol_cp')->where('cod_ceta_est', $data['cod_ceta_est'])->first();
+            $builder->where('cod_ceta_est', $data['cod_ceta_est'])->update(array_merge($payload, ['updated_at' => now()]));
+            $saved = $builder->where('cod_ceta_est', $data['cod_ceta_est'])->first();
+            $id = isset($saved->id) ? $saved->id : null;
         } else {
-            $id = DB::table('res_homol_cp')->insertGetId(array_merge($payload, ['created_at' => now(), 'updated_at' => now()]));
-            $saved = DB::table('res_homol_cp')->where('id', $id)->first();
+            $id = $builder->insertGetId(array_merge($payload, ['created_at' => now(), 'updated_at' => now()]));
+            $saved = $builder->where('id', $id)->first();
         }
+
+        // Guardar detalle de grados si hay tabla disponible
+        $gradosTbl = null;
+        if (DB::getSchemaBuilder()->hasTable('grados_homol_cp')) {
+            $gradosTbl = 'grados_homol_cp';
+        } elseif (DB::getSchemaBuilder()->hasTable('grados_homologacion_cp')) {
+            $gradosTbl = 'grados_homologacion_cp';
+        }
+        if ($gradosTbl && $id) {
+            // Detectar columna FK disponible
+            $fkCol = null;
+            foreach (['homol_cp_id', 'homologacion_cp_id', 'homologacion_cambio_plan_id'] as $cand) {
+                if (DB::getSchemaBuilder()->hasColumn($gradosTbl, $cand)) { $fkCol = $cand; break; }
+            }
+            if ($fkCol) {
+                // Limpiar existentes y reinsertar
+                DB::table($gradosTbl)->where($fkCol, $id)->delete();
+                $grados = (isset($data['grados_gestiones']) && is_array($data['grados_gestiones'])) ? $data['grados_gestiones'] : [];
+                foreach ($grados as $gt) {
+                    $row = [
+                        $fkCol => $id,
+                    ];
+                    if (DB::getSchemaBuilder()->hasColumn($gradosTbl, 'grado')) {
+                        $row['grado'] = isset($gt['grado']) ? $gt['grado'] : null;
+                    }
+                    if (DB::getSchemaBuilder()->hasColumn($gradosTbl, 'gestion')) {
+                        $row['gestion'] = isset($gt['gestion']) ? $gt['gestion'] : null;
+                    }
+                    $row['created_at'] = now();
+                    $row['updated_at'] = now();
+                    DB::table($gradosTbl)->insert($row);
+                }
+            }
+        }
+
         return response()->json(['success' => true, 'data' => $saved]);
     }
 
@@ -70,14 +126,33 @@ class ResHomolCpController extends CrudController
             'cod_ceta_est' => 'required|integer',
         ]);
         $cod = $data['cod_ceta_est'];
-        // Borrar grados_homol_cp ligados si existe la tabla
+        // Seleccionar tabla principal disponible
+        $tbl = null;
+        if (DB::getSchemaBuilder()->hasTable('res_homol_cp')) {
+            $tbl = 'res_homol_cp';
+        } elseif (DB::getSchemaBuilder()->hasTable('homologacion_cambio_plan')) {
+            $tbl = 'homologacion_cambio_plan';
+        } else {
+            return response()->json(['success' => true]);
+        }
+        // Borrar grados ligados si existe tabla y FK
+        $ids = DB::table($tbl)->where('cod_ceta_est', $cod)->pluck('id')->all();
+        $gradosTbl = null;
         if (DB::getSchemaBuilder()->hasTable('grados_homol_cp')) {
-            $ids = DB::table('res_homol_cp')->where('cod_ceta_est', $cod)->pluck('id')->all();
-            if (!empty($ids)) {
-                DB::table('grados_homol_cp')->whereIn('homol_cp_id', $ids)->delete();
+            $gradosTbl = 'grados_homol_cp';
+        } elseif (DB::getSchemaBuilder()->hasTable('grados_homologacion_cp')) {
+            $gradosTbl = 'grados_homologacion_cp';
+        }
+        if (!empty($ids) && $gradosTbl) {
+            $fkCol = null;
+            foreach (['homol_cp_id', 'homologacion_cp_id', 'homologacion_cambio_plan_id'] as $cand) {
+                if (DB::getSchemaBuilder()->hasColumn($gradosTbl, $cand)) { $fkCol = $cand; break; }
+            }
+            if ($fkCol) {
+                DB::table($gradosTbl)->whereIn($fkCol, $ids)->delete();
             }
         }
-        DB::table('res_homol_cp')->where('cod_ceta_est', $cod)->delete();
+        DB::table($tbl)->where('cod_ceta_est', $cod)->delete();
         return response()->json(['success' => true]);
     }
 }

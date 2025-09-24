@@ -1552,6 +1552,12 @@ private cargarPostulanteDesdeBD() {
               cod_ceta_est: codFinal,
               nro_resolucion: nro || null,
               fecha_emision: fec,
+              grados_gestiones: Array.isArray(cp.grados_gestiones)
+                ? cp.grados_gestiones.map((g: any) => ({
+                    grado: (g?.grado || '').toString().trim() || null,
+                    gestion: (g?.gestion || '').toString().trim() || null,
+                  }))
+                : [],
             } as any;
             saves.push(this.postulanteService.upsertHomolCpByCod(payloadCp));
           }
