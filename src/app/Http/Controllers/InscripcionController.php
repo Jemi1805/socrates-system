@@ -30,19 +30,23 @@ class InscripcionController extends Controller
 
         // Diploma Bachiller (nacional) - se vincula por cod_ceta_est
         $diploma = Schema::hasTable('diploma_bachiller')
-            ? DB::table('diploma_bachiller')->where('cod_ceta_est', (int) $cod_ceta)->orderByDesc('updated_at')->first()
+            ? DB::table('diploma_bachiller')
+                ->where('cod_ceta_est', (int) $cod_ceta)
+                ->orderByDesc('updated_at')
+                ->first()
             : null;
 
-        // Homologación Extranjero (RA) y sus grados
-        // Nota: en el esquema actual no hay columna cod_ceta_est directa en ra_homol_ex.
-        // Hasta definir la relación exacta, devolvemos null para evitar errores.
+        // Homologación Extranjero (RA) y sus grados (si existiera implementación futura)
+        // Mantener null para evitar errores mientras no se defina relación exacta
         $ra = null;
         $gradosRa = [];
-        // if ($ra) { ... }
 
-        // Datos de carrera (inicio/conclusión) - vinculados por cod_ceta_est
+        // Datos de carrera (inicio/conclusión) - vinculados por cod_ceta_est (tomar el último actualizado)
         $datosCarrera = Schema::hasTable('datos_carrera')
-            ? DB::table('datos_carrera')->where('cod_ceta_est', (int) $cod_ceta)->first()
+            ? DB::table('datos_carrera')
+                ->where('cod_ceta_est', (int) $cod_ceta)
+                ->orderByDesc('updated_at')
+                ->first()
             : null;
 
         // Transitabilidad Educación Regular (cod_ceta_est)
@@ -55,21 +59,37 @@ class InscripcionController extends Controller
             ? DB::table('transitabilidad_inst_tec')->where('cod_ceta_est', (int) $cod_ceta)->first()
             : null;
 
-        // Traspaso de Instituto y sus grados (cod_ceta_est)
+        // Traspaso de Instituto y sus grados (cod_ceta_est) - tomar el último actualizado
         $trasp = Schema::hasTable('traspasos_instituto')
-            ? DB::table('traspasos_instituto')->where('cod_ceta_est', (int) $cod_ceta)->first()
+            ? DB::table('traspasos_instituto')
+                ->where('cod_ceta_est', (int) $cod_ceta)
+                ->orderByDesc('updated_at')
+                ->first()
             : null;
         $gradosTrasp = [];
         if ($trasp) {
-            // Intentar ambas FK comunes
-            $colTrasp = Schema::hasTable('grados_trasp')
-                ? DB::table('grados_trasp')
-                    ->where(function ($q) use ($trasp) {
+            // Intentar FKs comunes, condicionando por columnas existentes
+            if (Schema::hasTable('grados_trasp')) {
+                $hasColA = Schema::hasColumn('grados_trasp', 'traspasos_instituto_id');
+                $hasColB = Schema::hasColumn('grados_trasp', 'traspaso_id');
+                $query = DB::table('grados_trasp');
+                $query->where(function ($q) use ($trasp, $hasColA, $hasColB) {
+                    if ($hasColA && $hasColB) {
                         $q->where('traspasos_instituto_id', $trasp->id)
                           ->orWhere('traspaso_id', $trasp->id);
-                    })
-                    ->get()
-                : collect();
+                    } elseif ($hasColA) {
+                        $q->where('traspasos_instituto_id', $trasp->id);
+                    } elseif ($hasColB) {
+                        $q->where('traspaso_id', $trasp->id);
+                    } else {
+                        // Sin columnas de relación conocidas: fuerza conjunto vacío
+                        $q->whereRaw('1=0');
+                    }
+                });
+                $colTrasp = $query->get();
+            } else {
+                $colTrasp = collect();
+            }
             $gradosTrasp = $colTrasp->map(function ($g) {
                 return [
                     'grado' => isset($g->grado) ? $g->grado : null,
@@ -78,12 +98,27 @@ class InscripcionController extends Controller
             })->values()->toArray();
         }
 
-        // Homologación por Cambio de Plan y sus grados
-        // Nota: en el esquema actual no hay columna cod_ceta_est directa en res_homol_cp.
-        // Hasta definir la relación exacta, devolvemos null para evitar errores.
-        $cp = null;
+        // Homologación por Cambio de Plan (res_homol_cp) y sus grados, vinculados por cod_ceta_est
+        $cp = Schema::hasTable('res_homol_cp')
+            ? DB::table('res_homol_cp')
+                ->where('cod_ceta_est', (int) $cod_ceta)
+                ->orderByDesc('updated_at')
+                ->first()
+            : null;
         $gradosCp = [];
-        // if ($cp) { ... }
+        if ($cp && Schema::hasTable('grados_homol_cp')) {
+            $gradosCp = DB::table('grados_homol_cp')
+                ->where('homol_cp_id', $cp->id)
+                ->get()
+                ->map(function ($g) {
+                    return [
+                        'grado' => isset($g->grado) ? $g->grado : null,
+                        'gestion' => isset($g->gestion) ? $g->gestion : null,
+                    ];
+                })
+                ->values()
+                ->toArray();
+        }
 
         // Inscripción de modalidad (para recuperar aranceles_completos y estado)
         $insRow = Schema::hasTable('inscrip_modalidad')
@@ -148,8 +183,8 @@ class InscripcionController extends Controller
             ] : null,
 
             'homol_cambio_plan' => $cp ? [
-                'nro_resolucion_rectoral' => null,
-                'fecha_emision' => null,
+                'nro_resolucion_rectoral' => isset($cp->nro_resolucion_rectoral) ? $cp->nro_resolucion_rectoral : (isset($cp->nro_res) ? $cp->nro_res : null),
+                'fecha_emision' => isset($cp->fecha_emision) ? $cp->fecha_emision : null,
                 'grados_gestiones' => $gradosCp,
             ] : null,
 

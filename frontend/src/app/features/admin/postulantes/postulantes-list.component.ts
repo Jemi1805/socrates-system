@@ -761,8 +761,8 @@ private cargarPostulanteDesdeBD() {
         this.datosConclusionCarrera.gestion_fin = gestFin || '';
         const eduReg = (src as any).educacion_regular || (src as any).edu_regular || null;
         const tecMed = (src as any).tecnico_medio || null;
-        const trasp = (src as any).traspaso_instituto || null;
-        const cambio = (src as any).homol_cambio_plan || (src as any).homologacion_cambio_plan || null;
+        const trasp = (src as any).traspaso_instituto || (src as any).traspaso_instituto_guardado || null;
+        const cambio = (src as any).homol_cambio_plan || (src as any).homologacion_cambio_plan || (src as any).homol_cambio_plan_guardado || null;
 
         // Resetear banderas y opción seleccionada
         this.opciones.educacionRegular = false;
@@ -792,10 +792,16 @@ private cargarPostulanteDesdeBD() {
           this.selectedOpcion = 'traspasoInstituto';
           this.traspasoData = {
             instituto_origen: (trasp.instituto_origen || '').toString(),
-            grados_gestiones: Array.isArray(trasp.grados_gestiones) ? trasp.grados_gestiones.map((g: any) => ({
-              grado: (g?.grado || '').toString(),
-              gestion: (g?.gestion || '').toString(),
-            })) : [],
+            // Aceptar diferentes nombres de arreglo: grados_gestiones, grados, grados_trasp
+            grados_gestiones: ((): Array<{ grado: string; gestion: string }> => {
+              const arr: any[] = Array.isArray(trasp.grados_gestiones)
+                ? trasp.grados_gestiones
+                : (Array.isArray(trasp.grados) ? trasp.grados : (Array.isArray(trasp.grados_trasp) ? trasp.grados_trasp : []));
+              return arr.map((g: any) => ({
+                grado: ((g && g.grado) || '').toString(),
+                gestion: ((g && g.gestion) || '').toString(),
+              }));
+            })(),
           } as any;
         } else if (cambio) {
           this.opciones.homologacionCambioPlan = true;
@@ -803,11 +809,50 @@ private cargarPostulanteDesdeBD() {
           this.homoCambioPlanData = {
             nro_resolucion_rectoral: (cambio.nro_resolucion_rectoral || cambio.nro_resolucion || '').toString(),
             fecha_emision: (cambio.fecha_emision || '').toString(),
-            grados_gestiones: Array.isArray(cambio.grados_gestiones) ? cambio.grados_gestiones.map((g: any) => ({
-              grado: (g?.grado || '').toString(),
-              gestion: (g?.gestion || '').toString(),
-            })) : [],
+            // Aceptar diferentes nombres de arreglo: grados_gestiones, grados, grados_homol_cp
+            grados_gestiones: ((): Array<{ grado: string; gestion: string }> => {
+              const arr: any[] = Array.isArray(cambio.grados_gestiones)
+                ? cambio.grados_gestiones
+                : (Array.isArray(cambio.grados) ? cambio.grados : (Array.isArray(cambio.grados_homol_cp) ? cambio.grados_homol_cp : []));
+              return arr.map((g: any) => ({
+                grado: ((g && g.grado) || '').toString(),
+                gestion: ((g && g.gestion) || '').toString(),
+              }));
+            })(),
           } as any;
+        } else {
+          // Fallback: si el composite no trae ni traspaso ni homol CP, intentar obtenerlos por cod_ceta_est
+          const cod = (this.postulanteActual?.cod_ceta || this.estudiante?.cod_ceta) as any;
+          if (cod) {
+            // Consultar ambos en paralelo y poblar si existen
+            forkJoin({
+              traspaso: this.postulanteService.getTraspasoByCod(cod),
+              homolcp: this.postulanteService.getHomolCpByCod(cod)
+            }).subscribe(({ traspaso, homolcp }) => {
+              if (traspaso) {
+                this.opciones.traspasoInstituto = true;
+                this.selectedOpcion = 'traspasoInstituto';
+                const arr: any[] = Array.isArray((traspaso as any).grados_gestiones)
+                  ? (traspaso as any).grados_gestiones
+                  : (Array.isArray((traspaso as any).grados) ? (traspaso as any).grados : (Array.isArray((traspaso as any).grados_trasp) ? (traspaso as any).grados_trasp : []));
+                this.traspasoData = {
+                  instituto_origen: (((traspaso as any).instituto_origen) || '').toString(),
+                  grados_gestiones: arr.map((g: any) => ({ grado: ((g && g.grado) || '').toString(), gestion: ((g && g.gestion) || '').toString() }))
+                } as any;
+              } else if (homolcp) {
+                this.opciones.homologacionCambioPlan = true;
+                this.selectedOpcion = 'homologacionCambioPlan';
+                const arr2: any[] = Array.isArray((homolcp as any).grados_gestiones)
+                  ? (homolcp as any).grados_gestiones
+                  : (Array.isArray((homolcp as any).grados) ? (homolcp as any).grados : (Array.isArray((homolcp as any).grados_homol_cp) ? (homolcp as any).grados_homol_cp : []));
+                this.homoCambioPlanData = {
+                  nro_resolucion_rectoral: (((homolcp as any).nro_resolucion_rectoral || (homolcp as any).nro_res || (homolcp as any).nro_resolucion) || '').toString(),
+                  fecha_emision: (((homolcp as any).fecha_emision) || '').toString(),
+                  grados_gestiones: arr2.map((g: any) => ({ grado: ((g && g.grado) || '').toString(), gestion: ((g && g.gestion) || '').toString() }))
+                } as any;
+              }
+            });
+          }
         }
         // Marcar biográficos como completados en modo Ver
         this.pasoBiograficosCompletado = true;
@@ -1232,6 +1277,23 @@ private cargarPostulanteDesdeBD() {
         const codFinal = Number(cod || (res as any)?.cod_ceta || (this.postulanteActual?.cod_ceta as any)) || undefined;
         // Preparar guardados secundarios después de conocer codFinal
         const saves: any[] = [];
+        // Detectar borrados por 'Quitar selección'
+        const prevSnap = this._snapshotAntes || this.getSnapshotActual();
+        const currSnap = this.getSnapshotActual();
+        const prevHadEduReg = !!(prevSnap.edu_reg_serie_tm || prevSnap.edu_reg_numero_tm || prevSnap.edu_reg_fecha_emision);
+        const nowHasEduReg = !!(currSnap.edu_reg_serie_tm || currSnap.edu_reg_numero_tm || currSnap.edu_reg_fecha_emision);
+        const prevHadTecMed = !!(prevSnap.tec_med_serie_tm || prevSnap.tec_med_numero_tm || prevSnap.tec_med_fecha_emision);
+        const nowHasTecMed = !!(currSnap.tec_med_serie_tm || currSnap.tec_med_numero_tm || currSnap.tec_med_fecha_emision);
+        const prevHadTrasp = (prevSnap.traspaso_instituto_origen || 0) || (prevSnap.traspaso_grados_count || 0);
+        const nowHasTrasp = (currSnap.traspaso_instituto_origen || 0) || (currSnap.traspaso_grados_count || 0);
+        const prevHadHomoCP = !!(prevSnap.homocp_nro_resolucion || prevSnap.homocp_fecha_emision || (prevSnap.homocp_grados_count || 0));
+        const nowHasHomoCP = !!(currSnap.homocp_nro_resolucion || currSnap.homocp_fecha_emision || (currSnap.homocp_grados_count || 0));
+        if (codFinal) {
+          if (prevHadEduReg && !nowHasEduReg) saves.push(this.postulanteService.deleteTransitabilidadEduRegByCod(codFinal));
+          if (prevHadTecMed && !nowHasTecMed) saves.push(this.postulanteService.deleteTransitabilidadInstTecByCod(codFinal));
+          if (prevHadTrasp && !nowHasTrasp) saves.push(this.postulanteService.deleteTraspasosByCod(codFinal));
+          if (prevHadHomoCP && !nowHasHomoCP) saves.push(this.postulanteService.deleteHomolCambioPlanByCod(codFinal));
+        }
         const tieneCarrera = !!(this.datosInicioCarrera?.reg_ini_c || this.datosInicioCarrera?.gestion_ini || this.datosConclusionCarrera?.reg_con_c || this.datosConclusionCarrera?.gestion_fin);
         if (codFinal && tieneCarrera) {
           const payloadCarrera = {
@@ -1364,6 +1426,31 @@ private cargarPostulanteDesdeBD() {
       next: (res) => {
         const codFinal = Number(cod || (res as any)?.cod_ceta || (this.postulanteActual?.cod_ceta as any)) || undefined;
         const saves: any[] = [];
+        // Detectar borrados por 'Quitar selección' comparando snapshot previo vs actual
+        const prevSnap = this._snapshotAntes || this.getSnapshotActual();
+        const currSnap = this.getSnapshotActual();
+        const prevHadEduReg = !!(prevSnap.edu_reg_serie_tm || prevSnap.edu_reg_numero_tm || prevSnap.edu_reg_fecha_emision);
+        const nowHasEduReg = !!(currSnap.edu_reg_serie_tm || currSnap.edu_reg_numero_tm || currSnap.edu_reg_fecha_emision);
+        const prevHadTecMed = !!(prevSnap.tec_med_serie_tm || prevSnap.tec_med_numero_tm || prevSnap.tec_med_fecha_emision);
+        const nowHasTecMed = !!(currSnap.tec_med_serie_tm || currSnap.tec_med_numero_tm || currSnap.tec_med_fecha_emision);
+        const prevHadTrasp = (prevSnap.traspaso_instituto_origen || 0) || (prevSnap.traspaso_grados_count || 0);
+        const nowHasTrasp = (currSnap.traspaso_instituto_origen || 0) || (currSnap.traspaso_grados_count || 0);
+        const prevHadHomoCP = !!(prevSnap.homocp_nro_resolucion || prevSnap.homocp_fecha_emision || (prevSnap.homocp_grados_count || 0));
+        const nowHasHomoCP = !!(currSnap.homocp_nro_resolucion || currSnap.homocp_fecha_emision || (currSnap.homocp_grados_count || 0));
+        if (codFinal) {
+          if (prevHadEduReg && !nowHasEduReg) {
+            saves.push(this.postulanteService.deleteTransitabilidadEduRegByCod(codFinal));
+          }
+          if (prevHadTecMed && !nowHasTecMed) {
+            saves.push(this.postulanteService.deleteTransitabilidadInstTecByCod(codFinal));
+          }
+          if (prevHadTrasp && !nowHasTrasp) {
+            saves.push(this.postulanteService.deleteTraspasosByCod(codFinal));
+          }
+          if (prevHadHomoCP && !nowHasHomoCP) {
+            saves.push(this.postulanteService.deleteHomolCambioPlanByCod(codFinal));
+          }
+        }
         // 1) Diploma de Bachiller
         if (codFinal) {
           // Detectar datos ingresados para nacional/extranjero
@@ -1421,6 +1508,53 @@ private cargarPostulanteDesdeBD() {
             observacion: null,
           };
           saves.push(this.postulanteService.saveTransitabilidadEduReg(payloadEduReg));
+        }
+        // Guardado opcional de Transitabilidad Técnico Medio
+        if (codFinal && this.selectedOpcion === 'tecnicoMedio') {
+          const serieTM2 = (this.tecnicoMedioData?.serie_titulo_tm || '').toString().trim();
+          const numeroTM2 = (this.tecnicoMedioData?.numero_titulo_tm || '').toString().trim();
+          const fechaTM2 = this.normalizarFecha(this.tecnicoMedioData?.fecha_emision);
+          const hayDatosTecMed = !!(serieTM2 || numeroTM2 || fechaTM2);
+          if (hayDatosTecMed) {
+            const payloadTecMed = {
+              cod_ceta_est: codFinal,
+              serie_titulo_tm: serieTM2 || null,
+              numero_titulo_tm: numeroTM2 || null,
+              fecha_emision: fechaTM2,
+              observacion: null,
+            };
+            saves.push(this.postulanteService.saveTransitabilidadInstTec(payloadTecMed));
+          }
+        }
+        // Guardado opcional de Traspaso de Instituto
+        if (codFinal && this.selectedOpcion === 'traspasoInstituto') {
+          const t = this.traspasoData || ({} as any);
+          const instit = (t.instituto_origen || '').toString().trim();
+          const hayTrasp = !!(instit || (Array.isArray(t.grados_gestiones) && t.grados_gestiones.length));
+          if (hayTrasp) {
+            const payloadTrasp = {
+              cod_ceta_est: codFinal,
+              instituto_origen: instit || null,
+              grados_gestiones: Array.isArray(t.grados_gestiones) ? t.grados_gestiones.map((g: any) => ({ grado: (g?.grado || '').toString().trim() || null, gestion: (g?.gestion || '').toString().trim() || null })) : []
+              // Si en el futuro agregamos más campos en el formulario, se añaden aquí
+            };
+            saves.push(this.postulanteService.upsertTraspasoByCod(payloadTrasp));
+          }
+        }
+        // Guardado opcional de Homologación por Cambio de Plan
+        if (codFinal && this.selectedOpcion === 'homologacionCambioPlan') {
+          const cp = this.homoCambioPlanData || ({} as any);
+          const nro = (cp.nro_resolucion_rectoral || '').toString().trim();
+          const fec = this.normalizarFecha(cp.fecha_emision);
+          const hayCp = !!(nro || fec || (Array.isArray(cp.grados_gestiones) && cp.grados_gestiones.length));
+          if (hayCp) {
+            const payloadCp = {
+              cod_ceta_est: codFinal,
+              nro_resolucion: nro || null,
+              fecha_emision: fec,
+            } as any;
+            saves.push(this.postulanteService.upsertHomolCpByCod(payloadCp));
+          }
         }
         const afterSuccess = () => {
           // Calcular cambios reales con snapshot previo y actual (incluye campos detallados de diploma)
@@ -1816,6 +1950,13 @@ private cargarPostulanteDesdeBD() {
     (Object.keys(this.opciones) as ('educacionRegular' | 'tecnicoMedio' | 'traspasoInstituto' | 'homologacionCambioPlan')[]).forEach((k) => {
       this.opciones[k] = false;
     });
+    // Limpiar formularios/estructuras de las opciones
+    this.eduRegularData = { serie_titulo_tm: '', numero_titulo_tm: '', fecha_emision: '' } as any;
+    this.tecnicoMedioData = { serie_titulo_tm: '', numero_titulo_tm: '', fecha_emision: '' } as any;
+    this.traspasoData = { instituto_origen: '', grados_gestiones: [] } as any;
+    this.homoCambioPlanData = { nro_resolucion_rectoral: '', fecha_emision: '', grados_gestiones: [] } as any;
+    // Marcar cambios en la vista para habilitar guardado si corresponde
+    this.markChangedInView();
   }
 
   // --- Traspaso: ABM de grados/gestiones ---
@@ -2134,6 +2275,21 @@ private cargarPostulanteDesdeBD() {
       diploma_observacion: (this.tipoBachiller === 'nacional') ? (this.diplomaNacional?.observacion ?? null) : null,
       diploma_nro_resolucion: (this.tipoBachiller === 'extranjero') ? (this.homologacionExtranjero?.nro_resolucion ?? null) : null,
       diploma_fecha_resolucion: (this.tipoBachiller === 'extranjero') ? (this.normalizarFecha(this.homologacionExtranjero?.fecha_emision) ?? null) : null,
+      // Transitabilidad Educación Regular (solo si opción activa)
+      edu_reg_serie_tm: (this.selectedOpcion === 'educacionRegular') ? (this.eduRegularData?.serie_titulo_tm ?? null) : null,
+      edu_reg_numero_tm: (this.selectedOpcion === 'educacionRegular') ? (this.eduRegularData?.numero_titulo_tm ?? null) : null,
+      edu_reg_fecha_emision: (this.selectedOpcion === 'educacionRegular') ? (this.normalizarFecha(this.eduRegularData?.fecha_emision) ?? null) : null,
+      // Transitabilidad Técnico Medio (solo si opción activa)
+      tec_med_serie_tm: (this.selectedOpcion === 'tecnicoMedio') ? (this.tecnicoMedioData?.serie_titulo_tm ?? null) : null,
+      tec_med_numero_tm: (this.selectedOpcion === 'tecnicoMedio') ? (this.tecnicoMedioData?.numero_titulo_tm ?? null) : null,
+      tec_med_fecha_emision: (this.selectedOpcion === 'tecnicoMedio') ? (this.normalizarFecha(this.tecnicoMedioData?.fecha_emision) ?? null) : null,
+      // Traspaso de Instituto (solo si opción activa)
+      traspaso_instituto_origen: (this.selectedOpcion === 'traspasoInstituto') ? (this.traspasoData?.instituto_origen ?? null) : null,
+      traspaso_grados_count: (this.selectedOpcion === 'traspasoInstituto') ? ((Array.isArray(this.traspasoData?.grados_gestiones) ? this.traspasoData.grados_gestiones.length : 0)) : null,
+      // Homologación por cambio de plan (solo si opción activa)
+      homocp_nro_resolucion: (this.selectedOpcion === 'homologacionCambioPlan') ? (this.homoCambioPlanData?.nro_resolucion_rectoral ?? null) : null,
+      homocp_fecha_emision: (this.selectedOpcion === 'homologacionCambioPlan') ? (this.normalizarFecha(this.homoCambioPlanData?.fecha_emision) ?? null) : null,
+      homocp_grados_count: (this.selectedOpcion === 'homologacionCambioPlan') ? ((Array.isArray(this.homoCambioPlanData?.grados_gestiones) ? this.homoCambioPlanData.grados_gestiones.length : 0)) : null,
       // Inicio/Conclusión
       reg_ini_c: this.datosInicioCarrera.reg_ini_c ?? null,
       gestion_ini: this.datosInicioCarrera.gestion_ini ?? null,
@@ -2172,6 +2328,17 @@ private cargarPostulanteDesdeBD() {
       diploma_observacion: 'diploma.observacion',
       diploma_nro_resolucion: 'diploma.nro_resolucion',
       diploma_fecha_resolucion: 'diploma.fecha_resolucion',
+      edu_reg_serie_tm: 'transitabilidad.edu_regular.serie_titulo_tm',
+      edu_reg_numero_tm: 'transitabilidad.edu_regular.numero_titulo_tm',
+      edu_reg_fecha_emision: 'transitabilidad.edu_regular.fecha_emision',
+      tec_med_serie_tm: 'transitabilidad.tecnico_medio.serie_titulo_tm',
+      tec_med_numero_tm: 'transitabilidad.tecnico_medio.numero_titulo_tm',
+      tec_med_fecha_emision: 'transitabilidad.tecnico_medio.fecha_emision',
+      traspaso_instituto_origen: 'traspaso.instituto_origen',
+      traspaso_grados_count: 'traspaso.grados_gestiones_count',
+      homocp_nro_resolucion: 'homologacion_cp.nro_resolucion',
+      homocp_fecha_emision: 'homologacion_cp.fecha_emision',
+      homocp_grados_count: 'homologacion_cp.grados_gestiones_count',
       reg_ini_c: 'Régimen Inicio',
       gestion_ini: 'Gestión Inicio',
       reg_con_c: 'Régimen Conclusión',

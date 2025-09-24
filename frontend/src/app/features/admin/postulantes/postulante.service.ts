@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpEvent, HttpRequest } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpEvent, HttpRequest } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Postulante } from './postulante.model';
 import { environment } from '../../../environments/environment';
@@ -80,6 +80,10 @@ export class PostulanteService {
     return this.http.post<any>(`${this.transitabilidadEduRegUrl}`, payload);
   }
 
+  deleteTransitabilidadEduRegByCod(cod_ceta_est: number | string): Observable<any> {
+    return this.http.post<any>(`${this.transitabilidadEduRegUrl}/delete_by_cod`, { cod_ceta_est });
+  }
+
   // --- Transitabilidad Instituto Técnico (opcional) ---
   saveTransitabilidadInstTec(payload: {
     cod_ceta_est: number;
@@ -89,6 +93,10 @@ export class PostulanteService {
     observacion?: string | null;
   }): Observable<any> {
     return this.http.post<any>(`${this.transitabilidadInstTecUrl}`, payload);
+  }
+
+  deleteTransitabilidadInstTecByCod(cod_ceta_est: number | string): Observable<any> {
+    return this.http.post<any>(`${this.transitabilidadInstTecUrl}/delete_by_cod`, { cod_ceta_est });
   }
 
   // --- Diploma de Bachiller ---
@@ -105,6 +113,48 @@ export class PostulanteService {
     is_active?: boolean;
   }): Observable<any> {
     return this.http.post<any>(`${this.diplomaBachillerUrl}/upsert`, payload);
+  }
+
+  // --- Traspasos e Homologación Cambio de Plan: delete-by-cod auxiliares ---
+  deleteTraspasosByCod(cod_ceta_est: number | string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/traspasos_instituto/delete_by_cod`, { cod_ceta_est });
+  }
+
+  deleteHomolCambioPlanByCod(cod_ceta_est: number | string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/res_homol_cp/delete_by_cod`, { cod_ceta_est });
+  }
+
+  upsertTraspasoByCod(payload: {
+    cod_ceta_est: number | string;
+    instituto_origen?: string | null;
+    grados_cursados?: string | null;
+    gestiones_cursadas?: string | null;
+    observacion?: string | null;
+    grados_gestiones?: Array<{ grado?: string | null; gestion?: string | null; }>;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/traspasos_instituto/upsert_by_cod`, payload);
+  }
+
+  upsertHomolCpByCod(payload: {
+    cod_ceta_est: number | string;
+    nro_resolucion?: string | null;
+    fecha_emision?: string | null;
+    grados_cursados?: string | null;
+    gestiones_cursadas?: string | null;
+    observacion?: string | null;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/res_homol_cp/upsert_by_cod`, payload);
+  }
+
+  // --- Fetch por cod_ceta_est (fallback para visualización) ---
+  getTraspasoByCod(cod_ceta_est: number | string): Observable<any> {
+    const params = new HttpParams().set('cod_ceta_est', String(cod_ceta_est));
+    return this.http.get<any>(`${this.baseUrl}/public/traspasos_instituto/get_by_cod`, { params });
+  }
+
+  getHomolCpByCod(cod_ceta_est: number | string): Observable<any> {
+    const params = new HttpParams().set('cod_ceta_est', String(cod_ceta_est));
+    return this.http.get<any>(`${this.baseUrl}/public/res_homol_cp/get_by_cod`, { params });
   }
 
   create(postulante: Postulante): Observable<Postulante> {

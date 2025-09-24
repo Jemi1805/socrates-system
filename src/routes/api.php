@@ -91,6 +91,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('transitabilidad_inst_tec', TransitabilidadInstTecController::class);
     Route::apiResource('traspasos_instituto', TraspasosInstitutoController::class);
     Route::apiResource('res_homol_cp', ResHomolCpController::class);
+    // Eliminación por cod_ceta_est
+    Route::post('transitabilidad_edu_reg/delete_by_cod', [TransitabilidadEduRegController::class, 'deleteByCodCeta']);
+    Route::post('transitabilidad_inst_tec/delete_by_cod', [TransitabilidadInstTecController::class, 'deleteByCodCeta']);
+    Route::post('traspasos_instituto/delete_by_cod', [TraspasosInstitutoController::class, 'deleteByCodCeta']);
+    Route::post('res_homol_cp/delete_by_cod', [ResHomolCpController::class, 'deleteByCodCeta']);
+    // Upsert por cod_ceta_est
+    Route::post('traspasos_instituto/upsert_by_cod', [TraspasosInstitutoController::class, 'upsertByCod']);
+    Route::post('res_homol_cp/upsert_by_cod', [ResHomolCpController::class, 'upsertByCod']);
+    // (Se mueven las rutas get_by_cod fuera del grupo protegido)
     Route::apiResource('grados_homol_cp', GradosHomolCpController::class);
     Route::apiResource('grados_trasp', GradosTraspController::class);
     // Datos de carrera (inicio / conclusión)
@@ -149,3 +158,19 @@ Route::prefix('sga')->group(function () {
 // 📈 RUTA PÚBLICA: listado de modalidades (solo lectura)
 // Permite que el frontend cargue las modalidades sin requerir autenticación
 Route::get('modalidades', [ModalidadController::class, 'index']);
+
+// =========================
+// RUTAS PÚBLICAS (SOLO LECTURA)
+// Visualización de datos guardados SIN autenticación
+// =========================
+Route::get('traspasos_instituto/get_by_cod', [TraspasosInstitutoController::class, 'getByCodCeta']);
+Route::get('res_homol_cp/get_by_cod', [ResHomolCpController::class, 'getByCodCeta']);
+
+// Diagnóstico: rutas públicas temporales
+Route::get('ping_public', fn() => response()->json(['ok' => true]));
+
+// Endpoints públicos alternativos (evitar cualquier colisión con rutas previas bajo auth)
+Route::prefix('public')->group(function () {
+    Route::get('traspasos_instituto/get_by_cod', [TraspasosInstitutoController::class, 'getByCodCeta']);
+    Route::get('res_homol_cp/get_by_cod', [ResHomolCpController::class, 'getByCodCeta']);
+});

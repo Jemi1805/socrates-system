@@ -90,6 +90,7 @@ class UserController extends Controller
                         'module' => $permission->module,
                         'action' => $permission->action,
                     ];
+                }),
             ]
         ]);
     }
