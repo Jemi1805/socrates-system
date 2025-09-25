@@ -1244,8 +1244,13 @@
             </table>
           </div>
         </div>
-        <div class="modal-footer py-2">
-          <button type="button" class="btn btn-success btn-sm" (click)="cerrarModalCambios()">Aceptar</button>
+        <div class="modal-footer py-2 d-flex justify-content-end gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="continuarCambios()">
+            Continuar cambios
+          </button>
+          <button type="button" class="btn btn-success btn-sm" (click)="cerrarModalCambios()">
+            Cerrar cambios
+          </button>
         </div>
       </div>
     </div>

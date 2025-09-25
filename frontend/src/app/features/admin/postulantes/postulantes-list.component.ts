@@ -2599,6 +2599,13 @@ private cargarPostulanteDesdeBD() {
     } catch (e) {}
   }
 
+  // Cerrar el modal de cambios y permanecer en la vista para seguir editando
+  continuarCambios() {
+    this.modalCambiosVisible = false;
+    this.cambiosRealizados = [];
+    // No construimos ni mostramos el resumen aquí para permitir más cambios
+  }
+
   // --- Resumen de inscripción ---
   private construirResumenInscripcion() {
     // Preferir valores persistidos en BD cuando existan
