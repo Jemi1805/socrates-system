@@ -97,13 +97,17 @@ export class PostulantesListComponent implements OnInit {
   // Estado y error de inscripción
   inscripcionLoading: boolean = false;
   inscripcionError: string | null = null;
-  
   // Control del modal
   modalVisible = false;
+  // Modal de confirmación de cambio de modalidad
+  modalConfirmCambioVisible: boolean = false;
+  nuevaModalidad: ModalidadGraduacion | null = null;
   // Modal de cambios guardados y lista de cambios
   modalCambiosVisible: boolean = false;
   cambiosRealizados: Array<{ campo: string; anterior: any; nuevo: any }> = [];
   // Modal de confirmación para guardar cambios (botón global)
+  modalConfirmarCambioModalidadVisible: boolean = false;
+  cambiosCambioModalidad: Array<{ campo: string; anterior: any; nuevo: any }> = [];
   modalConfirmGuardarVisible: boolean = false;
   showBiographicalData = true;
   showBachilleratoData = true;
@@ -1134,23 +1138,52 @@ private cargarPostulanteDesdeBD() {
   }
   
   seleccionarModalidad(modalidad: ModalidadGraduacion) {
-    this.modalidad = modalidad;
+    // No guardamos directo: pedimos confirmación mostrando el cambio
+    this.nuevaModalidad = modalidad;
+    this.modalConfirmCambioVisible = true;
+  }
+
+  cancelarCambioModalidad() {
+    this.modalConfirmCambioVisible = false;
+    this.nuevaModalidad = null;
+  }
+
+  confirmarCambioModalidad() {
+    if (!this.nuevaModalidad) return;
+    const anterior = this.modalidad ? { ...this.modalidad } : null;
+    const seleccionado = this.nuevaModalidad;
+    this.modalConfirmCambioVisible = false;
     this.ocultarModal();
-    
-    // Si hay un postulante seleccionado, actualizar la modalidad en el backend
-    if (this.postulanteActual.cod_ceta) {
-      this.postulanteService.asignarModalidad(this.postulanteActual.cod_ceta, modalidad.id).subscribe({
+
+    const cod = this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta;
+    if (cod) {
+      this.postulanteService.asignarModalidad(Number(cod), seleccionado.id).subscribe({
         next: (resultado) => {
           console.log('Modalidad asignada correctamente:', resultado);
-          // Refrescar modalidad actual desde el backend
+          this.modalidad = seleccionado;
+          this.cambiosRealizados.push({
+            campo: 'Modalidad de Graduación',
+            anterior: anterior ? `${anterior.nombre}` : '- (sin modalidad) -',
+            nuevo: `${seleccionado.nombre}`,
+          });
+          this.modalCambiosVisible = true;
           this.cargarModalidadActual();
         },
         error: (err) => {
           console.error('Error al asignar modalidad:', err);
-          // Opcionalmente mostrar un mensaje de error
         }
       });
+    } else {
+      // Sin CETA aún: solo estado local; se persistirá más adelante
+      this.modalidad = seleccionado;
+      this.cambiosRealizados.push({
+        campo: 'Modalidad de Graduación',
+        anterior: anterior ? `${anterior.nombre}` : '- (sin modalidad) -',
+        nuevo: `${seleccionado.nombre}`,
+      });
+      this.modalCambiosVisible = true;
     }
+    this.nuevaModalidad = null;
   }
 
   // --- Modalidades: carga y estado actual ---
@@ -1164,12 +1197,25 @@ private cargarPostulanteDesdeBD() {
           nombre: m.nombre,
           descripcion: m.descripcion || '',
           icono: this.getIconForModalidad(m?.nombre ?? m?.id),
-          monto_arancel: m.monto_arancel || undefined,
+          monto_arancel: (m.monto_arancel !== undefined && m.monto_arancel !== null
+            ? String(Number(m.monto_arancel))
+            : undefined),
         }));
         this.loadingModalidades = false;
         // Si no hay modalidad ya establecida (p. ej., desde sessionStorage), consultar al backend
         if (!this.modalidad) {
           this.cargarModalidadActual();
+        } else {
+          // Enriquecer modalidad actual con datos del catálogo si faltan descripción o monto
+          const found = (this.modalidades || []).find(m => Number(m.id) === Number(this.modalidad?.id));
+          if (found) {
+            if (!this.modalidad.descripcion || String(this.modalidad.descripcion).trim() === '') {
+              this.modalidad.descripcion = found.descripcion || '';
+            }
+            if (!this.modalidad.monto_arancel) {
+              this.modalidad.monto_arancel = found.monto_arancel;
+            }
+          }
         }
       },
       error: (err) => {
@@ -1188,17 +1234,32 @@ private cargarPostulanteDesdeBD() {
         const mod = res?.modalidad || null;
         if (mod) {
           // Usar la modalidad devuelta por el backend
+          const mId = Number(mod.id);
+          const fromCatalog = (this.modalidades || []).find(m => Number(m.id) === mId) || null;
+          const monto = (mod.monto_arancel !== undefined && mod.monto_arancel !== null)
+            ? String(Number(mod.monto_arancel))
+            : (fromCatalog?.monto_arancel !== undefined ? String(fromCatalog.monto_arancel as any) : undefined);
+          const desc = (mod.descripcion && String(mod.descripcion).trim() !== '')
+            ? String(mod.descripcion)
+            : (fromCatalog?.descripcion || '');
           this.modalidad = {
-            id: mod.id,
+            id: mId,
             nombre: mod.nombre,
-            descripcion: mod.descripcion || '',
+            descripcion: desc,
             icono: this.getIconForModalidad(mod?.nombre ?? mod?.id),
-            monto_arancel: mod.monto_arancel || undefined,
+            monto_arancel: monto,
           };
         } else {
           const mid = res?.modalidad_id;
           if (mid && this.modalidades?.length) {
-            this.modalidad = this.modalidades.find(m => m.id === mid) || null;
+            const found = this.modalidades.find(m => Number(m.id) === Number(mid)) || null;
+            this.modalidad = found ? {
+              id: Number(found.id),
+              nombre: found.nombre,
+              descripcion: found.descripcion || '',
+              icono: this.getIconForModalidad(found?.nombre ?? found?.id),
+              monto_arancel: (found.monto_arancel !== undefined && found.monto_arancel !== null) ? String(found.monto_arancel as any) : undefined,
+            } : null;
           } else {
             this.modalidad = null;
           }

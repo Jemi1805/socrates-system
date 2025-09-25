@@ -1139,6 +1139,50 @@
     </ng-template>
   </div>
 
+  <!-- Modal de confirmación de cambio de modalidad -->
+  <div *ngIf="modalConfirmCambioVisible">
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalConfirmCambioLabel">
+      <div class="modal-dialog modal-md modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h5 class="modal-title" id="modalConfirmCambioLabel">
+              <i class="bi bi-question-circle text-warning me-2"></i>
+              Confirmar cambio de modalidad
+            </h5>
+            <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="cancelarCambioModalidad()"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-warning py-2">
+              Se registrará un cambio de modalidad de graduación para este postulante.
+            </div>
+            <div class="row g-2 align-items-center">
+              <div class="col-12">
+                <strong>Modalidad actual:</strong>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                  <i class="bi" [ngClass]="(modalidad?.icono || 'bi-mortarboard')"></i>
+                  <span>{{ modalidad?.nombre || 'Ninguna' }}</span>
+                </div>
+              </div>
+              <div class="col-12">
+                <strong>Nueva modalidad:</strong>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                  <i class="bi" [ngClass]="(nuevaModalidad?.icono || 'bi-award')"></i>
+                  <span>{{ nuevaModalidad?.nombre }}</span>
+                </div>
+                <small class="text-muted" *ngIf="nuevaModalidad?.descripcion">{{ nuevaModalidad?.descripcion }}</small>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cancelarCambioModalidad()">Cancelar</button>
+            <button type="button" class="btn btn-primary btn-sm" (click)="confirmarCambioModalidad()">Confirmar cambio</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade show" (click)="cancelarCambioModalidad()"></div>
+  </div>
+
   <!-- Modal de selección de modalidad -->
   <div class="modal-overlay" *ngIf="modalVisible">
     <div class="modal-container">

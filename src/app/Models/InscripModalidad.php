@@ -14,6 +14,7 @@ class InscripModalidad extends Model
     protected $fillable = [
         'cod_ceta_est',
         'modalidad_id',
+        'modalidad_nom',
         'pract_ind_id',
         'aranceles_id',
         'fecha_inscripcion',

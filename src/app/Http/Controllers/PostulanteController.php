@@ -181,9 +181,14 @@ class PostulanteController extends Controller
             $data['fecha_inscripcion'] = now()->toDateString();
         }
 
+        // Resolver nombre de la modalidad para persistirlo en modalidad_nom
+        $modalidad = Modalidad::find($data['modalidad_id']);
+        $modalidadNom = $modalidad ? (string) $modalidad->nombre : null;
+
         $payload = [
             'cod_ceta_est' => (int) $cod_ceta,
             'modalidad_id' => $data['modalidad_id'],
+            'modalidad_nom' => $modalidadNom,
             'estado' => (isset($data['estado']) && $data['estado'] !== null) ? $data['estado'] : 'Inscrito',
             'fecha_inscripcion' => $data['fecha_inscripcion'],
         ];
@@ -194,6 +199,7 @@ class PostulanteController extends Controller
             $payload
         );
 
-        return response()->json($inscripcion, 200);
+        // Devolver con relación cargada para el front
+        return response()->json($inscripcion->fresh()->load('modalidad'), 200);
     }
 }
