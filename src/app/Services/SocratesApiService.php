@@ -621,6 +621,7 @@ class SocratesApiService
                     'Pensum',
                     'Fecha de Nacimiento',
                     'Lugar de Nacimiento',
+                    'Celular',
                     'Cédula de Identidad',
                     'Procedencia',
                     'N° Serie Titulo de Bachiller'
@@ -647,6 +648,7 @@ class SocratesApiService
                     'pensum' => isset($row['Pensum']) ? $row['Pensum'] : '',
                     'fecha_nacimiento' => isset($row['Fecha de Nacimiento']) ? $row['Fecha de Nacimiento'] : '',
                     'lugar_nacimiento' => isset($row['Lugar de Nacimiento']) ? $row['Lugar de Nacimiento'] : '',
+                    'celular' => isset($row['Celular']) ? $row['Celular'] : '',
                     'ci' => isset($row['Cédula de Identidad']) ? $row['Cédula de Identidad'] : '',
                     'procedencia' => isset($row['Procedencia']) ? $row['Procedencia'] : '',
                     'nro_serie_titulo' => isset($row['N° Serie Titulo de Bachiller']) ? $row['N° Serie Titulo de Bachiller'] : '',

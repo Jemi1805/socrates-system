@@ -402,7 +402,8 @@
               *ngIf="inscripcionActual && !esExcelencia(inscripcionActual.modalidad_id, inscripcionActual.nombre)"
               type="button"
               class="btn btn-sm btn-primary"
-              (click)="registrarProyecto()">
+              (click)="registrarProyecto()"
+              [routerLink]="['/registro-tema']">
               <i class="bi bi-journal-plus me-2"></i>
               Registrar tema
             </button>

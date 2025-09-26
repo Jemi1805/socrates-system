@@ -696,16 +696,39 @@ export class ModalidadGraduacionComponent implements OnInit {
   }
 
   registrarProyecto() {
-    if (!this.estudiante || !this.inscripcionActual) return;
-    // Preparar modalidad a enviar a Postulantes desde la inscripción existente
-    const mid = this.inscripcionActual.modalidad_id;
-    const found = (this.modalidades || []).find(m => m.id === mid) || null;
-    const modalidad = found || {
-      id: mid,
-      nombre: this.inscripcionActual.nombre || 'Modalidad #' + mid,
-      descripcion: '',
-      monto_arancel: ''
-    };
+    console.log('[registrarProyecto] estudiante:', this.estudiante, 'inscripcionActual:', this.inscripcionActual);
+    // Validar contexto y preparar modalidad
+    let modalidad: { id: number; nombre: string; descripcion: string; monto_arancel: string } | null = null;
+    if (this.inscripcionActual) {
+      const mid = this.inscripcionActual.modalidad_id;
+      const found = (this.modalidades || []).find(m => m.id === mid) || null;
+      modalidad = found
+        ? {
+            id: found.id,
+            nombre: found.nombre,
+            descripcion: found.descripcion || '',
+            monto_arancel: found.monto_arancel || ''
+          }
+        : {
+            id: mid,
+            nombre: this.inscripcionActual.nombre || ('Modalidad #' + mid),
+            descripcion: '',
+            monto_arancel: ''
+          };
+    } else if (this.modalidadSeleccionada) {
+      modalidad = {
+        id: this.modalidadSeleccionada.id,
+        nombre: this.modalidadSeleccionada.nombre,
+        descripcion: this.modalidadSeleccionada.descripcion || '',
+        monto_arancel: this.modalidadSeleccionada.monto_arancel || ''
+      };
+    }
+
+    if (!this.estudiante || !modalidad) {
+      this.error = 'No se pudo determinar el contexto (estudiante y modalidad). Seleccione un estudiante y asegure una inscripción activa.';
+      console.warn('[registrarProyecto] Contexto insuficiente.');
+      // Aún así intentar redirigir para no bloquear al usuario
+    }
 
     const datosPostulacion = {
       estudiante: this.estudiante,
@@ -713,10 +736,16 @@ export class ModalidadGraduacionComponent implements OnInit {
     };
     try {
       sessionStorage.setItem('datos_postulacion', JSON.stringify(datosPostulacion));
-    } catch {}
+    } catch (e) {
+      console.warn('No se pudo guardar datos_postulacion en sessionStorage:', e);
+    }
 
-    // Cerrar modal y navegar a Postulantes para continuar con el flujo de proyecto
+    // Cerrar modal y navegar a la página de Registro de Tema
     this.cerrarModal();
-    this.router.navigate(['/postulantes']);
+    this.router.navigate(['/registro-tema']).then(ok => {
+      if (!ok) {
+        console.error('Navegación a /registro-tema falló');
+      }
+    });
   }
 }

@@ -1,0 +1,154 @@
+<div class="registro-tema-container">
+  <app-header 
+    pageTitle="Registro de tema"
+    [breadcrumbItems]="[
+      { label: 'Inicio' },
+      { label: 'Modalidad de Graduación', route: '/modalidad-graduacion' },
+      { label: 'Registro de tema' }
+    ]">
+  </app-header>
+
+  <div class="content-wrapper">
+    <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
+    <div *ngIf="success" class="alert alert-success">{{ success }}</div>
+
+    <!-- Formulario -->
+    <form (ngSubmit)="onSubmit()" #frm="ngForm" novalidate>
+      <div class="form-card">
+        <h3 class="card-title">
+          <span>
+            <i class="bi bi-journal-plus me-2"></i>
+            Registro del tema
+          </span>
+        </h3>
+        <div class="card-body px-0">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Nombres</label>
+              <input class="form-control" [(ngModel)]="nombres" name="nombres" placeholder="Nombres" readonly />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Apellidos</label>
+              <input class="form-control" [(ngModel)]="apellidos" name="apellidos" placeholder="Apellidos" readonly />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">CI / Expedición</label>
+              <div class="input-group">
+                <input class="form-control" [(ngModel)]="ci" name="ci" placeholder="CI" readonly />
+                <input class="form-control" [(ngModel)]="expedicion" name="expedicion" placeholder="Expedición" readonly />
+              </div>
+            </div>
+
+            <div class="col-md-2">
+              <label class="form-label">Celular</label>
+              <input class="form-control" [(ngModel)]="celular" name="celular" placeholder="Celular" />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Nombre del instituto</label>
+              <input class="form-control" [(ngModel)]="instituto" name="instituto" placeholder="Nombre del instituto" readonly />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Carrera</label>
+              <input class="form-control" [(ngModel)]="carrera" name="carrera" placeholder="Carrera" readonly />
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Modalidad de graduación</label>
+              <div class="input-group">
+                <input class="form-control" [(ngModel)]="modalidadNombre" name="modalidadNombre" readonly />
+                <button type="button" class="btn btn-primary" title="Editar modalidad" (click)="mostrarModal()">
+                  <i class="bi bi-pencil-square"></i>
+                </button>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Nombre / Tema</label>
+              <input class="form-control" [(ngModel)]="tema" name="tema" placeholder="Tema del proyecto" required minlength="3" />
+            </div>
+            <div class="col-12">
+              <label class="form-label">Objetivos</label>
+              <textarea class="form-control" rows="5" [(ngModel)]="objetivos" name="objetivos" placeholder="Objetivos del proyecto"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer d-flex justify-content-end gap-2">
+          <button type="button" class="btn btn-outline-secondary" (click)="cancelar()" [disabled]="loading">
+            Cancelar
+          </button>
+          <button type="submit" class="btn btn-primary" [disabled]="loading || !frm.form.valid">
+            <span *ngIf="loading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            Registrar tema
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+  <!-- Modal de selección de modalidad (dentro del contenedor principal) -->
+  <div class="modal-overlay" *ngIf="modalVisible">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 class="modal-title">Seleccionar Modalidad de Graduación</h3>
+        <button class="btn-close" (click)="ocultarModal()">
+          <i class="bi bi-x"></i>
+        </button>
+        </div>
+      <div class="modal-body">
+        <p class="modal-description">Seleccione la modalidad de graduación para el estudiante:</p>
+          
+        <div class="modalidades-grid">
+          <div *ngFor="let mod of modalidades" class="modalidad-card-item" (click)="seleccionarModalidad(mod)">
+            <div class="modalidad-icon">
+              <i class="bi" [ngClass]="getModalidadIcon(mod)"></i>
+            </div>
+            <h4 class="modalidad-nombre">{{mod.nombre}}</h4>
+            <button class="btn btn-outline-primary btn-sm mt-2">Seleccionar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal de confirmación de cambio de modalidad (dentro del contenedor principal para aplicar estilos) -->
+  <div *ngIf="modalConfirmCambioVisible">
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalConfirmCambioLabel">
+      <div class="modal-dialog modal-md modal-dialog-centered" role="document">
+        <div class="modal-content rounded-3 shadow">
+          <div class="modal-header py-2 bg-primary text-white">
+            <h5 class="modal-title d-flex align-items-center gap-2" id="modalConfirmCambioLabel">
+              <i class="bi bi-question-circle text-white"></i>
+              <span>Confirmar cambio de modalidad</span>
+            </h5>
+            <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="cancelarCambioModalidad()"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-warning py-2 mb-3">
+              Se registrará un cambio de modalidad de graduación para este postulante.
+            </div>
+            <div class="row g-3">
+              <div class="col-12">
+                <div class="fw-semibold mb-1">Modalidad actual:</div>
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi text-primary" [ngClass]="getModalidadIcon(modalidad)" style="font-size: 1.2rem;"></i>
+                  <span class="fw-normal">{{ modalidad?.nombre || 'Ninguna' }}</span>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="fw-semibold mb-1">Nueva modalidad:</div>
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi text-primary" [ngClass]="getModalidadIcon(nuevaModalidad)" style="font-size: 1.2rem;"></i>
+                  <span class="fw-normal">{{ nuevaModalidad?.nombre }}</span>
+                </div>
+                <div class="text-muted mt-1" *ngIf="nuevaModalidad?.descripcion">{{ nuevaModalidad?.descripcion }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer py-2 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cancelarCambioModalidad()">Cancelar</button>
+            <button type="button" class="btn btn-primary btn-sm" (click)="confirmarCambioModalidad()">Confirmar cambio</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade show" (click)="cancelarCambioModalidad()"></div>
+  </div>
+</div>

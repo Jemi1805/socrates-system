@@ -5,12 +5,14 @@ import { ModalidadGraduacionComponent } from './features/admin/modalidades/modal
 import { TutoresHomeComponent } from './features/admin/tutores/tutores-home.component';
 import { RegistrarTutorComponent } from './features/admin/tutores/registrar-tutor.component';
 import { DesignarTutorComponent } from './features/admin/tutores/designar-tutor.component';
+import { RegistroTemaComponent } from './features/admin/proyectos/registro-tema.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/login', pathMatch: 'full' },
   { path: 'login', component: LoginComponent },
   { path: 'modalidad-graduacion', component: ModalidadGraduacionComponent },
   { path: 'postulantes', component: PostulantesListComponent },
+  { path: 'registro-tema', component: RegistroTemaComponent },
   { path: 'tutores', component: TutoresHomeComponent },
   { path: 'tutores/registrar', component: RegistrarTutorComponent },
   { path: 'tutores/designar', component: DesignarTutorComponent },
