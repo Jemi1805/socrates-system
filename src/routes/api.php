@@ -81,6 +81,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('modalidad', ModalidadController::class);
     Route::apiResource('pract_ind', PractIndController::class);
     Route::apiResource('proyecto', ProyectoController::class);
+    Route::get('proyecto/by_cod', [ProyectoController::class, 'getByCodCeta']);
     Route::apiResource('inscrip_modalidad', InscripModalidadController::class);
     Route::apiResource('documentos_requeridos', DocumentosRequeridosController::class);
     Route::apiResource('documentos_adjuntos', DocumentosAdjuntosController::class);

@@ -1,9 +1,17 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface ProyectoPayload {
-  modalidad_id?: number;
+  cod_ceta?: string;
+  nombres?: string;
+  apellidos?: string;
+  ci?: string;
+  expedicion?: string;
+  celular?: string;
+  instituto?: string;
+  carrera?: string;
   nombre?: string; // Nombre/Tema
   tipo?: string;
   objetivo?: string; // Objetivos
@@ -13,11 +21,17 @@ export interface ProyectoPayload {
 
 @Injectable({ providedIn: 'root' })
 export class ProyectoService {
-  private apiUrl = '/api/proyecto';
+  private baseUrl = environment.apiUrl;
+  private apiUrl = `${this.baseUrl}/proyecto`;
 
   constructor(private http: HttpClient) {}
 
   createProyecto(payload: ProyectoPayload): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}`, payload);
+  }
+
+  getByCod(cod_ceta: string | number): Observable<any> {
+    const params = { cod_ceta: String(cod_ceta) };
+    return this.http.get<any>(`${this.apiUrl}/by_cod`, { params });
   }
 }

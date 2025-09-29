@@ -37,6 +37,9 @@ export class RegistroTemaComponent {
   loading = false;
   error: string | null = null;
   success: string | null = null;
+  modalExitoVisible = false;
+  resumenVisible = false;
+  proyectoGuardado: any = null;
 
   estudiante: EstudianteCtx | null = null;
   modalidad: ModalidadCtx | null = null;
@@ -87,6 +90,20 @@ export class RegistroTemaComponent {
       this.modalidadNombre = this.modalidad.nombre;
     }
 
+    // Si tenemos cod CETA, verificar si ya existe un proyecto registrado para bloquear nuevos registros
+    const cod = this.codCeta;
+    if (cod) {
+      this.proyectoService.getByCod(cod).subscribe({
+        next: (p) => {
+          if (p) {
+            this.proyectoGuardado = p;
+            this.resumenVisible = true; // Mostrar directamente el resumen si ya existe
+          }
+        },
+        error: () => {}
+      });
+    }
+
     // Cargar modalidades disponibles para el modal de selección
     this.postulanteService.getModalidades().subscribe({
       next: (res: any) => {
@@ -117,7 +134,7 @@ export class RegistroTemaComponent {
 
   onSubmit() {
     this.error = null; this.success = null;
-    if (!this.modalidad?.id) {
+    if (!this.modalidad?.nombre) {
       this.error = 'No se ha determinado la modalidad.';
       return;
     }
@@ -127,7 +144,14 @@ export class RegistroTemaComponent {
     }
 
     const payload = {
-      modalidad_id: Number(this.modalidad.id),
+      cod_ceta: this.codCeta || undefined,
+      nombres: this.nombres?.trim() || undefined,
+      apellidos: this.apellidos?.trim() || undefined,
+      ci: this.ci?.toString() || undefined,
+      expedicion: this.expedicion?.toString() || undefined,
+      celular: this.celular?.toString() || undefined,
+      instituto: this.instituto?.trim() || undefined,
+      carrera: this.carrera?.trim() || undefined,
       nombre: this.tema.trim(),
       tipo: this.modalidad?.nombre || undefined,
       objetivo: this.objetivos?.trim() || undefined,
@@ -137,10 +161,10 @@ export class RegistroTemaComponent {
 
     this.loading = true;
     this.proyectoService.createProyecto(payload).subscribe({
-      next: () => {
+      next: (res) => {
         this.success = 'Tema registrado correctamente.';
-        // Redirigir a postulantes para continuar flujo
-        this.router.navigate(['/postulantes'], { queryParams: { ver: 1 } });
+        this.proyectoGuardado = res || null;
+        this.modalExitoVisible = true; // Mostrar modal primero; el resumen se muestra al cerrar
       },
       error: (err) => {
         console.error('Error al registrar tema:', err);
@@ -148,6 +172,20 @@ export class RegistroTemaComponent {
       },
       complete: () => this.loading = false,
     });
+  }
+
+  cerrarModalExito() {
+    console.log('[RegistroTema] cerrarModalExito');
+    this.modalExitoVisible = false;
+    this.resumenVisible = true;
+  }
+
+  irModalidadGraduacion() {
+    this.router.navigate(['/modalidad-graduacion']);
+  }
+
+  irPostulantes() {
+    this.router.navigate(['/postulantes'], { queryParams: { ver: 1 } });
   }
 
   // --- Gestión de Modalidades (UI) ---

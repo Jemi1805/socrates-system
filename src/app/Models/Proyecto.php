@@ -12,7 +12,14 @@ class Proyecto extends Model
     protected $table = 'proyecto';
 
     protected $fillable = [
-        'modalidad_id',
+        'cod_ceta',
+        'nombres',
+        'apellidos',
+        'ci',
+        'expedicion',
+        'celular',
+        'instituto',
+        'carrera',
         'nombre',
         'tipo',
         'objetivo',
@@ -23,9 +30,4 @@ class Proyecto extends Model
     protected $casts = [
         'porcentaje_avance' => 'integer',
     ];
-
-    public function modalidad()
-    {
-        return $this->belongsTo(Modalidad::class, 'modalidad_id');
-    }
 }

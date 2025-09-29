@@ -8,7 +8,7 @@
     ]">
   </app-header>
 
-  <div class="content-wrapper">
+  <div class="content-wrapper" *ngIf="!resumenVisible">
     <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
     <div *ngIf="success" class="alert alert-success">{{ success }}</div>
 
@@ -83,6 +83,44 @@
       </div>
     </form>
   </div>
+  
+  <!-- Resumen del registro de tema -->
+  <div class="content-wrapper" *ngIf="resumenVisible">
+    <div class="mt-3">
+      <div class="card">
+        <div class="card-title">
+          <h5 class="mb-0">
+            <i class="bi bi-clipboard-check me-2"></i>
+            Resumen del registro de tema
+          </h5>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-4"><strong>Carrera:</strong> {{ carrera || '-' }}</div>
+          <div class="col-md-3"><strong>Código CETA:</strong> {{ codCeta || '-' }}</div>
+          <div class="col-md-5"><strong>Modalidad de graduación:</strong> {{ modalidadNombre || proyectoGuardado?.tipo || '-' }}</div>
+          <div class="col-md-6"><strong>Nombre completo:</strong> {{ (nombres + ' ' + apellidos) || '-' }}</div>
+          <div class="col-md-6"><strong>Instituto:</strong> {{ instituto || '-' }}</div>
+
+          <div class="col-md-12"><hr class="my-1"/></div>
+
+          <div class="col-md-8"><strong>Nombre / Tema:</strong> {{ proyectoGuardado?.nombre || tema }}</div>
+          <div class="col-md-4"><strong>Estado:</strong> <span class="badge bg-info text-dark">{{ proyectoGuardado?.estado || 'En progreso' }}</span></div>
+          <div class="col-md-12" *ngIf="(proyectoGuardado?.objetivo || objetivos)">
+            <strong>Objetivos:</strong>
+            <div class="mt-1">{{ proyectoGuardado?.objetivo || objetivos }}</div>
+          </div>
+          <div class="col-md-12 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary" (click)="irModalidadGraduacion()">
+              Volver
+            </button>
+            <button type="button" class="btn btn-primary" (click)="irPostulantes()">
+              Ver postulante
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   <!-- Modal de selección de modalidad (dentro del contenedor principal) -->
   <div class="modal-overlay" *ngIf="modalVisible">
     <div class="modal-container">
@@ -150,5 +188,29 @@
       </div>
     </div>
     <div class="modal-backdrop fade show" (click)="cancelarCambioModalidad()"></div>
+  </div>
+  
+  <!-- Modal de éxito de registro de tema -->
+  <div *ngIf="modalExitoVisible">
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalExitoTemaLabel">
+      <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h5 class="modal-title" id="modalExitoTemaLabel">
+              <i class="bi bi-check2-circle text-success me-2"></i>
+              Tema registrado
+            </h5>
+            <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="cerrarModalExito()"></button>
+          </div>
+          <div class="modal-body">
+            <small>El tema del proyecto fue registrado satisfactoriamente.</small>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-success btn-sm" (click)="cerrarModalExito()">Aceptar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade show" (click)="cerrarModalExito()"></div>
   </div>
 </div>

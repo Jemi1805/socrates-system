@@ -273,6 +273,41 @@
                     </div>
                   </div>
                 </div>
+
+                <!-- Resumen visual de tema registrado -->
+                <div class="mt-3" *ngIf="proyectoActual as p">
+                  <div class="card border-0 shadow-sm">
+                    <div class="card-body d-flex align-items-start">
+                      <div class="me-3 text-success fs-3">
+                        <i class="bi bi-journal-check"></i>
+                      </div>
+                      <div class="flex-grow-1">
+                        <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+                          <strong class="me-2">Tema registrado</strong>
+                          <span class="badge bg-primary-subtle text-primary border border-primary" *ngIf="p.tipo">{{ p.tipo }}</span>
+                          <span class="badge bg-info text-dark border border-info" *ngIf="p.estado">{{ p.estado }}</span>
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-secondary ms-auto mt-2"
+                            [routerLink]="['/registro-tema']"
+                          >
+                            <i class="bi bi-eye me-1"></i>
+                            Ver registro
+                          </button>
+                        </div>
+                        <div class="text-muted small d-flex flex-wrap gap-3">
+                          <span *ngIf="p.created_at">
+                            <i class="bi bi-calendar-check me-1"></i>
+                            Registrado el {{ p.created_at | date:'dd/MM/yyyy' }}
+                          </span>
+                        </div>
+                        <div class="mt-1">
+                          <span class="fw-semibold">{{ p.nombre }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 
                 <!-- (Se elimina la fila inferior de Carrera y Pensum para mostrarlos como badges arriba) -->
 
@@ -399,7 +434,7 @@
             <button type="button" class="btn btn-sm btn-primary" (click)="cerrarModal()">Cancelar</button>
             <!-- Si ya está inscrito y NO es Excelencia, mostrar CTA Registrar proyecto -->
             <button
-              *ngIf="inscripcionActual && !esExcelencia(inscripcionActual.modalidad_id, inscripcionActual.nombre)"
+              *ngIf="inscripcionActual && !esExcelencia(inscripcionActual.modalidad_id, inscripcionActual.nombre) && !proyectoActual"
               type="button"
               class="btn btn-sm btn-primary"
               (click)="registrarProyecto()"

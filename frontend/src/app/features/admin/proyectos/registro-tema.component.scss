@@ -164,10 +164,13 @@ $transition: all 0.3s ease;
 
   .input-group {
     input {
-      height: 3rem !important;
+      height: 2.5rem !important;
     }
     .btn {
       margin-top: 0 !important;
+    }
+    .btn-primary {
+      height: 2.5rem !important;
     }
   }
 
@@ -237,6 +240,7 @@ $transition: all 0.3s ease;
       }
     }
     
+    // Modal body
     .modal-body {
       padding: 1rem;
       overflow-y: auto;
@@ -286,6 +290,75 @@ $transition: all 0.3s ease;
 
       .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
         color: $primary-color;
+      }
+    }
+  }
+
+  //Resumen del registro
+  .card{
+    background: #ffffffd2;
+    border-radius: $border-radius;
+    box-shadow: $shadow;
+    margin-bottom: 1rem;
+    backdrop-filter: blur(10px);
+    padding: 1rem;
+    overflow: hidden;
+    position: relative; // necesario para overlay de solo lectura
+    color: $text-dark-blue;
+    
+    .bio-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      border-bottom: #4C9DBD solid 2px;
+      
+      h3 {
+        margin: 0;
+        color: $text-dark-blue;
+        font-size: 1.3rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+      }
+      
+      .btn-primary{
+        color: $primary-color !important;
+      }
+      
+      .btn {
+        padding: 0.25rem 0.5rem;
+        background: transparent;
+        border: none;
+        
+        &:hover {
+          background: $light-gray;
+        }
+        
+        i {
+          font-size: 1.2rem;
+        }
+  
+        .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+          color: $primary-color !important;
+        }
+      }
+    }
+
+    .card-title {
+      color: $text-dark-blue;
+      margin: 0 0 1rem 0;
+      font-size: 1.3rem;
+      font-weight: 600;
+      border-bottom: 2px solid $primary-color;
+      padding-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      justify-content: space-between;
+
+      .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+        color: $primary-color !important;
       }
     }
   }

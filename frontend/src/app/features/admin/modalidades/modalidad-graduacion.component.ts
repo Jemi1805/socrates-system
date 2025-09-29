@@ -8,6 +8,7 @@ import { HeaderComponent } from '../../../shared/components/header/header.compon
 import { Estudiante, EstudianteService } from '../../../core/services/estudiante.service';
 import { PostulanteService } from '../postulantes/postulante.service';
 import { Postulante } from '../postulantes/postulante.model';
+import { ProyectoService } from '../proyectos/proyecto.service';
 
 interface ModalidadGraduacion {
   id: number;
@@ -58,6 +59,8 @@ export class ModalidadGraduacionComponent implements OnInit {
 
   // Inscripción actual (si ya está inscrito en alguna modalidad)
   inscripcionActual: { modalidad_id: number; nombre: string; estado?: string; fecha_inscripcion?: string } | null = null;
+  // Proyecto/Tema actual si existe
+  proyectoActual: { id?: number; nombre?: string; estado?: string; tipo?: string; created_at?: string } | null = null;
 
   // Validaciones
   private readonly CETA_REGEX = /^\d{9}$/; // exactamente 9 dígitos
@@ -67,11 +70,40 @@ export class ModalidadGraduacionComponent implements OnInit {
     private estudianteService: EstudianteService,
     private router: Router,
     private postulanteService: PostulanteService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private proyectoService: ProyectoService
   ) {}
 
   ngOnInit() {
     this.cargarModalidades();
+  }
+
+  // --- Proyecto/Tema existente ---
+  private cargarProyectoActual(codCeta: string | number) {
+    if (!codCeta) { this.proyectoActual = null; return; }
+    this.proyectoService.getByCod(codCeta).subscribe({
+      next: (res) => {
+        // Normalizar posibles formatos de respuesta
+        let p: any = null;
+        if (!res) {
+          p = null;
+        } else if (Array.isArray(res) && res.length > 0) {
+          p = res[0];
+        } else if (res.data) {
+          p = Array.isArray(res.data) ? res.data[0] : res.data;
+        } else if (res.proyecto) {
+          p = res.proyecto;
+        } else {
+          p = res;
+        }
+        this.proyectoActual = p || null;
+        console.log('[Modalidad] Proyecto actual:', this.proyectoActual);
+      },
+      error: (err) => {
+        console.warn('[Modalidad] No se pudo obtener proyecto por cod_ceta', codCeta, err);
+        this.proyectoActual = null;
+      }
+    });
   }
 
   // --- Utilidades de mapeo/merge ---
@@ -450,11 +482,14 @@ export class ModalidadGraduacionComponent implements OnInit {
       this.cargarInscripcionActual$(cod).subscribe({
         next: () => {},
         complete: () => {
+          // Cargar proyecto/tema existente para bloquear doble registro
+          this.cargarProyectoActual(String(cod));
           this.abrirModal();
         }
       });
     } else {
       this.inscripcionActual = null;
+      this.proyectoActual = null;
       this.abrirModal();
     }
   }
@@ -696,6 +731,11 @@ export class ModalidadGraduacionComponent implements OnInit {
   }
 
   registrarProyecto() {
+    // Bloquear si ya existe un proyecto
+    if (this.proyectoActual) {
+      this.error = 'Este estudiante ya tiene un tema registrado.';
+      return;
+    }
     console.log('[registrarProyecto] estudiante:', this.estudiante, 'inscripcionActual:', this.inscripcionActual);
     // Validar contexto y preparar modalidad
     let modalidad: { id: number; nombre: string; descripcion: string; monto_arancel: string } | null = null;
