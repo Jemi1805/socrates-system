@@ -80,8 +80,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('aranceles_est/upsert_by_cod', [ArancelesEstController::class, 'upsertByCod']);
     Route::apiResource('modalidad', ModalidadController::class);
     Route::apiResource('pract_ind', PractIndController::class);
-    Route::apiResource('proyecto', ProyectoController::class);
-    Route::get('proyecto/by_cod', [ProyectoController::class, 'getByCodCeta']);
+    Route::apiResource('proyecto', ProyectoController::class)
+        ->where(['proyecto' => '\d+']); // evita colisión con 'by_cod'
     Route::apiResource('inscrip_modalidad', InscripModalidadController::class);
     Route::apiResource('documentos_requeridos', DocumentosRequeridosController::class);
     Route::apiResource('documentos_adjuntos', DocumentosAdjuntosController::class);
@@ -167,6 +167,8 @@ Route::get('modalidades', [ModalidadController::class, 'index']);
 // =========================
 Route::get('traspasos_instituto/get_by_cod', [TraspasosInstitutoController::class, 'getByCodCeta']);
 Route::get('res_homol_cp/get_by_cod', [ResHomolCpController::class, 'getByCodCeta']);
+Route::get('proyecto/by_cod', [ProyectoController::class, 'getByCodCeta'])
+    ->withoutMiddleware('auth:sanctum');
 
 // Diagnóstico: rutas públicas temporales
 Route::get('ping_public', function () {
