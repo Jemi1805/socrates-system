@@ -284,8 +284,8 @@
                       <div class="flex-grow-1">
                         <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
                           <strong class="me-2">Tema registrado</strong>
-                          <span class="badge bg-primary-subtle text-primary border border-primary" *ngIf="p.tipo">{{ p.tipo }}</span>
                           <span class="badge bg-info text-dark border border-info" *ngIf="p.estado">{{ p.estado }}</span>
+                          <span class="badge bg-primary-subtle text-primary border border-primary" *ngIf="p.tipo">{{ p.tipo }}</span>
                           <button
                             type="button"
                             class="btn btn-sm btn-secondary ms-auto mt-2"
@@ -302,7 +302,7 @@
                           </span>
                         </div>
                         <div class="mt-1">
-                          <span class="fw-semibold">{{ p.nombre }}</span>
+                          <span class="fw">{{ p.nombre }}</span>
                         </div>
                       </div>
                     </div>
