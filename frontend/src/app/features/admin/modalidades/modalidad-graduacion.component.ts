@@ -81,14 +81,16 @@ export class ModalidadGraduacionComponent implements OnInit {
   // --- Proyecto/Tema existente ---
   private cargarProyectoActual(codCeta: string | number) {
     if (!codCeta) { this.proyectoActual = null; return; }
+    // Limpiar estado previo para evitar mostrar datos antiguos mientras carga
+    this.proyectoActual = null;
     this.proyectoService.getByCod(codCeta).subscribe({
       next: (res) => {
         // Normalizar posibles formatos de respuesta
         let p: any = null;
         if (!res) {
           p = null;
-        } else if (Array.isArray(res) && res.length > 0) {
-          p = res[0];
+        } else if (Array.isArray(res)) {
+          p = res.length > 0 ? res[0] : null;
         } else if (res.data) {
           p = Array.isArray(res.data) ? res.data[0] : res.data;
         } else if (res.proyecto) {
@@ -96,7 +98,9 @@ export class ModalidadGraduacionComponent implements OnInit {
         } else {
           p = res;
         }
-        this.proyectoActual = p || null;
+        // Considerar 'vacío' si no hay campos clave
+        const hasMeaningful = !!(p && (p.id || p.nombre || (p.cod_ceta ?? p.codCeta ?? p.codigo_ceta)));
+        this.proyectoActual = hasMeaningful ? p : null;
         console.log('[Modalidad] Proyecto actual:', this.proyectoActual);
       },
       error: (err) => {
@@ -504,6 +508,13 @@ export class ModalidadGraduacionComponent implements OnInit {
     document.body.classList.remove('modal-open');
   }
 
+  // CETA del estudiante seleccionado, seguro para la plantilla
+  get codCetaSeleccionado(): string | null {
+    const e: any = this.estudiante as any;
+    const v = e?.cod_ceta ?? e?.codCeta ?? e?.codigo_ceta;
+    return v != null ? String(v) : null;
+  }
+
   continuarConModalidad() {
     if (!this.estudiante || !this.modalidadSeleccionada) {
       this.error = 'Debe seleccionar un estudiante y una modalidad';
@@ -782,7 +793,8 @@ export class ModalidadGraduacionComponent implements OnInit {
 
     // Cerrar modal y navegar a la página de Registro de Tema
     this.cerrarModal();
-    this.router.navigate(['/registro-tema']).then(ok => {
+    const cod = (this.estudiante as any)?.cod_ceta || (this.estudiante as any)?.codCeta || (this.estudiante as any)?.codigo_ceta;
+    this.router.navigate(['/registro-tema'], { queryParams: { cod_ceta: cod } }).then(ok => {
       if (!ok) {
         console.error('Navegación a /registro-tema falló');
       }

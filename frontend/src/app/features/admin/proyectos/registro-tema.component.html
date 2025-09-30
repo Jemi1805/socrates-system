@@ -95,11 +95,11 @@
           </h5>
         </div>
         <div class="row g-3">
-          <div class="col-md-4"><strong>Carrera:</strong> {{ carrera || '-' }}</div>
-          <div class="col-md-3"><strong>Código CETA:</strong> {{ codCeta || '-' }}</div>
+          <div class="col-md-4"><strong>Carrera:</strong> {{ proyectoGuardado?.carrera || carrera || '-' }}</div>
+          <div class="col-md-3"><strong>Código CETA:</strong> {{ proyectoGuardado?.cod_ceta || codCeta || '-' }}</div>
           <div class="col-md-5"><strong>Modalidad de graduación:</strong> {{ modalidadNombre || proyectoGuardado?.tipo || '-' }}</div>
-          <div class="col-md-6"><strong>Nombre completo:</strong> {{ (nombres + ' ' + apellidos) || '-' }}</div>
-          <div class="col-md-6"><strong>Instituto:</strong> {{ instituto || '-' }}</div>
+          <div class="col-md-6"><strong>Nombre completo:</strong> {{ (proyectoGuardado?.nombres && proyectoGuardado?.apellidos) ? (proyectoGuardado?.nombres + ' ' + proyectoGuardado?.apellidos) : ((nombres + ' ' + apellidos) || '-') }}</div>
+          <div class="col-md-6"><strong>Instituto:</strong> {{ proyectoGuardado?.instituto || instituto || '-' }}</div>
 
           <div class="col-md-12"><hr class="my-1"/></div>
 
@@ -113,8 +113,8 @@
             <button type="button" class="btn btn-outline-secondary" (click)="irModalidadGraduacion()">
               Volver
             </button>
-            <button type="button" class="btn btn-primary" (click)="irPostulantes()">
-              Ver postulante
+            <button type="button" class="btn btn-primary" (click)="generarFMDG1()">
+              Generar formulario FMDG-1
             </button>
           </div>
         </div>

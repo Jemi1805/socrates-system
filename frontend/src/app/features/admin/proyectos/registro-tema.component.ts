@@ -1,10 +1,11 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { ProyectoService } from './proyecto.service';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
 import { PostulanteService } from '../postulantes/postulante.service';
+import { PdfService } from '../../../shared/services/pdf.service';
 
 interface EstudianteCtx {
   cod_ceta?: string | number;
@@ -33,7 +34,7 @@ interface ModalidadCtx {
   templateUrl: './registro-tema.component.html',
   styleUrls: ['./registro-tema.component.scss']
 })
-export class RegistroTemaComponent {
+export class RegistroTemaComponent implements OnInit {
   loading = false;
   error: string | null = null;
   success: string | null = null;
@@ -65,8 +66,16 @@ export class RegistroTemaComponent {
   modalConfirmCambioVisible = false;
   nuevaModalidad: ModalidadCtx | null = null;
 
-  constructor(private proyectoService: ProyectoService, private router: Router, private postulanteService: PostulanteService) {
-    // Cargar contexto desde sessionStorage si existe
+  constructor(
+    private proyectoService: ProyectoService,
+    private router: Router,
+    private postulanteService: PostulanteService,
+    private pdfService: PdfService,
+    private route: ActivatedRoute,
+  ) {}
+
+  ngOnInit(): void {
+    // 1) Cargar contexto desde sessionStorage si existe
     try {
       const raw = sessionStorage.getItem('datos_postulacion');
       if (raw) {
@@ -76,7 +85,7 @@ export class RegistroTemaComponent {
       }
     } catch {}
 
-    // Prellenar encabezado si tenemos estudiante
+    // 2) Prellenar encabezado si tenemos estudiante
     if (this.estudiante) {
       this.nombres = (this.estudiante.nombres || '').trim();
       const ap = [this.estudiante.ap_pat || '', this.estudiante.ap_mat || ''].filter(Boolean).join(' ').trim();
@@ -90,38 +99,125 @@ export class RegistroTemaComponent {
       this.modalidadNombre = this.modalidad.nombre;
     }
 
-    // Si tenemos cod CETA, verificar si ya existe un proyecto registrado para bloquear nuevos registros
-    const cod = this.codCeta;
-    if (cod) {
-      this.proyectoService.getByCod(cod).subscribe({
-        next: (p) => {
-          if (p) {
-            this.proyectoGuardado = p;
-            this.resumenVisible = true; // Mostrar directamente el resumen si ya existe
-          }
-        },
-        error: () => {}
-      });
-    }
+    // Importante: Angular puede reutilizar el componente en la misma ruta.
+    // Nos suscribimos a cambios de query params para forzar sincronización.
+    this.route.queryParamMap.subscribe(qp => {
+      const qpCod = qp.get('cod_ceta') || qp.get('cod') || qp.get('ceta');
+      if (qpCod && String(qpCod) !== String(this.codCeta)) {
+        // Actualizar estado base
+        if (!this.estudiante) this.estudiante = { cod_ceta: qpCod } as any;
+        else this.estudiante.cod_ceta = qpCod;
+        try {
+          const raw = sessionStorage.getItem('datos_postulacion');
+          const datos = raw ? JSON.parse(raw) : {};
+          datos.estudiante = { ...(datos.estudiante || {}), cod_ceta: qpCod };
+          sessionStorage.setItem('datos_postulacion', JSON.stringify(datos));
+        } catch {}
 
-    // Cargar modalidades disponibles para el modal de selección
-    this.postulanteService.getModalidades().subscribe({
-      next: (res: any) => {
-        const lista = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
-        this.modalidades = (lista || []).map((m: any) => ({
-          id: m.id,
-          nombre: m.nombre,
-          descripcion: m.descripcion || '',
-          monto_arancel: m.monto_arancel || '',
-          icono: m.icono || ''
-        }));
-      },
-      error: () => {
-        this.modalidades = [];
+        // Rehidratar cabecera desde BD local de postulantes
+        this.postulanteService.getById(qpCod as any).subscribe({
+          next: (p: any) => {
+            if (p) {
+              const nombres = (p.nombres_est || p.nombres || '').toString().trim();
+              const apPat = (p.ap_pat || '').toString().trim();
+              const apMat = (p.ap_mat || '').toString().trim();
+              this.nombres = nombres;
+              this.apellidos = [apPat, apMat].filter(Boolean).join(' ').trim();
+              this.ci = (p.ci || '').toString();
+              this.expedicion = ((p.procedencia || (p as any).expedido) || '').toString();
+              this.carrera = ((p as any).carrera_nombre || p.carrera || '').toString();
+              this.estudiante = {
+                cod_ceta: qpCod,
+                nombres: nombres,
+                ap_pat: apPat,
+                ap_mat: apMat,
+                ci: this.ci,
+                procedencia: this.expedicion,
+                celular: (p as any).celular || this.celular,
+                carrera: this.carrera,
+                pensum: p.pensum,
+              };
+              try {
+                const raw = sessionStorage.getItem('datos_postulacion');
+                const datos = raw ? JSON.parse(raw) : {};
+                datos.estudiante = { ...(datos.estudiante || {}), ...this.estudiante };
+                sessionStorage.setItem('datos_postulacion', JSON.stringify(datos));
+              } catch {}
+            }
+          },
+          error: () => {}
+        });
+
+        // Reconsultar proyecto por el nuevo CETA y sincronizar resumen
+        const cod = String(qpCod);
+        this.proyectoService.getByCod(cod).subscribe({
+          next: (res) => {
+            const wanted = String(cod);
+            const pickFromArray = (arr: any[]): any => {
+              const found = (arr || []).find(it => {
+                const v = (it?.cod_ceta ?? it?.codCeta ?? it?.codigo_ceta);
+                return v !== undefined && v !== null && String(v) === wanted;
+              });
+              return found || (arr && arr.length ? arr[0] : null);
+            };
+            let p: any = null;
+            if (!res) {
+              p = null;
+            } else if (Array.isArray(res)) {
+              p = pickFromArray(res);
+            } else if ((res as any).data) {
+              const data = (res as any).data;
+              p = Array.isArray(data) ? pickFromArray(data) : data;
+            } else if ((res as any).proyecto) {
+              const pr = (res as any).proyecto;
+              p = Array.isArray(pr) ? pickFromArray(pr) : pr;
+            } else {
+              p = res;
+            }
+            if (p) {
+              this.proyectoGuardado = p;
+              const pCod = (p as any).cod_ceta ?? (p as any).codCeta ?? (p as any).codigo_ceta;
+              const codMatch = pCod !== undefined && pCod !== null && String(pCod) === wanted;
+              if (codMatch || !this.estudiante) {
+                this.estudiante = {
+                  cod_ceta: String(pCod || wanted),
+                  nombres: (p as any).nombres || this.nombres,
+                  ap_pat: (p as any).apellidos ? String((p as any).apellidos).split(' ')[0] : (this.estudiante?.ap_pat || ''),
+                  ap_mat: (p as any).apellidos ? String((p as any).apellidos).split(' ').slice(1).join(' ') : (this.estudiante?.ap_mat || ''),
+                  ci: (p as any).ci || this.ci,
+                  procedencia: (p as any).expedicion || this.expedicion,
+                  celular: (p as any).celular || this.celular,
+                  carrera: (p as any).carrera || this.carrera,
+                };
+                const n = ((p as any).nombres || '').toString().trim();
+                const aps = ((p as any).apellidos || '').toString().trim();
+                if (n) this.nombres = n;
+                if (aps) this.apellidos = aps;
+                if ((p as any).ci) this.ci = String((p as any).ci);
+                if ((p as any).expedicion) this.expedicion = String((p as any).expedicion);
+                if ((p as any).carrera) this.carrera = String((p as any).carrera);
+                if ((p as any).instituto) this.instituto = String((p as any).instituto);
+                try {
+                  const raw = sessionStorage.getItem('datos_postulacion');
+                  const datos = raw ? JSON.parse(raw) : {};
+                  datos.estudiante = { ...(datos.estudiante || {}), ...this.estudiante };
+                  sessionStorage.setItem('datos_postulacion', JSON.stringify(datos));
+                } catch {}
+              }
+              this.resumenVisible = true;
+            } else {
+              // Si no hay proyecto, mostrar formulario (no resumen)
+              this.proyectoGuardado = null;
+              this.resumenVisible = false;
+            }
+          },
+          error: () => {}
+        });
       }
     });
   }
 
+  
   get codCeta(): string {
     const c = this.estudiante?.cod_ceta;
     return c !== undefined && c !== null ? String(c) : '';
@@ -186,6 +282,36 @@ export class RegistroTemaComponent {
 
   irPostulantes() {
     this.router.navigate(['/postulantes'], { queryParams: { ver: 1 } });
+  }
+
+  generarFMDG1() {
+    // Construir datos desde el estado actual y delegar al servicio PDF
+    const data = {
+      codCeta: this.codCeta,
+      nombreCompleto: `${this.nombres || ''} ${this.apellidos || ''}`.trim(),
+      nombres: this.nombres,
+      apellidos: this.apellidos,
+      ci: this.ci,
+      expedicion: this.expedicion,
+      celular: (() => {
+        const fromProyecto = (this.proyectoGuardado as any)?.celular;
+        const fromEstudiante = this.estudiante?.celular;
+        const fromLocal = this.celular;
+        const v = (fromProyecto ?? fromEstudiante ?? fromLocal ?? '').toString().trim();
+        return v;
+      })(),
+      instituto: this.instituto,
+      carrera: this.carrera,
+      modalidad: this.proyectoGuardado?.tipo || this.modalidadNombre || '-',
+      tema: this.proyectoGuardado?.nombre || this.tema || '-',
+      objetivo: this.proyectoGuardado?.objetivo || this.objetivos || '',
+    };
+    try {
+      this.pdfService.generarFMDG1(data);
+    } catch (e) {
+      console.error('Error generando FMDG-1', e);
+      this.error = 'No fue posible generar el PDF.';
+    }
   }
 
   // --- Gestión de Modalidades (UI) ---
