@@ -323,8 +323,7 @@
                           <button
                             type="button"
                             class="btn btn-sm btn-secondary ms-auto mt-2"
-                            [routerLink]="['/registro-tema']"
-                            [queryParams]="{ cod_ceta: codCetaSeleccionado }"
+                            (click)="verRegistroTema()"
                           >
                             <i class="bi bi-eye me-1"></i>
                             Ver registro

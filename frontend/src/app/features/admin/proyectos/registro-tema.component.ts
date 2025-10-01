@@ -38,9 +38,13 @@ export class RegistroTemaComponent implements OnInit {
   loading = false;
   error: string | null = null;
   success: string | null = null;
+  // Estado del botón de generación de PDF
+  generandoFmdg = false;
   modalExitoVisible = false;
   resumenVisible = false;
   proyectoGuardado: any = null;
+  // Cargando silencioso del resumen para evitar parpadeos
+  hydratingResumen = false;
 
   estudiante: EstudianteCtx | null = null;
   modalidad: ModalidadCtx | null = null;
@@ -83,6 +87,25 @@ export class RegistroTemaComponent implements OnInit {
         this.estudiante = datos?.estudiante || null;
         this.modalidad = datos?.modalidad || null;
       }
+      // Sembrar proyecto desde cache si existe para render inmediato
+      const rawProyecto = sessionStorage.getItem('proyecto_cache');
+      if (rawProyecto) {
+        const pc = JSON.parse(rawProyecto);
+        // No confiar ciegamente: solo tomar campos útiles
+        const nombreTema = pc?.nombre ?? pc?.tema ?? pc?.titulo ?? pc?.title ?? '';
+        const objetivo = pc?.objetivo ?? pc?.objetivos ?? '';
+        const estado = pc?.estado ?? '';
+        const tipo = pc?.tipo ?? '';
+        this.tema = nombreTema ? String(nombreTema) : (this.tema || '');
+        this.objetivos = objetivo ? String(objetivo) : (this.objetivos || '');
+        this.proyectoGuardado = {
+          ...(this.proyectoGuardado || {}),
+          nombre: this.tema || undefined,
+          objetivo: this.objetivos || undefined,
+          estado: estado || (this.proyectoGuardado?.estado || undefined),
+          tipo: tipo || (this.proyectoGuardado?.tipo || undefined),
+        };
+      }
     } catch {}
 
     // 2) Prellenar encabezado si tenemos estudiante
@@ -103,6 +126,8 @@ export class RegistroTemaComponent implements OnInit {
     // Nos suscribimos a cambios de query params para forzar sincronización.
     this.route.queryParamMap.subscribe(qp => {
       const qpCod = qp.get('cod_ceta') || qp.get('cod') || qp.get('ceta');
+      const ver = (qp.get('ver') || '').toString().toLowerCase();
+      const verResumen = ver === 'resumen' || ver === '1' || ver === 'true';
       if (qpCod && String(qpCod) !== String(this.codCeta)) {
         // Actualizar estado base
         if (!this.estudiante) this.estudiante = { cod_ceta: qpCod } as any;
@@ -150,6 +175,27 @@ export class RegistroTemaComponent implements OnInit {
 
         // Reconsultar proyecto por el nuevo CETA y sincronizar resumen
         const cod = String(qpCod);
+        // Si se solicita ver=resumen, mostramos el resumen de inmediato (optimista) y sembramos datos locales
+        if (verResumen) {
+          this.resumenVisible = true;
+          this.hydratingResumen = true;
+          const nombreCompleto = `${this.nombres || ''} ${this.apellidos || ''}`.trim();
+          this.proyectoGuardado = {
+            ...(this.proyectoGuardado || {}),
+            cod_ceta: this.codCeta || qpCod,
+            nombres: this.nombres || (this.estudiante?.nombres || ''),
+            apellidos: this.apellidos || [this.estudiante?.ap_pat || '', this.estudiante?.ap_mat || ''].filter(Boolean).join(' ').trim(),
+            ci: this.ci || (this.estudiante?.ci || ''),
+            expedicion: this.expedicion || (this.estudiante?.procedencia || ''),
+            celular: this.celular || (this.estudiante?.celular || ''),
+            instituto: this.instituto,
+            carrera: this.carrera || (this.estudiante?.carrera || ''),
+            tipo: this.modalidadNombre || (this.modalidad?.nombre || ''),
+            nombre: this.tema || '',
+            objetivo: this.objetivos || '',
+            estado: (this.proyectoGuardado && this.proyectoGuardado.estado) ? this.proyectoGuardado.estado : 'En progreso',
+          };
+        }
         this.proyectoService.getByCod(cod).subscribe({
           next: (res) => {
             const wanted = String(cod);
@@ -175,7 +221,15 @@ export class RegistroTemaComponent implements OnInit {
               p = res;
             }
             if (p) {
-              this.proyectoGuardado = p;
+              // Fusionar sobre el objeto existente para evitar reflow y parpadeo
+              this.proyectoGuardado = { ...(this.proyectoGuardado || {}), ...p };
+              // Sincronizar campos locales para que el resumen siempre tenga valores (acepta varias claves)
+              const nombreTema = (p as any).nombre ?? (p as any).tema ?? (p as any).nombre_tema ?? (p as any).titulo ?? (p as any).title;
+              if (nombreTema) this.tema = String(nombreTema);
+              const obj = (p as any).objetivo ?? (p as any).objetivos;
+              if (obj && !this.objetivos) this.objetivos = String(obj);
+              // Limpiar cache de proyecto para no dejar datos viejos en futuras navegaciones
+              try { sessionStorage.removeItem('proyecto_cache'); } catch {}
               const pCod = (p as any).cod_ceta ?? (p as any).codCeta ?? (p as any).codigo_ceta;
               const codMatch = pCod !== undefined && pCod !== null && String(pCod) === wanted;
               if (codMatch || !this.estudiante) {
@@ -206,13 +260,74 @@ export class RegistroTemaComponent implements OnInit {
               }
               this.resumenVisible = true;
             } else {
-              // Si no hay proyecto, mostrar formulario (no resumen)
+              // Si no hay proyecto y no se forzó resumen, mostrar formulario
               this.proyectoGuardado = null;
+              if (!verResumen) {
+                this.resumenVisible = false;
+              }
+            }
+            this.hydratingResumen = false;
+          },
+          error: () => {
+            // En error: si no se forzó resumen, caer al formulario
+            if (!verResumen) {
               this.resumenVisible = false;
             }
-          },
-          error: () => {}
+            this.hydratingResumen = false;
+          }
         });
+      } else {
+        // Si no cambió el código pero ver=resumen está presente, mostrar resumen y también hidratar desde backend
+        if (verResumen) {
+          this.resumenVisible = true;
+          this.hydratingResumen = true;
+          // Siembra local para evitar salto visual
+          this.proyectoGuardado = {
+            ...(this.proyectoGuardado || {}),
+            cod_ceta: this.codCeta || qpCod || undefined,
+            nombres: this.nombres || (this.estudiante?.nombres || ''),
+            apellidos: this.apellidos || [this.estudiante?.ap_pat || '', this.estudiante?.ap_mat || ''].filter(Boolean).join(' ').trim(),
+            ci: this.ci || (this.estudiante?.ci || ''),
+            expedicion: this.expedicion || (this.estudiante?.procedencia || ''),
+            celular: this.celular || (this.estudiante?.celular || ''),
+            instituto: this.instituto,
+            carrera: this.carrera || (this.estudiante?.carrera || ''),
+            tipo: this.modalidadNombre || (this.modalidad?.nombre || ''),
+            nombre: this.tema || '',
+            objetivo: this.objetivos || '',
+            estado: (this.proyectoGuardado && this.proyectoGuardado.estado) ? this.proyectoGuardado.estado : 'En progreso',
+          };
+          const cod = String(this.codCeta || qpCod || '');
+          if (cod) {
+            this.proyectoService.getByCod(cod).subscribe({
+              next: (res) => {
+                const wanted = String(cod);
+                const pickFromArray = (arr: any[]): any => {
+                  const found = (arr || []).find(it => {
+                    const v = (it?.cod_ceta ?? it?.codCeta ?? it?.codigo_ceta);
+                    return v !== undefined && v !== null && String(v) === wanted;
+                  });
+                  return found || (arr && arr.length ? arr[0] : null);
+                };
+                let p: any = null;
+                if (!res) p = null;
+                else if (Array.isArray(res)) p = pickFromArray(res);
+                else if ((res as any).data) { const data = (res as any).data; p = Array.isArray(data) ? pickFromArray(data) : data; }
+                else if ((res as any).proyecto) { const pr = (res as any).proyecto; p = Array.isArray(pr) ? pickFromArray(pr) : pr; }
+                else p = res;
+                if (p) {
+                  this.proyectoGuardado = { ...(this.proyectoGuardado || {}), ...p };
+                  const nombreTema = (p as any).nombre ?? (p as any).tema ?? (p as any).nombre_tema ?? (p as any).titulo ?? (p as any).title;
+                  if (nombreTema) this.tema = String(nombreTema);
+                }
+                this.hydratingResumen = false;
+              },
+              error: () => { this.hydratingResumen = false; }
+            });
+          } else {
+            this.hydratingResumen = false;
+          }
+        }
       }
     });
   }
@@ -285,6 +400,8 @@ export class RegistroTemaComponent implements OnInit {
   }
 
   generarFMDG1() {
+    if (this.generandoFmdg) return;
+    this.generandoFmdg = true;
     // Construir datos desde el estado actual y delegar al servicio PDF
     const data = {
       codCeta: this.codCeta,
@@ -306,12 +423,24 @@ export class RegistroTemaComponent implements OnInit {
       tema: this.proyectoGuardado?.nombre || this.tema || '-',
       objetivo: this.proyectoGuardado?.objetivo || this.objetivos || '',
     };
-    try {
-      this.pdfService.generarFMDG1(data);
-    } catch (e) {
-      console.error('Error generando FMDG-1', e);
-      this.error = 'No fue posible generar el PDF.';
-    }
+    // Permitir que Angular pinte el spinner antes de la tarea pesada
+    setTimeout(() => {
+      try {
+        this.pdfService.generarFMDG1(data);
+      } catch (e) {
+        console.error('Error generando FMDG-1', e);
+        this.error = 'No fue posible generar el PDF.';
+      } finally {
+        this.generandoFmdg = false;
+      }
+    }, 0);
+  }
+
+  // Valor consolidado del nombre del tema para el resumen (evita depender de una sola clave)
+  get nombreTemaResumen(): string {
+    const pg: any = this.proyectoGuardado || {};
+    const v = pg.nombre ?? pg.tema ?? pg.nombre_tema ?? pg.titulo ?? pg.title ?? this.tema ?? '';
+    return (v || '').toString().trim() || '-';
   }
 
   // --- Gestión de Modalidades (UI) ---
@@ -347,6 +476,29 @@ export class RegistroTemaComponent implements OnInit {
       datos.modalidad = this.modalidad;
       sessionStorage.setItem('datos_postulacion', JSON.stringify(datos));
     } catch {}
+
+    // Sincronizar también en inscrip_modalidad.modalidad_nom (y modalidad_id) usando cod_ceta
+    const cod = this.codCeta;
+    if (cod && this.modalidadNombre) {
+      this.postulanteService.getInscripModalidadByCodCeta(cod).subscribe({
+        next: (res: any) => {
+          // Respuesta puede ser lista o un objeto con data
+          let row: any = null;
+          if (!res) row = null;
+          else if (Array.isArray(res)) row = res[0] || null;
+          else if (res.data) row = Array.isArray(res.data) ? (res.data[0] || null) : res.data;
+          else row = res;
+          const id = row?.id || row?.inscripcion_id || row?.inscrip_modalidad_id;
+          if (id) {
+            this.postulanteService.updateInscripModalidad(id, {
+              modalidad_nom: this.modalidadNombre,
+              modalidad_id: (this.modalidad as any)?.id,
+            }).subscribe({ next: () => {}, error: () => {} });
+          }
+        },
+        error: () => {}
+      });
+    }
   }
 
   // Iconos consistentes con el selector de modalidades (libros, persona, medalla, birrete)

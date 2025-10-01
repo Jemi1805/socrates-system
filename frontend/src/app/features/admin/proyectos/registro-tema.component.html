@@ -103,7 +103,10 @@
 
           <div class="col-md-12"><hr class="my-1"/></div>
 
-          <div class="col-md-8"><strong>Nombre / Tema:</strong> {{ proyectoGuardado?.nombre || tema }}</div>
+          <div class="col-md-8">
+            <strong>Nombre / Tema:</strong>
+            {{ proyectoGuardado?.nombre || tema || '-' }}
+          </div>
           <div class="col-md-4"><strong>Estado:</strong> <span class="badge bg-info text-dark">{{ proyectoGuardado?.estado || 'En progreso' }}</span></div>
           <div class="col-md-12" *ngIf="(proyectoGuardado?.objetivo || objetivos)">
             <strong>Objetivos:</strong>
@@ -113,8 +116,9 @@
             <button type="button" class="btn btn-outline-secondary" (click)="irModalidadGraduacion()">
               Volver
             </button>
-            <button type="button" class="btn btn-primary" (click)="generarFMDG1()">
-              Generar formulario FMDG-1
+            <button type="button" class="btn btn-primary" (click)="generarFMDG1()" [disabled]="generandoFmdg">
+              <span *ngIf="generandoFmdg" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              {{ generandoFmdg ? 'Generando...' : 'Generar formulario FMDG-1' }}
             </button>
           </div>
         </div>

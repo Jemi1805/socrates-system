@@ -102,6 +102,48 @@ export class ModalidadGraduacionComponent implements OnInit {
         const hasMeaningful = !!(p && (p.id || p.nombre || (p.cod_ceta ?? p.codCeta ?? p.codigo_ceta)));
         this.proyectoActual = hasMeaningful ? p : null;
         console.log('[Modalidad] Proyecto actual:', this.proyectoActual);
+        // Sincronizar visual y backend: si la modalidad de inscripción y la del proyecto difieren, actualizar inscrip_modalidad.modalidad_nom
+        try {
+          const nombreIns = this.inscripcionActual?.nombre || '';
+          const nombreProj = (this.proyectoActual as any)?.tipo || '';
+          // Resolver modalidad_id por nombre (si está cargada la lista)
+          const foundMod = (this.modalidades || []).find(m => (m.nombre || '').toString().toLowerCase() === (nombreProj || '').toString().toLowerCase());
+          const modalidadId = foundMod?.id;
+          if (this.inscripcionActual && this.proyectoActual && nombreIns && nombreProj && nombreIns !== nombreProj) {
+            this.postulanteService.getInscripModalidadByCodCeta(String(codCeta)).subscribe({
+              next: (r: any) => {
+                let row: any = null;
+                if (!r) row = null; else if (Array.isArray(r)) row = r[0] || null; else if (r.data) row = Array.isArray(r.data) ? (r.data[0] || null) : r.data; else row = r;
+                const id = row?.id || row?.inscripcion_id || row?.inscrip_modalidad_id;
+                if (id) {
+                  this.postulanteService.updateInscripModalidad(id, { modalidad_nom: nombreProj, modalidad_id: modalidadId }).subscribe({
+                    next: (resp) => {
+                      console.log('[Sync modalidad] PATCH por id OK:', resp);
+                      this.inscripcionActual = { ...(this.inscripcionActual as any), nombre: nombreProj } as any;
+                    },
+                    error: (err) => {
+                      console.warn('[Sync modalidad] PATCH por id falló, fallback por cod', err);
+                      // Fallback por código
+                      this.postulanteService.updateInscripModalidadByCod(String(codCeta), { modalidad_nom: nombreProj, modalidad_id: modalidadId })
+                        .subscribe({ next: (resp2) => {
+                          console.log('[Sync modalidad] upsert_by_cod OK:', resp2);
+                          this.inscripcionActual = { ...(this.inscripcionActual as any), nombre: nombreProj } as any;
+                        }, error: (err2) => console.error('[Sync modalidad] upsert_by_cod ERROR:', err2) });
+                    }
+                  });
+                } else {
+                  // Sin id: usar fallback por código
+                  this.postulanteService.updateInscripModalidadByCod(String(codCeta), { modalidad_nom: nombreProj, modalidad_id: modalidadId })
+                    .subscribe({ next: (resp) => {
+                      console.log('[Sync modalidad] upsert_by_cod OK (sin id):', resp);
+                      this.inscripcionActual = { ...(this.inscripcionActual as any), nombre: nombreProj } as any;
+                    }, error: (err) => console.error('[Sync modalidad] upsert_by_cod ERROR (sin id):', err) });
+                }
+              },
+              error: () => {}
+            });
+          }
+        } catch {}
       },
       error: (err) => {
         console.warn('[Modalidad] No se pudo obtener proyecto por cod_ceta', codCeta, err);
@@ -555,6 +597,25 @@ export class ModalidadGraduacionComponent implements OnInit {
     // Cerrar modal y navegar con query param ver=1 para activar el modo lectura
     this.cerrarModal();
     this.router.navigate(['/postulantes'], { queryParams: { ver: 1 } });
+  }
+
+  // Navegar a Registro de tema mostrando el RESUMEN directamente (sin parpadeo)
+  verRegistroTema() {
+    if (!this.estudiante) return;
+    const modalidad = this.inscripcionActual
+      ? { id: this.inscripcionActual.modalidad_id, nombre: this.inscripcionActual.nombre, descripcion: '', monto_arancel: '' }
+      : null;
+    const datosPostulacion = { estudiante: this.estudiante, modalidad };
+    try {
+      sessionStorage.setItem('datos_postulacion', JSON.stringify(datosPostulacion));
+      // Persistir un cache de proyecto actual (si existe) para hidratar inmediatamente el resumen
+      if (this.proyectoActual) {
+        sessionStorage.setItem('proyecto_cache', JSON.stringify(this.proyectoActual));
+      }
+    } catch {}
+    this.cerrarModal();
+    const cod = (this.estudiante as any)?.cod_ceta || (this.estudiante as any)?.codCeta || (this.estudiante as any)?.codigo_ceta;
+    this.router.navigate(['/registro-tema'], { queryParams: { cod_ceta: cod, ver: 'resumen' } });
   }
 
   // --- Helpers de validación/sanitización ---

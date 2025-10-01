@@ -273,4 +273,15 @@ export class PostulanteService {
     const params: any = { cod_ceta_est: codCeta };
     return this.http.get<any>(`${this.baseUrl}/inscrip_modalidad`, { params });
   }
+
+  // Actualiza la fila de inscrip_modalidad por ID (por ejemplo, para sincronizar modalidad_nom)
+  updateInscripModalidad(id: number | string, payload: { modalidad_nom?: string; modalidad_id?: number | string; estado?: string | null }): Observable<any> {
+    return this.http.patch<any>(`${this.baseUrl}/inscrip_modalidad/${id}`, payload);
+  }
+
+  // Fallback robusto: upsert por código CETA (si el backend no soporta PATCH por ID)
+  updateInscripModalidadByCod(codCeta: number | string, payload: { modalidad_nom?: string; modalidad_id?: number | string; estado?: string | null }): Observable<any> {
+    const body = { cod_ceta_est: codCeta, ...payload } as any;
+    return this.http.post<any>(`${this.baseUrl}/inscrip_modalidad/upsert_by_cod`, body);
+  }
 }
