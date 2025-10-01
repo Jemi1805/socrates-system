@@ -46,6 +46,20 @@ export class RegistroTemaComponent implements OnInit {
   // Cargando silencioso del resumen para evitar parpadeos
   hydratingResumen = false;
 
+  // --- Edición en resumen ---
+  editResumen = false;
+  editFromResumen = false; // cuando se edita en el formulario original
+  editModalidadId: number | null = null;
+  editModalidadNombre: string = '';
+  editTema: string = '';
+  editObjetivos: string = '';
+  // Cuando se edita modalidad desde el resumen, diferir persistencia hasta Guardar
+  private editModalidadEnResumen = false;
+
+  // Modal de cambios guardados
+  showModalCambios = false;
+  cambiosGuardados: Array<{ campo: string; anterior: any; nuevo: any }> = [];
+
   estudiante: EstudianteCtx | null = null;
   modalidad: ModalidadCtx | null = null;
 
@@ -124,7 +138,7 @@ export class RegistroTemaComponent implements OnInit {
 
     // Importante: Angular puede reutilizar el componente en la misma ruta.
     // Nos suscribimos a cambios de query params para forzar sincronización.
-    this.route.queryParamMap.subscribe(qp => {
+    this.route.queryParamMap.subscribe((qp: any) => {
       const qpCod = qp.get('cod_ceta') || qp.get('cod') || qp.get('ceta');
       const ver = (qp.get('ver') || '').toString().toLowerCase();
       const verResumen = ver === 'resumen' || ver === '1' || ver === 'true';
@@ -399,6 +413,119 @@ export class RegistroTemaComponent implements OnInit {
     this.router.navigate(['/postulantes'], { queryParams: { ver: 1 } });
   }
 
+  // --- Modo edición del resumen ---
+  iniciarEdicionResumen() {
+    // Mostrar formulario completo con datos prellenados al estilo del registro inicial
+    this.editResumen = false;
+    this.editFromResumen = true;
+    this.resumenVisible = false;
+    // Asegurar lista de modalidades mínima (si no está cargada)
+    if (!this.modalidades || this.modalidades.length === 0) {
+      this.postulanteService.getModalidades().subscribe({ next: (lista: any[]) => {
+        this.modalidades = (lista || []).map(m => ({ id: m.id, nombre: m.nombre, descripcion: m.descripcion || '' }));
+      }, error: () => {} });
+    }
+    const tipoActual = (this.proyectoGuardado?.tipo || this.modalidadNombre || '').toString();
+    const found = (this.modalidades || []).find(m => (m.nombre || '').toString().toLowerCase() === tipoActual.toLowerCase());
+    this.editModalidadId = found?.id ?? (this.modalidad as any)?.id ?? null;
+    this.editModalidadNombre = found?.nombre || tipoActual;
+    // Prellenar campos visibles del formulario
+    this.modalidadNombre = this.editModalidadNombre;
+    this.tema = (this.proyectoGuardado?.nombre || this.tema || '').toString();
+    this.objetivos = (this.proyectoGuardado?.objetivo || this.objetivos || '').toString();
+    // Asegurar que el campo celular esté visible con el valor consolidado
+    const cel = (this.proyectoGuardado as any)?.celular ?? this.estudiante?.celular ?? this.celular ?? '';
+    this.celular = String(cel);
+    // Mantener cabecera ya cargada (nombres, apellidos, etc.)
+  }
+
+  cancelarEdicionResumen() {
+    // Si estábamos editando en el formulario, volver al resumen
+    if (this.editFromResumen) {
+      this.editFromResumen = false;
+      this.resumenVisible = true;
+    }
+    this.editResumen = false;
+    this.editModalidadEnResumen = false;
+  }
+
+  guardarEdicionResumen() {
+    if (!this.proyectoGuardado?.id) { this.editResumen = false; this.editFromResumen = false; return; }
+    // Tomar de los campos del formulario cuando venimos desde el formulario original
+    const nombreTema = (this.editFromResumen ? (this.tema || '') : (this.editTema || '')).trim();
+    const objetivos = (this.editFromResumen ? (this.objetivos || '') : (this.editObjetivos || '')).trim();
+    const tipoNom = (this.editFromResumen ? (this.modalidadNombre || '') : (this.editModalidadNombre || '')).trim();
+    const payload: any = { nombre: nombreTema, objetivo: objetivos, tipo: tipoNom };
+    // Calcular diffs contra estado actual antes de enviar
+    const prev = this.proyectoGuardado || {};
+    const diffs: Array<{ campo: string; anterior: any; nuevo: any }> = [];
+    const pushDiff = (campo: string, a: any, n: any) => {
+      const aStr = (a ?? '').toString();
+      const nStr = (n ?? '').toString();
+      if (aStr !== nStr) diffs.push({ campo, anterior: aStr, nuevo: nStr });
+    };
+    pushDiff('tipo', prev.tipo ?? this.modalidadNombre, tipoNom);
+    pushDiff('nombre', prev.nombre ?? this.tema, nombreTema);
+    pushDiff('objetivo', prev.objetivo ?? this.objetivos, objetivos);
+    // Persistir proyecto
+    this.proyectoService.updateProyecto(this.proyectoGuardado.id, payload).subscribe({
+      next: (resp) => {
+        // Actualizar estado local
+        this.proyectoGuardado = { ...(this.proyectoGuardado || {}), ...resp };
+        this.tema = this.proyectoGuardado?.nombre || nombreTema || this.tema;
+        this.objetivos = this.proyectoGuardado?.objetivo || objetivos || this.objetivos;
+        this.modalidadNombre = this.proyectoGuardado?.tipo || tipoNom || this.modalidadNombre;
+        // Sincronizar inscrip_modalidad.modalidad_nom/modalidad_id
+        const cod = this.codCeta;
+        if (cod && this.modalidadNombre) {
+          const mid = this.editModalidadId ?? (this.modalidad as any)?.id;
+          this.postulanteService.getInscripModalidadByCodCeta(cod).subscribe({
+            next: (res: any) => {
+              let row: any = null;
+              if (!res) row = null; else if (Array.isArray(res)) row = res[0] || null; else if (res.data) row = Array.isArray(res.data) ? (res.data[0] || null) : res.data; else row = res;
+              const id = row?.id || row?.inscripcion_id || row?.inscrip_modalidad_id;
+              const toSend: any = { modalidad_nom: this.modalidadNombre };
+              if (mid) toSend.modalidad_id = mid;
+              const onOk = () => {
+                this.editResumen = false; this.editFromResumen = false; this.resumenVisible = true;
+                this.cambiosGuardados = diffs;
+                this.showModalCambios = true;
+              };
+              if (id) {
+                this.postulanteService.updateInscripModalidad(id, toSend).subscribe({ next: onOk, error: () => {
+                  this.postulanteService.updateInscripModalidadByCod(String(cod), toSend).subscribe({ next: onOk, error: () => { this.editResumen = false; } });
+                }});
+              } else {
+                this.postulanteService.updateInscripModalidadByCod(String(cod), toSend).subscribe({ next: onOk, error: () => { this.editResumen = false; } });
+              }
+            },
+            error: () => { this.editResumen = false; }
+          });
+        } else {
+          this.editResumen = false; this.editFromResumen = false; this.resumenVisible = true;
+          this.cambiosGuardados = diffs;
+          this.showModalCambios = true;
+        }
+      },
+      error: () => { this.editResumen = false; this.editFromResumen = false; this.resumenVisible = true; }
+    });
+  }
+
+  // Modal handlers
+  continuarCambios() {
+    // Mantener edición abierta: simplemente cerrar el modal y volver al formulario si se desea seguir editando
+    this.showModalCambios = false;
+  }
+  cerrarModalCambios() {
+    this.showModalCambios = false;
+  }
+
+  // Abrir selector de modalidad desde el modo edición del resumen
+  abrirSelectorModalidadResumen() {
+    this.editModalidadEnResumen = true;
+    this.mostrarModal();
+  }
+
   generarFMDG1() {
     if (this.generandoFmdg) return;
     this.generandoFmdg = true;
@@ -466,6 +593,21 @@ export class RegistroTemaComponent implements OnInit {
     if (!this.nuevaModalidad) return;
     this.modalConfirmCambioVisible = false;
     const seleccionado = this.nuevaModalidad;
+
+    // Si venimos desde el modo edición del resumen, solo actualizar campos de edición y no persistir todavía
+    if ((this.editResumen && this.editModalidadEnResumen) || this.editFromResumen) {
+      this.editModalidadId = (seleccionado as any)?.id ?? null;
+      this.editModalidadNombre = seleccionado?.nombre || '';
+      // Reflejar en el formulario si estamos en modo formulario
+      if (this.editFromResumen) {
+        this.modalidadNombre = this.editModalidadNombre;
+      }
+      this.editModalidadEnResumen = false;
+      this.nuevaModalidad = null;
+      return;
+    }
+
+    // Flujo normal (fuera del resumen): actualizar modalidad global y persistir
     this.modalidad = { ...seleccionado };
     this.modalidadNombre = seleccionado.nombre;
     this.nuevaModalidad = null;

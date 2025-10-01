@@ -15,12 +15,22 @@
     <!-- Formulario -->
     <form (ngSubmit)="onSubmit()" #frm="ngForm" novalidate>
       <div class="form-card">
-        <h3 class="card-title">
-          <span>
-            <i class="bi bi-journal-plus me-2"></i>
-            Registro del tema
-          </span>
-        </h3>
+        <div class="card-title d-flex align-items-center justify-content-between">
+          <h5 class="mb-0 d-flex align-items-center gap-2">
+            <i class="bi bi-journal-plus"></i>
+            <span>Registro del tema</span>
+          </h5>
+          <div *ngIf="editFromResumen" class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-edit-header" (click)="guardarEdicionResumen()">
+              <i class="bi bi-save"></i>
+              Guardar cambios
+            </button>
+            <button type="button" class="btn btn-edit-header" (click)="cancelarEdicionResumen()">
+              <i class="bi bi-x-circle"></i>
+              Cancelar
+            </button>
+          </div>
+        </div>
         <div class="card-body px-0">
           <div class="row g-3">
             <div class="col-md-4">
@@ -71,7 +81,7 @@
             </div>
           </div>
         </div>
-        <div class="card-footer d-flex justify-content-end gap-2">
+        <div class="card-footer d-flex justify-content-end gap-2" *ngIf="!editFromResumen">
           <button type="button" class="btn btn-outline-secondary" (click)="cancelar()" [disabled]="loading">
             Cancelar
           </button>
@@ -88,16 +98,47 @@
   <div class="content-wrapper" *ngIf="resumenVisible">
     <div class="mt-3">
       <div class="card">
-        <div class="card-title">
+        <div class="card-title d-flex align-items-center justify-content-between">
           <h5 class="mb-0">
             <i class="bi bi-clipboard-check me-2"></i>
             Resumen del registro de tema
           </h5>
+          <ng-container *ngIf="!editFromResumen; else headerAccionesEdicion">
+            <button type="button" class="btn btn-edit-header" (click)="iniciarEdicionResumen()">
+              <i class="bi bi-pencil-square"></i>
+              Editar
+            </button>
+          </ng-container>
+          <ng-template #headerAccionesEdicion>
+            <div class="d-flex align-items-center gap-2">
+              <button type="button" class="btn btn-edit-header" (click)="guardarEdicionResumen()">
+                <i class="bi bi-save"></i>
+                Guardar cambios
+              </button>
+              <button type="button" class="btn btn-edit-header" (click)="cancelarEdicionResumen()">
+                <i class="bi bi-x-circle"></i>
+                Cancelar
+              </button>
+            </div>
+          </ng-template>
         </div>
         <div class="row g-3">
           <div class="col-md-4"><strong>Carrera:</strong> {{ proyectoGuardado?.carrera || carrera || '-' }}</div>
           <div class="col-md-3"><strong>Código CETA:</strong> {{ proyectoGuardado?.cod_ceta || codCeta || '-' }}</div>
-          <div class="col-md-5"><strong>Modalidad de graduación:</strong> {{ modalidadNombre || proyectoGuardado?.tipo || '-' }}</div>
+          <div class="col-md-5">
+            <strong>Modalidad de graduación:</strong>
+            <ng-container *ngIf="!editResumen; else modoEditModalidad">
+              {{ modalidadNombre || proyectoGuardado?.tipo || '-' }}
+            </ng-container>
+            <ng-template #modoEditModalidad>
+              <div class="input-group input-group-sm">
+                <input class="form-control" [value]="editModalidadNombre || modalidadNombre || proyectoGuardado?.tipo || '-'" readonly>
+                <button type="button" class="btn btn-outline-primary" title="Editar modalidad" (click)="abrirSelectorModalidadResumen()">
+                  <i class="bi bi-pencil-square"></i>
+                </button>
+              </div>
+            </ng-template>
+          </div>
           <div class="col-md-6"><strong>Nombre completo:</strong> {{ (proyectoGuardado?.nombres && proyectoGuardado?.apellidos) ? (proyectoGuardado?.nombres + ' ' + proyectoGuardado?.apellidos) : ((nombres + ' ' + apellidos) || '-') }}</div>
           <div class="col-md-6"><strong>Instituto:</strong> {{ proyectoGuardado?.instituto || instituto || '-' }}</div>
 
@@ -105,18 +146,27 @@
 
           <div class="col-md-8">
             <strong>Nombre / Tema:</strong>
-            {{ proyectoGuardado?.nombre || tema || '-' }}
+            <ng-container *ngIf="!editResumen; else modoEditTema">
+              {{ proyectoGuardado?.nombre || tema || '-' }}
+            </ng-container>
+            <ng-template #modoEditTema>
+              <input class="form-control form-control-sm" [(ngModel)]="editTema" name="editTema" placeholder="Nombre / Tema" />
+            </ng-template>
           </div>
           <div class="col-md-4"><strong>Estado:</strong> <span class="badge bg-info text-dark">{{ proyectoGuardado?.estado || 'En progreso' }}</span></div>
-          <div class="col-md-12" *ngIf="(proyectoGuardado?.objetivo || objetivos)">
+          <div class="col-md-12" *ngIf="!editResumen && (proyectoGuardado?.objetivo || objetivos)">
             <strong>Objetivos:</strong>
             <div class="mt-1">{{ proyectoGuardado?.objetivo || objetivos }}</div>
           </div>
+          <div class="col-md-12" *ngIf="editResumen">
+            <strong>Objetivos:</strong>
+            <textarea class="form-control" rows="4" [(ngModel)]="editObjetivos" name="editObjetivos" placeholder="Objetivos"></textarea>
+          </div>
           <div class="col-md-12 d-flex justify-content-end gap-2">
-            <button type="button" class="btn btn-outline-secondary" (click)="irModalidadGraduacion()">
-              Volver
-            </button>
-            <button type="button" class="btn btn-primary" (click)="generarFMDG1()" [disabled]="generandoFmdg">
+            <button type="button" class="btn btn-outline-secondary" (click)="irModalidadGraduacion()" [disabled]="editResumen">Volver</button>
+            <button *ngIf="editResumen" type="button" class="btn btn-success" (click)="guardarEdicionResumen()">Guardar</button>
+            <button *ngIf="editResumen" type="button" class="btn btn-outline-secondary" (click)="cancelarEdicionResumen()">Cancelar</button>
+            <button type="button" class="btn btn-primary" (click)="generarFMDG1()" [disabled]="generandoFmdg || editResumen">
               <span *ngIf="generandoFmdg" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
               {{ generandoFmdg ? 'Generando...' : 'Generar formulario FMDG-1' }}
             </button>
@@ -216,5 +266,50 @@
       </div>
     </div>
     <div class="modal-backdrop fade show" (click)="cerrarModalExito()"></div>
+  </div>
+
+  <!-- Modal de cambios guardados -->
+  <div *ngIf="showModalCambios">
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalCambiosLabel">
+      <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h5 class="modal-title" id="modalCambiosLabel">
+              <i class="bi bi-clipboard-check text-success me-2"></i>
+              Cambios guardados
+            </h5>
+            <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="cerrarModalCambios()"></button>
+          </div>
+          <div class="modal-body">
+            <div class="table-responsive">
+              <table class="table table-sm table-striped align-middle">
+                <thead>
+                  <tr>
+                    <th>Campo</th>
+                    <th>Anterior</th>
+                    <th>Nuevo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let c of cambiosGuardados">
+                    <td class="text-muted">{{ c.campo }}</td>
+                    <td>{{ c.anterior }}</td>
+                    <td>{{ c.nuevo }}</td>
+                  </tr>
+                  <tr *ngIf="!cambiosGuardados || cambiosGuardados.length === 0">
+                    <td colspan="3" class="text-center text-muted">No hubo cambios</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-outline-primary btn-sm" (click)="continuarCambios()">Continuar cambios</button>
+            <button type="button" class="btn btn-success btn-sm" (click)="cerrarModalCambios()">Cerrar cambios</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade show" (click)="cerrarModalCambios()"></div>
   </div>
 </div>

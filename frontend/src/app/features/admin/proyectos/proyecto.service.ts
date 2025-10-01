@@ -34,4 +34,8 @@ export class ProyectoService {
     const params = { cod_ceta: String(cod_ceta) };
     return this.http.get<any>(`${this.apiUrl}/by_cod`, { params });
   }
+
+  updateProyecto(id: number | string, payload: Partial<ProyectoPayload>): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/${id}`, payload);
+  }
 }
