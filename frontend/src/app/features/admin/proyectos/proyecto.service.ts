@@ -17,6 +17,7 @@ export interface ProyectoPayload {
   objetivo?: string; // Objetivos
   estado?: string;
   porcentaje_avance?: number;
+  inscrip_modalidad_id?: number | string;
 }
 
 @Injectable({ providedIn: 'root' })

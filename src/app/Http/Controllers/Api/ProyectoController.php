@@ -25,6 +25,7 @@ class ProyectoController extends CrudController
             'objetivo' => 'nullable|string',
             'estado' => 'nullable|string|max:255',
             'porcentaje_avance' => 'nullable|integer|min:0|max:100',
+            'inscrip_modalidad_id' => 'nullable|exists:inscrip_modalidad,id',
         ];
     }
 
@@ -35,7 +36,8 @@ class ProyectoController extends CrudController
         if (!$cod) {
             return response()->json(null);
         }
-        $proy = Proyecto::where('cod_ceta', (string)$cod)
+        $proy = Proyecto::with('inscripModalidad')
+            ->where('cod_ceta', (string)$cod)
             ->orderByDesc('id')
             ->first();
         return response()->json($proy);

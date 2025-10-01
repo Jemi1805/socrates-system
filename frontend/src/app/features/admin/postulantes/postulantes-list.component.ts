@@ -467,7 +467,9 @@ private validarCampos(): string[] {
 
   // Bachillerato (según tipo)
   if (this.tipoBachiller === 'nacional') {
-    if (!this.isNonEmpty(p.nro_serie_titulo)) faltantes.push('N° de Serie (Bachiller Nacional)');
+    // En la UI el N° de Serie se edita en diplomaNacional.nro_serie, no en postulanteActual.nro_serie_titulo
+    const nroSerie = (this.diplomaNacional?.nro_serie || p.nro_serie_titulo);
+    if (!this.isNonEmpty(nroSerie)) faltantes.push('N° de Serie (Bachiller Nacional)');
     if (!this.isNonEmpty(this.diplomaNacional.emision)) faltantes.push('Emisión (Bachiller Nacional)');
     if (!this.isNonEmpty(this.diplomaNacional.fecha_emision)) faltantes.push('Fecha de Emisión (Bachiller Nacional)');
     if (!this.isNonEmpty(this.diplomaNacional.gestion_bachillerato)) faltantes.push('Gestión de Bachillerato');

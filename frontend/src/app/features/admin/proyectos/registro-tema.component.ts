@@ -83,6 +83,7 @@ export class RegistroTemaComponent implements OnInit {
   modalVisible = false;
   modalConfirmCambioVisible = false;
   nuevaModalidad: ModalidadCtx | null = null;
+  loadingModalidades = false;
 
   constructor(
     private proyectoService: ProyectoService,
@@ -344,6 +345,12 @@ export class RegistroTemaComponent implements OnInit {
         }
       }
     });
+
+    // Prefetch de modalidades para que el selector tenga datos disponibles
+    if (!this.modalidades || this.modalidades.length === 0) {
+      this.cargarModalidades();
+    }
+    console.log('[RegistroTema] ngOnInit listo. modalidades.length:', (this.modalidades || []).length);
   }
 
   
@@ -368,7 +375,7 @@ export class RegistroTemaComponent implements OnInit {
       return;
     }
 
-    const payload = {
+    const payload: any = {
       cod_ceta: this.codCeta || undefined,
       nombres: this.nombres?.trim() || undefined,
       apellidos: this.apellidos?.trim() || undefined,
@@ -382,21 +389,42 @@ export class RegistroTemaComponent implements OnInit {
       objetivo: this.objetivos?.trim() || undefined,
       estado: 'En progreso',
       porcentaje_avance: 0,
-    } as const;
+    } as any;
 
-    this.loading = true;
-    this.proyectoService.createProyecto(payload).subscribe({
-      next: (res) => {
-        this.success = 'Tema registrado correctamente.';
-        this.proyectoGuardado = res || null;
-        this.modalExitoVisible = true; // Mostrar modal primero; el resumen se muestra al cerrar
-      },
-      error: (err) => {
-        console.error('Error al registrar tema:', err);
-        this.error = (err?.error?.message || err?.message || 'No se pudo registrar el tema');
-      },
-      complete: () => this.loading = false,
-    });
+    const crear = (body: any) => {
+      this.loading = true;
+      this.proyectoService.createProyecto(body).subscribe({
+        next: (res) => {
+          this.success = 'Tema registrado correctamente.';
+          this.proyectoGuardado = res || null;
+          this.modalExitoVisible = true; // Mostrar modal primero; el resumen se muestra al cerrar
+        },
+        error: (err) => {
+          console.error('Error al registrar tema:', err);
+          this.error = (err?.error?.message || err?.message || 'No se pudo registrar el tema');
+        },
+        complete: () => this.loading = false,
+      });
+    };
+
+    // Resolver inscrip_modalidad_id por cod_ceta antes de crear
+    const cod = this.codCeta;
+    if (cod) {
+      this.postulanteService.getInscripModalidadByCodCeta(cod).subscribe({
+        next: (res: any) => {
+          const row = this.extractFirstRow(res);
+          const inscId = this.extractInscripModalidadId(row);
+          if (inscId) payload.inscrip_modalidad_id = inscId;
+          crear(payload);
+        },
+        error: () => {
+          // Si falla la consulta, continuar sin el campo
+          crear(payload);
+        }
+      });
+    } else {
+      crear(payload);
+    }
   }
 
   cerrarModalExito() {
@@ -474,17 +502,24 @@ export class RegistroTemaComponent implements OnInit {
         this.proyectoGuardado = { ...(this.proyectoGuardado || {}), ...resp };
         this.tema = this.proyectoGuardado?.nombre || nombreTema || this.tema;
         this.objetivos = this.proyectoGuardado?.objetivo || objetivos || this.objetivos;
-        this.modalidadNombre = this.proyectoGuardado?.tipo || tipoNom || this.modalidadNombre;
+        // Mantener el nombre elegido en variables locales para sincronizaciones subsiguientes
+        const nombreElegido = tipoNom;
+        this.modalidadNombre = this.proyectoGuardado?.tipo || nombreElegido || this.modalidadNombre;
         // Sincronizar inscrip_modalidad.modalidad_nom/modalidad_id
         const cod = this.codCeta;
-        if (cod && this.modalidadNombre) {
-          const mid = this.editModalidadId ?? (this.modalidad as any)?.id;
+        if (cod && nombreElegido) {
+          // Resolver modalidad_id: priorizar editModalidadId; si falta, buscar por nombre en la lista cargada
+          let mid = this.editModalidadId ?? (this.modalidad as any)?.id ?? null;
+          if (!mid && nombreElegido && Array.isArray(this.modalidades) && this.modalidades.length) {
+            const byName = this.modalidades.find(m => (m.nombre || '').toString().toLowerCase() === nombreElegido.toLowerCase());
+            if (byName?.id) mid = byName.id;
+          }
           this.postulanteService.getInscripModalidadByCodCeta(cod).subscribe({
             next: (res: any) => {
-              let row: any = null;
-              if (!res) row = null; else if (Array.isArray(res)) row = res[0] || null; else if (res.data) row = Array.isArray(res.data) ? (res.data[0] || null) : res.data; else row = res;
-              const id = row?.id || row?.inscripcion_id || row?.inscrip_modalidad_id;
-              const toSend: any = { modalidad_nom: this.modalidadNombre };
+              const row = this.extractFirstRow(res);
+              const id = this.extractInscripModalidadId(row);
+              console.log('[RegistroTema] getInscripModalidadByCodCeta -> row:', row, 'id:', id);
+              const toSend: any = { modalidad_nom: nombreElegido };
               if (mid) toSend.modalidad_id = mid;
               const onOk = () => {
                 this.editResumen = false; this.editFromResumen = false; this.resumenVisible = true;
@@ -492,14 +527,17 @@ export class RegistroTemaComponent implements OnInit {
                 this.showModalCambios = true;
               };
               if (id) {
-                this.postulanteService.updateInscripModalidad(id, toSend).subscribe({ next: onOk, error: () => {
-                  this.postulanteService.updateInscripModalidadByCod(String(cod), toSend).subscribe({ next: onOk, error: () => { this.editResumen = false; } });
+                console.log('[RegistroTema] updateInscripModalidad(id, body):', id, toSend);
+                this.postulanteService.updateInscripModalidad(id, toSend).subscribe({ next: (u) => { console.log('[RegistroTema] updateInscripModalidad OK:', u); onOk(); this.verificarInscripModalidad(String(cod), nombreElegido, (toSend as any).modalidad_id ?? null); }, error: (err1) => {
+                  console.warn('[RegistroTema] updateInscripModalidad FALLÓ, intento por COD:', err1);
+                  this.postulanteService.updateInscripModalidadByCod(String(cod), toSend).subscribe({ next: (u2) => { console.log('[RegistroTema] updateInscripModalidadByCod OK:', u2); onOk(); this.verificarInscripModalidad(String(cod), nombreElegido, (toSend as any).modalidad_id ?? null); }, error: (err2) => { console.error('[RegistroTema] updateInscripModalidadByCod FALLÓ:', err2); this.editResumen = false; } });
                 }});
               } else {
-                this.postulanteService.updateInscripModalidadByCod(String(cod), toSend).subscribe({ next: onOk, error: () => { this.editResumen = false; } });
+                console.log('[RegistroTema] No se detectó ID. updateInscripModalidadByCod(cod, body):', String(cod), toSend);
+                this.postulanteService.updateInscripModalidadByCod(String(cod), toSend).subscribe({ next: (u3) => { console.log('[RegistroTema] updateInscripModalidadByCod OK:', u3); onOk(); this.verificarInscripModalidad(String(cod), nombreElegido, (toSend as any).modalidad_id ?? null); }, error: (err3) => { console.error('[RegistroTema] updateInscripModalidadByCod FALLÓ:', err3); this.editResumen = false; } });
               }
             },
-            error: () => { this.editResumen = false; }
+            error: (e) => { console.error('[RegistroTema] getInscripModalidadByCodCeta error:', e); this.editResumen = false; }
           });
         } else {
           this.editResumen = false; this.editFromResumen = false; this.resumenVisible = true;
@@ -571,9 +609,106 @@ export class RegistroTemaComponent implements OnInit {
   }
 
   // --- Gestión de Modalidades (UI) ---
-  mostrarModal() { 
+  private normalizeModalidades(input: any): ModalidadCtx[] {
+    if (!input) return [];
+    let list: any = input;
+    if (Array.isArray(input)) list = input;
+    else if (input.data) list = input.data;
+    else if (input.modalidades) list = input.modalidades;
+    else if (input.items) list = input.items;
+    if (!Array.isArray(list)) list = [list];
+    return (list || []).map((m: any) => ({
+      id: Number(m?.id ?? m?.modalidad_id ?? 0),
+      nombre: String(m?.nombre ?? m?.name ?? m?.titulo ?? ''),
+      descripcion: String(m?.descripcion ?? m?.description ?? ''),
+      icono: m?.icono,
+    })).filter((x: ModalidadCtx) => !!x.nombre);
+  }
+
+  private cargarModalidades(): void {
+    this.loadingModalidades = true;
+    this.postulanteService.getModalidades().subscribe({
+      next: (resp: any) => {
+        console.log('[RegistroTema] getModalidades() resp:', resp);
+        const arr = this.normalizeModalidades(resp);
+        this.modalidades = arr;
+        console.log('[RegistroTema] modalidades normalizadas:', this.modalidades);
+        this.loadingModalidades = false;
+      },
+      error: (e) => { 
+        console.error('[RegistroTema] getModalidades() error:', e);
+        this.loadingModalidades = false; 
+      }
+    });
+  }
+
+  // Verifica que modalidad_nom/modalidad_id se hayan persistido; si no, reintenta por COD
+  private verificarInscripModalidad(cod: string, esperadoNom: string, esperadoId: number | null) {
+    if (!cod) return;
+    this.postulanteService.getInscripModalidadByCodCeta(cod).subscribe({
+      next: (res: any) => {
+        const row = this.extractFirstRow(res);
+        const id = this.extractInscripModalidadId(row);
+        const dbNom = (row?.modalidad_nom ?? '').toString();
+        const dbId = row?.modalidad_id !== undefined && row?.modalidad_id !== null ? Number(row.modalidad_id) : null;
+        const needNom = esperadoNom && dbNom !== esperadoNom;
+        const needId = esperadoId !== null && dbId !== esperadoId;
+        console.log('[RegistroTema] verificarInscripModalidad -> id:', id, 'dbNom:', dbNom, 'dbId:', dbId, 'needNom:', needNom, 'needId:', needId);
+        if ((needNom || needId) && id) {
+          const body: any = { modalidad_nom: esperadoNom };
+          if (esperadoId !== null) body.modalidad_id = esperadoId;
+          console.warn('[RegistroTema] Corrigiendo por ID (no por COD) para evitar 405):', id, body);
+          this.postulanteService.updateInscripModalidad(id, body).subscribe({
+            next: (u) => console.log('[RegistroTema] Corrección por ID OK:', u),
+            error: (e) => console.error('[RegistroTema] Corrección por ID FALLÓ:', e),
+          });
+        }
+      },
+      error: (e) => console.error('[RegistroTema] verificarInscripModalidad error:', e)
+    });
+  }
+
+  // --- Utils de InscripModalidad ---
+  private extractFirstRow(resp: any): any {
+    if (!resp) return null;
+    if (Array.isArray(resp)) return resp[0] || null;
+    if (resp.data) {
+      const d = resp.data;
+      return Array.isArray(d) ? (d[0] || null) : d;
+    }
+    if (resp.result) {
+      const r = resp.result;
+      return Array.isArray(r) ? (r[0] || null) : r;
+    }
+    if (resp.record) return resp.record;
+    if (resp.inscrip_modalidad) return resp.inscrip_modalidad;
+    return resp;
+  }
+
+  private extractInscripModalidadId(row: any): number | null {
+    if (!row) return null;
+    const candidates = [
+      row.id,
+      row.inscripcion_id,
+      row.inscrip_modalidad_id,
+      row.id_inscrip_modalidad,
+      row?.inscrip_modalidad?.id,
+      row?.record?.id,
+    ];
+    const val = candidates.find(v => v !== undefined && v !== null);
+    const n = Number(val);
+    return isNaN(n) ? null : n;
+  }
+
+  mostrarModal() {
     console.log('[RegistroTema] abrir modal');
-    this.modalVisible = true; 
+    // Mostrar inmediatamente el modal
+    this.modalVisible = true;
+    console.log('[RegistroTema] estado inicial modal -> modalidades.length:', (this.modalidades || []).length, 'loadingModalidades:', this.loadingModalidades);
+    // Cargar modalidades en background si faltan
+    if (!this.modalidades || this.modalidades.length === 0) {
+      this.cargarModalidades();
+    }
   }
   ocultarModal() { this.modalVisible = false; }
 

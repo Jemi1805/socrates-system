@@ -25,6 +25,25 @@ class InscripModalidad extends Model
         'fecha_inscripcion' => 'date',
     ];
 
+    /**
+     * Mantener sincronizado modalidad_nom según modalidad_id
+     */
+    protected static function booted()
+    {
+        static::saving(function (self $model) {
+            // Si hay modalidad_id, asegurar que modalidad_nom refleje el nombre actual
+            if ($model->modalidad_id) {
+                if ($model->isDirty('modalidad_id') || empty($model->modalidad_nom)) {
+                    $nombre = Modalidad::whereKey($model->modalidad_id)->value('nombre');
+                    $model->modalidad_nom = $nombre ?: null;
+                }
+            } else {
+                // Sin modalidad: limpiar nombre
+                $model->modalidad_nom = null;
+            }
+        });
+    }
+
     public function modalidad()
     {
         return $this->belongsTo(Modalidad::class, 'modalidad_id');
