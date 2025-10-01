@@ -273,6 +273,40 @@
                     </div>
                   </div>
                 </div>
+                
+                <!-- (Se elimina la fila inferior de Carrera y Pensum para mostrarlos como badges arriba) -->
+
+                <!-- Resumen visual de inscripción -->
+                <div class="mt-3" *ngIf="inscripcionActual as insc">
+                  <div class="card border-0 shadow-sm">
+                    <div class="card-body d-flex align-items-start">
+                      <div class="me-3 text-success fs-3">
+                        <i class="bi bi-check-circle-fill"></i>
+                      </div>
+                      <div class="flex-grow-1">
+                        <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+                          <strong class="me-2">Inscripción activa</strong>
+                          <span class="badge bg-success-subtle text-success border border-success" *ngIf="insc.estado as est">{{ est }}</span>
+                          <span class="badge bg-primary-subtle text-primary border border-primary" *ngIf="insc.nombre">{{ insc.nombre }}</span>
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-secondary ms-auto mt-2"
+                            (click)="verInscripcion()"
+                          >
+                            <i class="bi bi-eye me-1"></i>
+                            Ver inscripción
+                          </button>
+                        </div>
+                        <div class="text-muted small d-flex flex-wrap gap-3">
+                          <span *ngIf="insc.fecha_inscripcion">
+                            <i class="bi bi-calendar-event me-1"></i>
+                            Inscrito el {{ insc.fecha_inscripcion | date:'dd/MM/yyyy' }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 <!-- Resumen visual de tema registrado -->
                 <div class="mt-3" *ngIf="proyectoActual as p">
@@ -304,40 +338,6 @@
                         </div>
                         <div class="mt-1">
                           <span class="fw">{{ p.nombre }}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- (Se elimina la fila inferior de Carrera y Pensum para mostrarlos como badges arriba) -->
-
-                <!-- Resumen visual de inscripción -->
-                <div class="mt-3" *ngIf="inscripcionActual as insc">
-                  <div class="card border-0 shadow-sm">
-                    <div class="card-body d-flex align-items-start">
-                      <div class="me-3 text-success fs-3">
-                        <i class="bi bi-check-circle-fill"></i>
-                      </div>
-                      <div class="flex-grow-1">
-                        <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
-                          <strong class="me-2">Inscripción activa</strong>
-                          <span class="badge bg-success-subtle text-success border border-success" *ngIf="insc.estado as est">{{ est }}</span>
-                          <span class="badge bg-primary-subtle text-primary border border-primary" *ngIf="insc.nombre">{{ insc.nombre }}</span>
-                          <button
-                            type="button"
-                            class="btn btn-sm btn-secondary ms-auto mt-2"
-                            (click)="verInscripcion()"
-                          >
-                            <i class="bi bi-eye me-1"></i>
-                            Ver inscripción
-                          </button>
-                        </div>
-                        <div class="text-muted small d-flex flex-wrap gap-3">
-                          <span *ngIf="insc.fecha_inscripcion">
-                            <i class="bi bi-calendar-event me-1"></i>
-                            Inscrito el {{ insc.fecha_inscripcion | date:'dd/MM/yyyy' }}
-                          </span>
                         </div>
                       </div>
                     </div>
