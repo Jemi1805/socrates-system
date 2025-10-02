@@ -46,6 +46,16 @@ export interface Carrera {
   num_materias: number;
 }
 
+export interface Docente {
+  nombre: string;
+  apellido_p: string;
+  apellido_m: string;
+  ci: string;
+  profesion: string;
+  celular: string;
+  pertinencia?: string;
+}
+
 export interface ArancelEst {
   id: number;
   cod_ceta_est: number;
@@ -196,6 +206,16 @@ export class SgaService {
       params = params.set('carrera', carrera);
     }
     return this.http.get<ApiResponse<string[]>>(`${this.baseUrl}/pensums`, { params })
+      .pipe(catchError(this.handleError));
+  }
+
+  // --- DOCENTES (SGA legacy) ---
+  getDocentes(carrera?: string): Observable<ApiResponse<Docente[]>> {
+    let params = new HttpParams();
+    if (carrera) {
+      params = params.set('carrera', carrera);
+    }
+    return this.http.get<ApiResponse<Docente[]>>(`${this.baseUrl}/docentes`, { params })
       .pipe(catchError(this.handleError));
   }
 
