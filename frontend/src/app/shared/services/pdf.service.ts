@@ -30,6 +30,71 @@ export class PdfService {
     return btoa(binary);
   }
 
+  private async flattenToPng(dataUrl: string, bgColor = '#FFFFFF'): Promise<string> {
+    return await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const srcW = img.naturalWidth || img.width;
+        const srcH = img.naturalHeight || img.height;
+        const padRatio = 0.06;
+        const padW = Math.round(srcW * padRatio);
+        const padH = Math.round(srcH * padRatio);
+        const outW = srcW + padW * 2;
+        const outH = srcH + padH * 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = outW;
+        canvas.height = outH;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('No 2D context')); return; }
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, padW, padH, srcW, srcH);
+        try {
+          const png = canvas.toDataURL('image/png');
+          resolve(png);
+        } catch (e) { reject(e); }
+      };
+      img.onerror = (e) => reject(e);
+      img.src = dataUrl;
+    });
+  }
+
+  private async flattenToJpeg(dataUrl: string, bgColor = '#FFFFFF'): Promise<string> {
+    return await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const srcW = img.naturalWidth || img.width;
+        const srcH = img.naturalHeight || img.height;
+        const padRatio = 0.06; // 6% de padding blanco alrededor
+        const padW = Math.round(srcW * padRatio);
+        const padH = Math.round(srcH * padRatio);
+        const outW = srcW + padW * 2;
+        const outH = srcH + padH * 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = outW;
+        canvas.height = outH;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('No 2D context')); return; }
+        // Fondo blanco para aplanar la transparencia
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, padW, padH, srcW, srcH);
+        try {
+          const jpeg = canvas.toDataURL('image/jpeg', 1.0);
+          resolve(jpeg);
+        } catch (e) {
+          reject(e);
+        }
+      };
+      img.onerror = (e) => reject(e);
+      img.src = dataUrl;
+    });
+  }
+
   private async ensureVerdana(doc: jsPDF) {
     if (this.verdanaReady) return;
     try {
@@ -59,20 +124,47 @@ export class PdfService {
     });
   }
 
-  async generarFMDG1(data: Fmdg1Data, options?: { logoUrl?: string }) {
+  private async loadImageWithMeta(url: string): Promise<{ dataUrl: string; naturalWidth: number; naturalHeight: number; }> {
+    // Obtiene dataUrl y dimensiones naturales para preservar proporción
+    const dataUrl = await this.loadImageDataUrl(url);
+    return await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ dataUrl, naturalWidth: img.naturalWidth || img.width, naturalHeight: img.naturalHeight || img.height });
+      img.onerror = (e) => reject(e);
+      img.src = dataUrl;
+    });
+  }
+
+  async generarFMDG1(
+    data: Fmdg1Data,
+    options?: { logoUrl?: string; logoWidthMm?: number; logoMaxHeightMm?: number; logoBgColor?: string; logoFormat?: 'PNG' | 'JPEG' }
+  ) {
     const doc = new jsPDF({ unit: 'mm', format: 'letter' }); // 216 x 279 mm aprox
     // Usaremos la fuente por defecto (Helvetica)
 
     const margin = 15;
     let y = margin;
 
-    // Encabezado con logo
-    const logoUrl = options?.logoUrl || 'assets/images/LOGO-CETA.png';
+    // Encabezado con logo (preservando proporción)
+    const logoUrl = options?.logoUrl || 'assets/images/LOGO.png';
     try {
-      const dataUrl = await this.loadImageDataUrl(logoUrl);
-      const logoW = 22; // ancho en mm
-      const logoH = 22; // alto en mm
-      doc.addImage(dataUrl, 'PNG', margin, y - 2, logoW, logoH, undefined, 'FAST');
+      const meta = await this.loadImageWithMeta(logoUrl);
+      const logoW = options?.logoWidthMm ?? 22; // ancho deseado en mm
+      const aspect = meta.naturalHeight > 0 ? meta.naturalWidth / meta.naturalHeight : 1; // w/h
+      const maxH = options?.logoMaxHeightMm ?? 26; // altura máxima en mm
+      // Limitar por ancho y por altura manteniendo proporción
+      const maxWByHeight = maxH * aspect;
+      const finalW = Math.min(logoW, maxWByHeight);
+      const finalH = finalW / (aspect || 1);
+      // Aplanar sobre fondo para evitar artefactos de alpha
+      const useFormat = options?.logoFormat || 'PNG';
+      if (useFormat === 'JPEG') {
+        const flatJpeg = await this.flattenToJpeg(meta.dataUrl, options?.logoBgColor || '#FFFFFF');
+        doc.addImage(flatJpeg, 'JPEG', margin, y - 2, finalW, finalH, undefined, 'SLOW');
+      } else {
+        const flatPng = await this.flattenToPng(meta.dataUrl, options?.logoBgColor || '#FFFFFF');
+        doc.addImage(flatPng, 'PNG', margin, y - 2, finalW, finalH, undefined, 'SLOW');
+      }
     } catch {
       // Si falla la carga del logo, continuamos sin interrumpir
     }
@@ -86,17 +178,18 @@ export class PdfService {
     };
 
     // Títulos centrados según ejemplo (con subrayado)
+    y += 7;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
+    doc.setFontSize(14);
     const instText = 'INSTITUTO TECNOLÓGICO DE ENSEÑANZA AUTOMOTRIZ';
     doc.text(instText, 108.5, y, { align: 'center' });
     underlineCentered(instText, y);
     y += 8; // más espacio después del instituto
-    doc.setFontSize(16);
+    doc.setFontSize(15);
     const cetaText = '"CETA"';
     doc.text(cetaText, 108.5, y, { align: 'center' });
     underlineCentered(cetaText, y);
-    y += 10; // más espacio después de "CETA"
+    y += 6; // más espacio después de "CETA"
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
     doc.text('Cochabamba – Bolivia', 108.5, y, { align: 'center' });
@@ -110,10 +203,11 @@ export class PdfService {
     y += 8;
 
     // Título del formulario
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text('FORMULARIO DE MODALIDAD DE GRADUACIÓN (FMDG-1)', 108.5, y, { align: 'center' });
-    y += 6;
+    doc.setFontSize(17);
+    const titText = 'FORMULARIO DE MODALIDAD DE GRADUACIÓN (FMDG-1)';
+    doc.text(titText, 108.5, y, { align: 'center' });
+    underlineCentered(titText, y);
+    y += 6; // más espacio después de "CETA"
 
     // Cuadro principal con etiquetas azules usando autoTable
     const tableMarginX = margin;
@@ -340,7 +434,7 @@ export class PdfService {
     // Nota en recuadro (centrado, Helvetica, "NOTA:" en bold y resto en itálica, caja más delgada)
     const notaPrefix = 'NOTA:';
     const notaResto = 'El contenido de la presente declaración es de exclusiva responsabilidad del declarante.';
-    const notaW = 216 - margin * 1.5;
+    const notaW = 216 - margin * 2;
     const notaH = 7; // más delgado en altura
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.6); // borde más delgado

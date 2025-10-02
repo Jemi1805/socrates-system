@@ -591,7 +591,7 @@ export class RegistroTemaComponent implements OnInit {
     // Permitir que Angular pinte el spinner antes de la tarea pesada
     setTimeout(() => {
       try {
-        this.pdfService.generarFMDG1(data);
+        this.pdfService.generarFMDG1(data, { logoWidthMm: 24, logoMaxHeightMm: 24, logoFormat: 'JPEG', logoBgColor: '#FFFFFF' });
       } catch (e) {
         console.error('Error generando FMDG-1', e);
         this.error = 'No fue posible generar el PDF.';
