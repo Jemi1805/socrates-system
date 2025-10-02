@@ -370,6 +370,36 @@ class SgaController extends Controller
             'cod_carrera' => $codCarrera,
         ]);
     }
+
+    /**
+     * Obtener docentes del SGA (legacy)
+     */
+    public function getDocentes(Request $request)
+    {
+        $carreraRaw = $request->get('carrera');
+        $carrera = $this->normalizeCarrera($carreraRaw);
+        $result = $this->sgaService->getDocentes($carrera);
+
+        if ($result && isset($result['success']) && $result['success']) {
+            $data = isset($result['data']) ? $result['data'] : [];
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+                'total' => isset($result['total']) ? $result['total'] : count($data),
+                'carrera' => $carrera ?: 'default',
+            ]);
+        }
+
+        $message = 'Error al obtener docentes';
+        if (is_array($result) && isset($result['message'])) {
+            $message = $result['message'];
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => $message,
+        ], 500);
+    }
     
     /**
      * Normaliza el nombre de la carrera a un código soportado por el backend

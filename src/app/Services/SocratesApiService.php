@@ -452,6 +452,19 @@ class SocratesApiService
     }
 
     /**
+     * Obtener docentes activos del SGA (legacy)
+     * @param string|null $carrera Carrera para determinar la URL del SGA
+     * @return array
+     */
+    public function getDocentes($carrera = null)
+    {
+        if ($carrera) {
+            $this->setCarrera($carrera);
+        }
+        return $this->buscarDocentesLegacy();
+    }
+
+    /**
      * Realizar petición a la API del SGA
      */
     private function makeApiRequest($method, $endpoint, $params = [])
@@ -668,6 +681,172 @@ class SocratesApiService
         }
 
         return $estudiantes;
+    }
+
+    /**
+     * Parsear HTML de docentes (tabla legacy dataTables-docentes) a array estructurado
+     * Retorna elementos con: nombre, apellido_p, apellido_m, ci, profesion, celular
+     */
+    private function parseDocentesHtml($html)
+    {
+        $docentes = [];
+        if (trim($html) === '') { return $docentes; }
+
+        libxml_use_internal_errors(true);
+        $dom = new \DOMDocument();
+        $dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'), LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $xpath = new \DOMXPath($dom);
+
+        // Intentar por ID específico
+        $table = $xpath->query('//table[@id="dataTables-docentes"]')->item(0);
+        $tables = [];
+        if ($table) { $tables = [$table]; }
+        else { $tables = iterator_to_array($xpath->query('//table')); }
+
+        foreach ($tables as $tbl) {
+            $rows = $xpath->query('.//tr', $tbl);
+            if ($rows->length === 0) { continue; }
+
+            // Detectar encabezados
+            $headers = [];
+            $headerRowIndex = -1;
+            for ($r = 0; $r < $rows->length; $r++) {
+                $ths = $xpath->query('.//th', $rows->item($r));
+                if ($ths->length > 0) {
+                    $headerRowIndex = $r;
+                    foreach ($ths as $th) { $headers[] = trim($th->textContent); }
+                    break;
+                }
+            }
+
+            // Validar que parezca la tabla de docentes
+            $headerText = strtolower(implode(' ', $headers));
+            $looksLike = (strpos($headerText, 'nombres') !== false && strpos($headerText, 'paterno') !== false && strpos($headerText, 'materno') !== false)
+                      || (strpos($headerText, 'cédula') !== false && strpos($headerText, 'profesion') !== false);
+            if (!$looksLike && !$table) { continue; }
+
+            $startRow = ($headerRowIndex > -1) ? $headerRowIndex + 1 : 1;
+            for ($i = $startRow; $i < $rows->length; $i++) {
+                $tds = $xpath->query('.//td', $rows->item($i));
+                if ($tds->length === 0) { continue; }
+
+                // Manejar fila de "No existen datos..."
+                $firstTxt = trim($tds->item(0)->textContent);
+                if (stripos($firstTxt, 'No existen datos') !== false) { break; }
+
+                // Determinar si hay columna Nº
+                $hasNumero = false;
+                foreach ($headers as $h) {
+                    $hLower = strtolower($h);
+                    if (strpos($hLower, 'nº') !== false || strpos($hLower, 'n°') !== false || strpos($hLower, 'nro') !== false || $hLower === 'n' || $hLower === 'no') {
+                        $hasNumero = true; break;
+                    }
+                }
+                $offset = $hasNumero ? 1 : 0;
+
+                if ($tds->length < ($offset + 6)) { continue; }
+                $nombre    = trim($tds->item($offset + 0)->textContent);
+                $apPat     = trim($tds->item($offset + 1)->textContent);
+                $apMat     = trim($tds->item($offset + 2)->textContent);
+                $ci        = trim($tds->item($offset + 3)->textContent);
+                $profesion = trim($tds->item($offset + 4)->textContent);
+                $celular   = trim($tds->item($offset + 5)->textContent);
+
+                // Filtrar filas vacías
+                if ($nombre === '' && $apPat === '' && $apMat === '' && $ci === '') { continue; }
+
+                $docentes[] = [
+                    'nombre' => $nombre,
+                    'apellido_p' => $apPat,
+                    'apellido_m' => $apMat,
+                    'ci' => $ci,
+                    'profesion' => $profesion,
+                    'celular' => $celular,
+                ];
+            }
+
+            if (!empty($docentes)) { break; }
+        }
+
+        return $docentes;
+    }
+
+    /**
+     * Llamar al endpoint legacy para listar docentes y parsear HTML
+     */
+    private function buscarDocentesLegacy()
+    {
+        try {
+            $carrera = array_search($this->currentUrl, $this->baseUrls);
+            if ($carrera === false || $carrera === null) { $carrera = 'unknown'; }
+
+            $candidateEndpoints = [
+                'index.php/titulacion/serviciostitulacion/buscar_docentes',
+                'titulacion/serviciostitulacion/buscar_docentes',
+            ];
+
+            foreach ($candidateEndpoints as $endpoint) {
+                $requestUrl = rtrim($this->currentUrl, '/') . '/' . ltrim($endpoint, '/');
+                // 1) Intento POST sin parámetros
+                $ch = curl_init($requestUrl);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, []);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: text/html,application/xhtml+xml']);
+                curl_setopt($ch, CURLOPT_ENCODING, '');
+                $rawResponse = curl_exec($ch);
+                $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $error = curl_error($ch);
+                curl_close($ch);
+
+                Log::info('Docentes SGA (POST)', [ 'url' => $requestUrl, 'status' => $statusCode, 'error' => $error, 'body_preview' => $rawResponse ? substr($rawResponse,0,300) : '' ]);
+
+                if ($statusCode >= 200 && $statusCode < 300 && !empty($rawResponse)) {
+                    if (strpos($rawResponse, 'PHP Error') !== false || strpos($rawResponse, 'Fatal error') !== false) {
+                        Log::warning('SGA devolvió errores PHP en Docentes (POST)', [ 'endpoint' => $endpoint ]);
+                    } else {
+                        $docentes = $this->parseDocentesHtml($rawResponse);
+                        if (!empty($docentes)) {
+                            return [ 'success' => true, 'data' => $docentes, 'total' => count($docentes), 'carrera' => $carrera, 'endpoint' => $endpoint, 'method' => 'POST' ];
+                        }
+                    }
+                }
+
+                // 2) Intento GET
+                $ch = curl_init($requestUrl);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: text/html,application/xhtml+xml']);
+                curl_setopt($ch, CURLOPT_ENCODING, '');
+                $rawResponse = curl_exec($ch);
+                $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $error = curl_error($ch);
+                curl_close($ch);
+
+                Log::info('Docentes SGA (GET)', [ 'url' => $requestUrl, 'status' => $statusCode, 'error' => $error, 'body_preview' => $rawResponse ? substr($rawResponse,0,300) : '' ]);
+
+                if ($statusCode >= 200 && $statusCode < 300 && !empty($rawResponse)) {
+                    if (strpos($rawResponse, 'PHP Error') !== false || strpos($rawResponse, 'Fatal error') !== false) {
+                        Log::warning('SGA devolvió errores PHP en Docentes (GET)', [ 'endpoint' => $endpoint ]);
+                    } else {
+                        $docentes = $this->parseDocentesHtml($rawResponse);
+                        if (!empty($docentes)) {
+                            return [ 'success' => true, 'data' => $docentes, 'total' => count($docentes), 'carrera' => $carrera, 'endpoint' => $endpoint, 'method' => 'GET' ];
+                        }
+                    }
+                }
+            }
+
+            return [ 'success' => false, 'message' => 'No se pudo obtener la lista de docentes desde el SGA' ];
+        } catch (\Exception $e) {
+            Log::error('Error en buscarDocentesLegacy', [ 'error' => $e->getMessage() ]);
+            return [ 'success' => false, 'message' => 'Error de conexión: ' . $e->getMessage() ];
+        }
     }
     
     /**

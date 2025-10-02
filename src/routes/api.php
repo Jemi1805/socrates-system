@@ -152,6 +152,7 @@ Route::prefix('sga')->group(function () {
     Route::get('carreras', [SgaController::class, 'getCarreras']);
     Route::get('gestiones', [SgaController::class, 'getGestiones']);
     Route::get('pensums', [SgaController::class, 'getPensums']);
+    Route::get('docentes', [SgaController::class, 'getDocentes']);
     Route::get('inscripciones/{codCeta}', [SgaController::class, 'getInscripciones']);
     
     Route::post('sync-estudiante', [SgaController::class, 'syncEstudiante']);
