@@ -9,16 +9,16 @@ class GradosHomolCp extends Model
 {
     use HasFactory;
 
-    protected $table = 'grados_homol_cp';
+    protected $table = 'grados_homologacion_cp';
 
     protected $fillable = [
-        'homol_cp_id',
+        'homologacion_cambio_plan_id',
         'grado',
         'gestion',
     ];
 
-    public function homologacion()
+    public function homologacionCambioPlan()
     {
-        return $this->belongsTo(ResHomolCp::class, 'homol_cp_id');
+        return $this->belongsTo(HomologacionCambioPlan::class, 'homologacion_cambio_plan_id');
     }
 }

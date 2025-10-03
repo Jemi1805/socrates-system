@@ -12,6 +12,7 @@ class TransitabilidadInstTec extends Model
     protected $table = 'transitabilidad_inst_tec';
 
     protected $fillable = [
+        'diploma_bachiller_id',
         'cod_ceta_est',
         'id_doc_req',
         'serie_titulo_tm',
@@ -23,4 +24,12 @@ class TransitabilidadInstTec extends Model
     protected $casts = [
         'fecha_emision' => 'date',
     ];
+
+    /**
+     * Diploma asociado
+     */
+    public function diplomaBachiller()
+    {
+        return $this->belongsTo(DiplomaBachiller::class, 'diploma_bachiller_id');
+    }
 }

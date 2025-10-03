@@ -43,7 +43,7 @@ class Postulante extends Model
      */
     public function getCarreraNombreAttribute()
     {
-        $raw = (string)($this->attributes['carrera'] ?? '');
+        $raw = (string)(isset($this->attributes['carrera']) ? $this->attributes['carrera'] : '');
         $norm = trim(mb_strtolower($raw));
 
         // Mapas de normalización comunes (ajusta según tu catálogo real)
@@ -65,5 +65,45 @@ class Postulante extends Model
 
         // Fallback: Title Case sencillo del valor almacenado
         return mb_convert_case($raw, MB_CASE_TITLE, 'UTF-8');
+    }
+
+    /**
+     * Relación con diploma_bachiller
+     */
+    public function diplomaBachiller()
+    {
+        return $this->hasMany(DiplomaBachiller::class, 'cod_ceta_est', 'cod_ceta');
+    }
+
+    /**
+     * Relación con datos_carrera
+     */
+    public function datosCarrera()
+    {
+        return $this->hasMany(DatosCarrera::class, 'cod_ceta_est', 'cod_ceta');
+    }
+
+    /**
+     * Relación con aranceles_est
+     */
+    public function aranceles()
+    {
+        return $this->hasMany(ArancelesEst::class, 'cod_ceta_est', 'cod_ceta');
+    }
+
+    /**
+     * Relación con inscrip_modalidad
+     */
+    public function inscripcionesModalidad()
+    {
+        return $this->hasMany(InscripModalidad::class, 'cod_ceta_est', 'cod_ceta');
+    }
+
+    /**
+     * Carreras asociadas vía tabla pivote datos_carrera
+     */
+    public function carreras()
+    {
+        return $this->belongsToMany(Carrera::class, 'datos_carrera', 'cod_ceta_est', 'cod_carrera', 'cod_ceta', 'cod_carrera');
     }
 }

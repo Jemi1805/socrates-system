@@ -63,4 +63,12 @@ class InscripModalidad extends Model
     {
         return $this->hasMany(DocumentosAdjuntos::class, 'inscripcion_id');
     }
+
+    /**
+     * Relación con Postulante por cod_ceta
+     */
+    public function postulante()
+    {
+        return $this->belongsTo(Postulante::class, 'cod_ceta_est', 'cod_ceta');
+    }
 }

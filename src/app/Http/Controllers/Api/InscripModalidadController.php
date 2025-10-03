@@ -25,13 +25,58 @@ class InscripModalidadController extends CrudController
     /**
      * Sanitiza números de serie/resoluciones: permite solo A-Z, 0-9, guion -, comillas dobles " y símbolo °, y devuelve en MAYÚSCULAS.
      */
-    private function sanitizeSerie(?string $v): ?string
+    private function sanitizeSerie($v)
     {
         if ($v === null) return null;
         $v = strtoupper($v);
         // Mantener solo A-Z, 0-9, -, " , ° y espacios
         $v = preg_replace('/[^A-Z0-9\-\"°\s]+/u', '', $v);
         return $v;
+    }
+
+    // Resolver código de carrera (MEA/EEA) desde postulantes.carrera y tabla carrera
+    private function resolveCodCarrera($codCeta)
+    {
+        try {
+            $raw = DB::table('postulantes')->where('cod_ceta', (int)$codCeta)->value('carrera');
+            if ($raw === null) return null;
+            $val = trim((string)$raw);
+            if ($val === '') return null;
+            $upper = strtoupper($val);
+            if (in_array($upper, array('MEA','EEA'), true)) {
+                $exists = DB::table('carrera')->where('cod_carrera', $upper)->exists();
+                if ($exists) return $upper;
+            }
+            $norm = mb_strtolower($val, 'UTF-8');
+            $map = array(
+                'mecanica' => 'MEA',
+                'mecánica' => 'MEA',
+                'mecanica automotriz' => 'MEA',
+                'mecánica automotriz' => 'MEA',
+                'electricidad' => 'EEA',
+                'eléctrica' => 'EEA',
+                'electronica' => 'EEA',
+                'eléctrónica' => 'EEA',
+                'electricidad y electrónica automotriz' => 'EEA',
+            );
+            if (isset($map[$norm])) {
+                $code = $map[$norm];
+                $exists = DB::table('carrera')->where('cod_carrera', $code)->exists();
+                if ($exists) return $code;
+            }
+            $candidate = DB::table('carrera')
+                ->whereRaw('LOWER(nombre_carrera) = ?', array(mb_strtolower($val, 'UTF-8')))
+                ->value('cod_carrera');
+            if ($candidate) return $candidate;
+            $like = DB::table('carrera')->select('cod_carrera')->where('nombre_carrera', 'LIKE', '%'.$val.'%')->limit(2)->get();
+            if ($like && count($like) === 1) {
+                $row = (array)$like[0];
+                return isset($row['cod_carrera']) ? $row['cod_carrera'] : null;
+            }
+        } catch (\Throwable $e) {
+            // ignorar
+        }
+        return null;
     }
     
     protected function rules()
@@ -128,12 +173,12 @@ class InscripModalidadController extends CrudController
         $user = $request->user();
 
         return DB::transaction(function () use ($data, $user) {
-            $codCeta = $data['cod_ceta_est'] ?? null;
+            $codCeta = isset($data['cod_ceta_est']) ? $data['cod_ceta_est'] : null;
             if (empty($codCeta)) {
                 // Generar código CETA: 9 + AAAA + F + NNN
                 $year = (int) date('Y');
                 $flag = 0; // 0 = mecánica, 1 = electrónica
-                $carrera = strtolower((string)($data['carrera'] ?? ''));
+                $carrera = strtolower((string)(isset($data['carrera']) ? $data['carrera'] : ''));
                 if (strpos($carrera, 'elect') !== false) { $flag = 1; }
                 // Prefijo base por año (sin distinguir carrera para el correlativo)
                 $yearPrefix = '9' . sprintf('%04d', $year);
@@ -145,7 +190,10 @@ class InscripModalidadController extends CrudController
                     ->max('cod_ceta_est');
                 $seq = 0;
                 if ($max) {
-                    $seq = (int) substr((string)$max, -3);
+                    // Extraer últimos 4 dígitos (flag + correlativo) para obtener el correlativo real
+                    $lastFour = (int) substr((string)$max, -4);
+                    // El correlativo son los últimos 3 dígitos de esos 4
+                    $seq = $lastFour % 1000;
                 }
                 $seq = $seq + 1;
                 $codCeta = (int)($yearPrefix . $flag . str_pad((string)$seq, 3, '0', STR_PAD_LEFT));
@@ -177,6 +225,29 @@ class InscripModalidadController extends CrudController
                     $item = null;
                     if (!empty($a['id'])) {
                         $item = ArancelesEst::find($a['id']);
+                    }
+                    // Evitar duplicados: intentar localizar registro existente por claves fuertes
+                    if (!$item) {
+                        $base = DB::table('aranceles_est')->where('cod_ceta_est', $ins->cod_ceta_est);
+                        $nf = (isset($a['num_factura']) && trim((string)$a['num_factura']) !== '') ? trim((string)$a['num_factura']) : '';
+                        $nc = (isset($a['num_comprobante']) && trim((string)$a['num_comprobante']) !== '') ? trim((string)$a['num_comprobante']) : '';
+                        $fecha = array_key_exists('fecha', $a) ? $a['fecha'] : null;
+                        $concepto = array_key_exists('concepto', $a) ? $a['concepto'] : null;
+                        $monto = array_key_exists('monto', $a) ? $a['monto'] : null;
+                        $q = clone $base;
+                        if ($nf !== '' && $nf !== '0') {
+                            $q->where('num_factura', $nf);
+                        } elseif ($nc !== '' && $nc !== '0') {
+                            $q->where('num_comprobante', $nc);
+                        } else {
+                            if ($fecha !== null) $q->where('fecha', $fecha);
+                            if ($concepto !== null) $q->where('concepto', $concepto);
+                            if ($monto !== null) $q->where('monto', $monto);
+                        }
+                        $exists = $q->first();
+                        if ($exists) {
+                            $item = ArancelesEst::find($exists->id);
+                        }
                     }
                     if (!$item) {
                         $item = new ArancelesEst();
@@ -227,13 +298,23 @@ class InscripModalidadController extends CrudController
                 if (!$regFin && !empty($dc['gestion_fin'])) {
                     $regFin = $regIni; // si hay gestión fin pero no régimen fin, asumir el mismo
                 }
+                // Resolver cod_carrera si no viene en datos_carrera
+                $codCarr = isset($dc['cod_carrera']) ? $dc['cod_carrera'] : null;
+                if ($codCarr === null || $codCarr === '') {
+                    $codCarr = $this->resolveCodCarrera((int)$data['cod_ceta_est']);
+                }
+                $keyDc = ['cod_ceta_est' => $data['cod_ceta_est']];
+                if ($codCarr !== null && $codCarr !== '') {
+                    $keyDc['cod_carrera'] = $codCarr;
+                }
                 DatosCarrera::updateOrCreate(
-                    ['cod_ceta_est' => $data['cod_ceta_est']],
+                    $keyDc,
                     [
+                        'cod_carrera' => $codCarr,
                         'regimen_ini' => $regIni,
                         'regimen_fin' => $regFin,
-                        'gestion_ini' => $dc['gestion_ini'] ?? null,
-                        'gestion_fin' => $dc['gestion_fin'] ?? null,
+                        'gestion_ini' => isset($dc['gestion_ini']) ? $dc['gestion_ini'] : null,
+                        'gestion_fin' => isset($dc['gestion_fin']) ? $dc['gestion_fin'] : null,
                         'is_active' => true,
                     ]
                 );
@@ -251,7 +332,7 @@ class InscripModalidadController extends CrudController
                     [
                         // Persistir capitalizado
                         'tipo_bachiller' => ucfirst(strtolower($data['tipo_bachiller'])),
-                        'nro_serie_titulo' => $d['nro_serie_titulo'] ?? null,
+                        'nro_serie_titulo' => isset($d['nro_serie_titulo']) ? $d['nro_serie_titulo'] : null,
                         'emision' => data_get($data, 'diploma_bachiller.emision'),
                         'fecha_emision' => data_get($data, 'diploma_bachiller.fecha_emision'),
                         'observacion' => data_get($data, 'diploma_bachiller.observacion'),
@@ -270,10 +351,10 @@ class InscripModalidadController extends CrudController
                     TransitabilidadEduReg::updateOrCreate(
                         ['cod_ceta_est' => $data['cod_ceta_est']],
                         [
-                            'serie_titulo_tm' => $t['serie_titulo_tm'] ?? null,
-                            'numero_titulo_tm' => $t['numero_titulo_tm'] ?? null,
-                            'fecha_emision' => $t['fecha_emision'] ?? null,
-                            'observacion' => $t['observacion'] ?? null,
+                            'serie_titulo_tm' => isset($t['serie_titulo_tm']) ? $t['serie_titulo_tm'] : null,
+                            'numero_titulo_tm' => isset($t['numero_titulo_tm']) ? $t['numero_titulo_tm'] : null,
+                            'fecha_emision' => isset($t['fecha_emision']) ? $t['fecha_emision'] : null,
+                            'observacion' => isset($t['observacion']) ? $t['observacion'] : null,
                             'is_active' => true,
                         ]
                     );
@@ -294,10 +375,10 @@ class InscripModalidadController extends CrudController
                     TransitabilidadInstTec::updateOrCreate(
                         ['cod_ceta_est' => $data['cod_ceta_est']],
                         [
-                            'serie_titulo_tm' => $t2['serie_titulo_tm'] ?? null,
-                            'numero_titulo_tm' => $t2['numero_titulo_tm'] ?? null,
-                            'fecha_emision' => $t2['fecha_emision'] ?? null,
-                            'observacion' => $t2['observacion'] ?? null,
+                            'serie_titulo_tm' => isset($t2['serie_titulo_tm']) ? $t2['serie_titulo_tm'] : null,
+                            'numero_titulo_tm' => isset($t2['numero_titulo_tm']) ? $t2['numero_titulo_tm'] : null,
+                            'fecha_emision' => isset($t2['fecha_emision']) ? $t2['fecha_emision'] : null,
+                            'observacion' => isset($t2['observacion']) ? $t2['observacion'] : null,
                             'is_active' => true,
                         ]
                     );
@@ -333,9 +414,9 @@ class InscripModalidadController extends CrudController
                     if (!empty($grados) && Schema::hasTable('grados_bach_extranjero')) {
                         Log::info('Guardando grados_bach_extranjero', ['cod_ceta_est' => $data['cod_ceta_est'], 'count' => count($grados)]);
                         // Determinar clave para relación: preferir id del diploma, fallback a cod_ceta_est si no existe id
-                        $diplomaKey = $diplomaExtranjero->id ?? null;
+                        $diplomaKey = isset($diplomaExtranjero->id) ? $diplomaExtranjero->id : null;
                         if ($diplomaKey === null) {
-                            $diplomaKey = $diplomaExtranjero->cod_ceta_est ?? ($data['cod_ceta_est'] ?? null);
+                            $diplomaKey = isset($diplomaExtranjero->cod_ceta_est) ? $diplomaExtranjero->cod_ceta_est : (isset($data['cod_ceta_est']) ? $data['cod_ceta_est'] : null);
                             Log::warning('Diploma sin columna id; usando cod_ceta_est como clave en grados_bach_extranjero.', [
                                 'cod_ceta_est' => $diplomaKey
                             ]);
@@ -348,8 +429,8 @@ class InscripModalidadController extends CrudController
                             ->where('diploma_bachiller_id', $diplomaKey)
                             ->delete();
                             foreach ($grados as $gg) {
-                                $g = $gg['grado'] ?? null;
-                                $gest = $gg['gestion'] ?? null;
+                                $g = isset($gg['grado']) ? $gg['grado'] : null;
+                                $gest = isset($gg['gestion']) ? $gg['gestion'] : null;
                                 if ($g || $gest) {
                                     DB::table('grados_bach_extranjero')->insert([
                                     'diploma_bachiller_id' => $diplomaKey,
@@ -390,16 +471,16 @@ class InscripModalidadController extends CrudController
                         $payloadTrasp['cod_ceta_est'] = $data['cod_ceta_est'];
                     }
                     if (Schema::hasColumn('traspasos_instituto', 'instituto_origen')) {
-                        $payloadTrasp['instituto_origen'] = $ti['instituto_origen'] ?? null;
+                        $payloadTrasp['instituto_origen'] = isset($ti['instituto_origen']) ? $ti['instituto_origen'] : null;
                     }
                     if (Schema::hasColumn('traspasos_instituto', 'grados_cursados')) {
-                        $payloadTrasp['grados_cursados'] = $ti['grados_cursados'] ?? null;
+                        $payloadTrasp['grados_cursados'] = isset($ti['grados_cursados']) ? $ti['grados_cursados'] : null;
                     }
                     if (Schema::hasColumn('traspasos_instituto', 'gestiones_cursadas')) {
-                        $payloadTrasp['gestiones_cursadas'] = $ti['gestiones_cursadas'] ?? null;
+                        $payloadTrasp['gestiones_cursadas'] = isset($ti['gestiones_cursadas']) ? $ti['gestiones_cursadas'] : null;
                     }
                     if (Schema::hasColumn('traspasos_instituto', 'observacion')) {
-                        $payloadTrasp['observacion'] = $ti['observacion'] ?? null;
+                        $payloadTrasp['observacion'] = isset($ti['observacion']) ? $ti['observacion'] : null;
                     }
                     if (Schema::hasColumn('traspasos_instituto', 'is_active')) {
                         $payloadTrasp['is_active'] = true;
@@ -418,13 +499,13 @@ class InscripModalidadController extends CrudController
                     // Guardar grados en grados_trasp si la tabla existe
                     $gradosT = data_get($ti, 'grados', []);
                     if (!empty($gradosT) && Schema::hasTable('grados_trasp')) {
-                        $traspasoId = $traspasoGuardado->id ?? null;
+                        $traspasoId = isset($traspasoGuardado->id) ? $traspasoGuardado->id : null;
                         if ($traspasoId) {
                             // Limpiar existentes
                             DB::table('grados_trasp')->where('traspaso_id', $traspasoId)->delete();
                             foreach ($gradosT as $gt) {
-                                $g = $gt['grado'] ?? null;
-                                $gest = $gt['gestion'] ?? null;
+                                $g = isset($gt['grado']) ? $gt['grado'] : null;
+                                $gest = isset($gt['gestion']) ? $gt['gestion'] : null;
                                 if ($g || $gest) {
                                     DB::table('grados_trasp')->insert([
                                         'traspaso_id' => $traspasoId,
@@ -457,19 +538,19 @@ class InscripModalidadController extends CrudController
                     // Construir payload solo con columnas existentes
                     $payloadCp = [];
                     if (Schema::hasColumn('homologacion_cambio_plan', 'cod_ceta_est')) {
-                        $payloadCp['cod_ceta_est'] = $data['cod_ceta_est'] ?? null;
+                        $payloadCp['cod_ceta_est'] = isset($data['cod_ceta_est']) ? $data['cod_ceta_est'] : null;
                     }
                     if (Schema::hasColumn('homologacion_cambio_plan', 'nro_resolucion')) {
                         $payloadCp['nro_resolucion'] = isset($cp['nro_resolucion']) ? $this->sanitizeSerie($cp['nro_resolucion']) : null;
                     }
                     if (Schema::hasColumn('homologacion_cambio_plan', 'fecha_emision')) {
-                        $payloadCp['fecha_emision'] = $cp['fecha_emision'] ?? null;
+                        $payloadCp['fecha_emision'] = isset($cp['fecha_emision']) ? $cp['fecha_emision'] : null;
                     }
                     if (Schema::hasColumn('homologacion_cambio_plan', 'grados_cursados')) {
-                        $payloadCp['grados_cursados'] = $cp['grados_cursados'] ?? null;
+                        $payloadCp['grados_cursados'] = isset($cp['grados_cursados']) ? $cp['grados_cursados'] : null;
                     }
                     if (Schema::hasColumn('homologacion_cambio_plan', 'gestiones_cursadas')) {
-                        $payloadCp['gestiones_cursadas'] = $cp['gestiones_cursadas'] ?? null;
+                        $payloadCp['gestiones_cursadas'] = isset($cp['gestiones_cursadas']) ? $cp['gestiones_cursadas'] : null;
                     }
                     // Upsert por nro_resolucion si existe, caso contrario create
                     if (!empty($payloadCp['nro_resolucion'])) {
@@ -531,7 +612,7 @@ class InscripModalidadController extends CrudController
                             $parentIdVal = property_exists($homolCpGuardado, 'id') ? $homolCpGuardado->id : null;
                             if ($parentIdVal === null) {
                                 if (in_array($fk, ['homologacion_cambio_plan', 'homologacion'])) {
-                                    $parentIdVal = $homolCpGuardado->nro_resolucion ?? null;
+                                    $parentIdVal = isset($homolCpGuardado->nro_resolucion) ? $homolCpGuardado->nro_resolucion : null;
                                 }
                             }
                             if ($parentIdVal === null) {
@@ -540,8 +621,8 @@ class InscripModalidadController extends CrudController
                                 DB::table('grados_homologacion_cp')->where($fk, $parentIdVal)->delete();
                                 $insertados = 0;
                                 foreach ($gradosCp as $gg) {
-                                    $g = $gg['grado'] ?? null;
-                                    $gest = $gg['gestion'] ?? null;
+                                    $g = isset($gg['grado']) ? $gg['grado'] : null;
+                                    $gest = isset($gg['gestion']) ? $gg['gestion'] : null;
                                     if ($g || $gest) {
                                         DB::table('grados_homologacion_cp')->insert([
                                             $fk => $parentIdVal,
@@ -557,8 +638,8 @@ class InscripModalidadController extends CrudController
                                     'parent_val' => $parentIdVal,
                                     'count' => $insertados,
                                     'fk' => $fk,
-                                    'primer_grado' => $gradosCp[0]['grado'] ?? null,
-                                    'primer_gestion' => $gradosCp[0]['gestion'] ?? null,
+                                    'primer_grado' => (isset($gradosCp[0]['grado']) ? $gradosCp[0]['grado'] : null),
+                                    'primer_gestion' => (isset($gradosCp[0]['gestion']) ? $gradosCp[0]['gestion'] : null),
                                 ]);
                             }
                         } else {
@@ -575,7 +656,7 @@ class InscripModalidadController extends CrudController
                 'message' => 'Inscripción registrada correctamente',
                 'data' => [
                     'inscripcion' => $ins,
-                    'datos_carrera' => $data['datos_carrera'] ?? null,
+                    'datos_carrera' => isset($data['datos_carrera']) ? $data['datos_carrera'] : null,
                     'datos_carrera_guardado' => $datosCarreraGuardado,
                     'diploma_bachiller_guardado' => $diplomaGuardado,
                     'traspaso_instituto_guardado' => $traspasoGuardado,

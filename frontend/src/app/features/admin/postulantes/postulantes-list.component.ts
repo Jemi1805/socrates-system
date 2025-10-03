@@ -1140,7 +1140,12 @@ private cargarPostulanteDesdeBD() {
   }
   
   seleccionarModalidad(modalidad: ModalidadGraduacion) {
-    // No guardamos directo: pedimos confirmación mostrando el cambio
+    // Para postulantes nuevos: asignar directamente sin confirmación
+    if (this.esNuevoPostulante) {
+      this.modalidad = modalidad;
+      return;
+    }
+    // Para edición: pedir confirmación mostrando el cambio
     this.nuevaModalidad = modalidad;
     this.modalConfirmCambioVisible = true;
   }
@@ -1163,12 +1168,15 @@ private cargarPostulanteDesdeBD() {
         next: (resultado) => {
           console.log('Modalidad asignada correctamente:', resultado);
           this.modalidad = seleccionado;
-          this.cambiosRealizados.push({
-            campo: 'Modalidad de Graduación',
-            anterior: anterior ? `${anterior.nombre}` : '- (sin modalidad) -',
-            nuevo: `${seleccionado.nombre}`,
-          });
-          this.modalCambiosVisible = true;
+          // Solo mostrar modal de cambios si NO es postulante nuevo
+          if (!this.esNuevoPostulante) {
+            this.cambiosRealizados.push({
+              campo: 'Modalidad de Graduación',
+              anterior: anterior ? `${anterior.nombre}` : '- (sin modalidad) -',
+              nuevo: `${seleccionado.nombre}`,
+            });
+            this.modalCambiosVisible = true;
+          }
           this.cargarModalidadActual();
         },
         error: (err) => {
@@ -1178,12 +1186,15 @@ private cargarPostulanteDesdeBD() {
     } else {
       // Sin CETA aún: solo estado local; se persistirá más adelante
       this.modalidad = seleccionado;
-      this.cambiosRealizados.push({
-        campo: 'Modalidad de Graduación',
-        anterior: anterior ? `${anterior.nombre}` : '- (sin modalidad) -',
-        nuevo: `${seleccionado.nombre}`,
-      });
-      this.modalCambiosVisible = true;
+      // Solo mostrar modal de cambios si NO es postulante nuevo
+      if (!this.esNuevoPostulante) {
+        this.cambiosRealizados.push({
+          campo: 'Modalidad de Graduación',
+          anterior: anterior ? `${anterior.nombre}` : '- (sin modalidad) -',
+          nuevo: `${seleccionado.nombre}`,
+        });
+        this.modalCambiosVisible = true;
+      }
     }
     this.nuevaModalidad = null;
   }
@@ -2585,6 +2596,10 @@ private cargarPostulanteDesdeBD() {
   }
 
   private mostrarModalCambios(cambios: Array<{ campo: string; anterior: any; nuevo: any }>) {
+    // Solo mostrar el modal si NO es un postulante nuevo (modo edición)
+    if (this.esNuevoPostulante) {
+      return;
+    }
     this.cambiosRealizados = cambios || [];
     this.modalCambiosVisible = true;
   }

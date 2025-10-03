@@ -1140,7 +1140,7 @@
   </div>
 
   <!-- Modal de confirmación de cambio de modalidad -->
-  <div *ngIf="modalConfirmCambioVisible">
+  <div *ngIf="modalConfirmCambioVisible && !esNuevoPostulante">
     <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalConfirmCambioLabel">
       <div class="modal-dialog modal-md modal-dialog-centered" role="document">
         <div class="modal-content">
@@ -1210,7 +1210,7 @@
 </div>
 
 <!-- Modal de Cambios Guardados (global, al final para evitar clipping) -->
-<div *ngIf="modalCambiosVisible">
+<div *ngIf="modalCambiosVisible && !esNuevoPostulante">
   <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalCambiosLabel">
     <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
       <div class="modal-content">
@@ -1245,10 +1245,10 @@
           </div>
         </div>
         <div class="modal-footer py-2 d-flex justify-content-end gap-2">
-          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="continuarCambios()">
+          <button type="button" class="btn btn-success btn-sm" (click)="continuarCambios()">
             Continuar cambios
           </button>
-          <button type="button" class="btn btn-success btn-sm" (click)="cerrarModalCambios()">
+          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cerrarModalCambios()">
             Cerrar cambios
           </button>
         </div>

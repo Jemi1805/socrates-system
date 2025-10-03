@@ -40,4 +40,12 @@ class ArancelesEst extends Model
     {
         return $this->hasOne(InscripModalidad::class, 'aranceles_id');
     }
+
+    /**
+     * Relación inversa con postulante
+     */
+    public function postulante()
+    {
+        return $this->belongsTo(Postulante::class, 'cod_ceta_est', 'cod_ceta');
+    }
 }

@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 class UpdateDatosCarreraRegimenColumns extends Migration
 {
-    public function up(): void
+    public function up()
     {
         if (!Schema::hasTable('datos_carrera')) {
             return;
@@ -37,7 +37,7 @@ class UpdateDatosCarreraRegimenColumns extends Migration
         });
     }
 
-    public function down(): void
+    public function down()
     {
         if (!Schema::hasTable('datos_carrera')) {
             return;

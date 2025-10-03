@@ -9,7 +9,7 @@ class UpdateProyectoTableAddCamposRegistroTema extends Migration
     /**
      * Run the migrations.
      */
-    public function up(): void
+    public function up()
     {
         Schema::table('proyecto', function (Blueprint $table) {
             // Eliminar la FK y la columna modalidad_id si existen
@@ -54,7 +54,7 @@ class UpdateProyectoTableAddCamposRegistroTema extends Migration
     /**
      * Reverse the migrations.
      */
-    public function down(): void
+    public function down()
     {
         Schema::table('proyecto', function (Blueprint $table) {
             // Revertir los nuevos campos
