@@ -70,10 +70,28 @@ $transition: all 0.3s ease;
   td {
     color: #052544;
   }
-
   .table-dark {
     --bs-table-bg: #4C9DBD !important;
     --bs-table-border-color: #4C9DBD !important;
     color: white !important;
   }
+}
+
+// Modal: estilos consistentes (header celeste)
+.modal .modal-header {
+  background: $primary-color;
+  color: white;
+  .modal-title {
+    font-weight: 600;
+  }
+  .btn-close {
+    filter: invert(1) grayscale(100%);
+    opacity: 1;
+    &:hover { opacity: 0.85; }
+  }
+}
+
+.modal .modal-content {
+  border-radius: $border-radius;
+  box-shadow: $shadow;
 }

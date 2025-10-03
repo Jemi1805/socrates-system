@@ -21,6 +21,9 @@ export class TutoresHomeComponent {
   errorDocentes: string | null = null;
   // Selección múltiple por checkbox (clave: ci)
   selectedCis: Set<string> = new Set<string>();
+  // Modal de edición de docente
+  modalEditarDocenteVisible: boolean = false;
+  editingDocente: Partial<Docente> | null = null;
 
   constructor(private sga: SgaService, private router: Router) {}
 
@@ -58,15 +61,44 @@ export class TutoresHomeComponent {
   }
 
   editarDocente(doc: Docente) {
-    // Navega a Registrar Tutor con parámetros útiles (p.ej. ci) para pre-carga
-    this.router.navigate(['/tutores/registrar'], { queryParams: {
+    // Abrir modal de edición en lugar de navegar
+    this.editingDocente = {
+      nombre: doc.nombre,
+      apellido_p: doc.apellido_p,
+      apellido_m: doc.apellido_m,
       ci: doc.ci,
-      nombres: doc.nombre,
-      ap_pat: doc.apellido_p,
-      ap_mat: doc.apellido_m,
-      titulo: doc.profesion,
-      celular: doc.celular
-    }});
+      profesion: doc.profesion,
+      celular: doc.celular,
+      pertinencia: doc.pertinencia || ''
+    } as Partial<Docente>;
+    this.modalEditarDocenteVisible = true;
+  }
+
+  cerrarModalEditarDocente() {
+    this.modalEditarDocenteVisible = false;
+    this.editingDocente = null;
+  }
+
+  guardarDocenteEditado() {
+    if (!this.editingDocente) return;
+    // Actualizar la fila en memoria (por CI como clave). TODO: integrar backend cuando esté disponible
+    const ciKey = (this.editingDocente.ci || '').toString().trim();
+    const idx = this.docentes.findIndex(d => (d.ci || '').toString().trim() === ciKey);
+    const updated: Docente = {
+      nombre: this.editingDocente.nombre || '',
+      apellido_p: this.editingDocente.apellido_p || '',
+      apellido_m: this.editingDocente.apellido_m || '',
+      ci: this.editingDocente.ci || '',
+      profesion: this.editingDocente.profesion || '',
+      celular: this.editingDocente.celular || '',
+      pertinencia: this.editingDocente.pertinencia || ''
+    } as Docente;
+    if (idx >= 0) {
+      this.docentes[idx] = updated;
+    } else {
+      this.docentes.push(updated);
+    }
+    this.cerrarModalEditarDocente();
   }
 
   // Helpers de selección
