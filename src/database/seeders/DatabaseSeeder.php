@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             // Semillas base para carreras y pensums
             CarreraSeeder::class,
             PensumSeeder::class,
+            PertinenciaAcadSeeder::class,
         ]);
 
         // Crear usuarios adicionales de prueba si es necesario

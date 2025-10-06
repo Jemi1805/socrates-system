@@ -8,7 +8,7 @@
 
   <div class="content-wrapper">
     <div class="row g-3 align-items-start">
-      <div class="col-md-6">
+      <div class="col-12">
         <div class="card action-card">
           <div class="card-body d-flex flex-column justify-content-between">
             <div>
@@ -30,28 +30,6 @@
                 <i class="bi" [ngClass]="showImport ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
                 {{ showImport ? 'Ocultar Importación' : 'Importar Docentes' }}
               </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="card action-card">
-          <div class="card-body d-flex flex-column justify-content-between">
-            <div>
-              <h5 class="card-title d-flex align-items-center gap-2">
-                <i class="bi bi-person-check fs-5 text-success"></i>
-                Designar Tutor
-              </h5>
-              <div class="alert alert-info py-1 px-2 mb-1">
-                <i class="bi bi-info-circle me-1"></i>
-                Asigna un tutor a un estudiante o proyecto de graduación.
-              </div>
-            </div>
-            <div class="mt-1">
-              <a routerLink="/tutores/designar" class="btn btn-success">
-                <i class="bi bi-check2-circle me-1"></i>
-                Ir a designación
-              </a>
             </div>
           </div>
         </div>
@@ -119,7 +97,7 @@
 
     <!-- Fila separada para la card de Importar Docentes (no afecta la otra columna) -->
     <div class="row g-3 align-items-start" *ngIf="showImport">
-      <div class="col-md-6">
+      <div class="col-12">
         <div class="card action-card">
           <div class="card-body">
             <h5 class="card-title d-flex align-items-center gap-2">

@@ -24,4 +24,12 @@ class Carrera extends Model
     {
         return $this->hasMany(Pensum::class, 'cod_carrera', 'cod_carrera');
     }
+
+    /**
+     * Docentes asociados a la carrera mediante la tabla pivote docente_carrera
+     */
+    public function docentes()
+    {
+        return $this->belongsToMany(Docente::class, 'docente_carrera', 'cod_carrera', 'docente_id', 'cod_carrera', 'id');
+    }
 }

@@ -174,7 +174,7 @@ class AddForeignKeysToPostulanteRelatedTables extends Migration
     /**
      * Verifica si existe una clave foránea en MySQL usando INFORMATION_SCHEMA
      */
-    private function fkExists(string $table, string $fkName): bool
+    private function fkExists(string $table, string $fkName)
     {
         $database = DB::getDatabaseName();
         $sql = "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = ? AND CONSTRAINT_NAME = ?";

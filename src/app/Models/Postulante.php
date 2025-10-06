@@ -106,4 +106,14 @@ class Postulante extends Model
     {
         return $this->belongsToMany(Carrera::class, 'datos_carrera', 'cod_ceta_est', 'cod_carrera', 'cod_ceta', 'cod_carrera');
     }
+
+    /**
+     * Tutores asignados al postulante mediante la pivote designacion_tutor
+     */
+    public function tutores()
+    {
+        return $this->belongsToMany(Tutor::class, 'designacion_tutor', 'cod_ceta', 'tutor_id', 'cod_ceta', 'id')
+            ->withPivot(['fecha_designacion', 'user_id'])
+            ->withTimestamps();
+    }
 }
