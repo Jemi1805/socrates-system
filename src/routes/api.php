@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\GradosHomolCpController;
 use App\Http\Controllers\Api\GradosTraspController;
 use App\Http\Controllers\Api\CarreraController;
 use App\Http\Controllers\Api\PensumController;
+use App\Http\Controllers\Api\DocenteController;
 
 // 🔐 RUTAS DE AUTENTICACIÓN (Sin middleware)
 Route::prefix('auth')->group(function () {
@@ -112,6 +113,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Catálogos base
     Route::apiResource('carrera', CarreraController::class);
     Route::apiResource('pensum', PensumController::class);
+    // Docentes: Upsert por CI
+    Route::post('docentes/upsert_by_ci', [DocenteController::class, 'upsertByCi']);
+    // Docentes locales: listado
+    Route::get('docentes', [DocenteController::class, 'index']);
 });
 
 // 📦 RUTAS DE PRODUCTOS (Mantener existentes)
@@ -152,6 +157,7 @@ Route::prefix('sga')->group(function () {
     Route::get('carreras', [SgaController::class, 'getCarreras']);
     Route::get('gestiones', [SgaController::class, 'getGestiones']);
     Route::get('pensums', [SgaController::class, 'getPensums']);
+    Route::get('pertinencias', [SgaController::class, 'getPertinencias']);
     Route::get('docentes', [SgaController::class, 'getDocentes']);
     Route::get('inscripciones/{codCeta}', [SgaController::class, 'getInscripciones']);
     

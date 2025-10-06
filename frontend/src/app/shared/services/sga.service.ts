@@ -54,6 +54,13 @@ export interface Docente {
   profesion: string;
   celular: string;
   pertinencia?: string;
+  pertinencia_acad_id?: number | null;
+}
+
+export interface Pertinencia {
+  id: number;
+  nombre_pert: string;
+  cod_carrera?: string;
 }
 
 export interface ArancelEst {
@@ -216,6 +223,33 @@ export class SgaService {
       params = params.set('carrera', carrera);
     }
     return this.http.get<ApiResponse<Docente[]>>(`${this.baseUrl}/docentes`, { params })
+      .pipe(catchError(this.handleError));
+  }
+
+  // --- DOCENTES (Local BD) ---
+  getDocentesLocales(carrera?: string): Observable<ApiResponse<Docente[]>> {
+    let params = new HttpParams();
+    if (carrera) {
+      params = params.set('carrera', carrera);
+    }
+    return this.http.get<ApiResponse<Docente[]>>(`${environment.apiUrl}/docentes`, { params })
+      .pipe(catchError(this.handleError));
+  }
+
+  // Guardar/actualizar Docente por CI (fuera de /sga)
+  saveDocenteByCi(data: Partial<Docente> & { ci: string; cod_carrera?: string | null }): Observable<ApiResponse<Docente>> {
+    const url = `${environment.apiUrl}/docentes/upsert_by_ci`;
+    return this.http.post<ApiResponse<Docente>>(url, data)
+      .pipe(catchError(this.handleError));
+  }
+
+  // --- PERTINENCIAS ACADÉMICAS ---
+  getPertinencias(carrera?: string): Observable<ApiResponse<Pertinencia[]>> {
+    let params = new HttpParams();
+    if (carrera) {
+      params = params.set('carrera', carrera);
+    }
+    return this.http.get<ApiResponse<Pertinencia[]>>(`${this.baseUrl}/pertinencias`, { params })
       .pipe(catchError(this.handleError));
   }
 

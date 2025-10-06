@@ -372,6 +372,36 @@ class SgaController extends Controller
     }
 
     /**
+     * Obtener pertinencias académicas filtradas por carrera
+     * Acepta 'cod_carrera' (MEA/EEA) o 'carrera' (mecanica/electricidad)
+     */
+    public function getPertinencias(Request $request)
+    {
+        $codCarrera = $request->get('cod_carrera');
+        $carreraRaw = $request->get('carrera');
+        $carreraNorm = $this->normalizeCarrera($carreraRaw);
+        if (empty($codCarrera) && !empty($carreraNorm)) {
+            $codCarrera = $this->findCodCarreraByNombre($carreraNorm);
+            if ($codCarrera === null) {
+                $codCarrera = $this->carreraToCodCarrera($carreraNorm);
+            }
+        }
+
+        $query = DB::table('pertinencia_acad')->select('id', 'nombre_pert', 'cod_carrera');
+        if (!empty($codCarrera)) {
+            $query->where('cod_carrera', $codCarrera);
+        }
+        $items = $query->orderBy('nombre_pert')->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $items,
+            'carrera' => $carreraNorm ?: 'default',
+            'cod_carrera' => $codCarrera,
+        ]);
+    }
+
+    /**
      * Obtener docentes del SGA (legacy)
      */
     public function getDocentes(Request $request)

@@ -95,3 +95,9 @@ $transition: all 0.3s ease;
   border-radius: $border-radius;
   box-shadow: $shadow;
 }
+
+.btn-outline-secondary {
+  .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+    color: $primary-color !important;
+  }
+}

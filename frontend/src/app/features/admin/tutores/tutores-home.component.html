@@ -10,34 +10,32 @@
     <div class="row g-3 align-items-start">
       <div class="col-12">
         <div class="card action-card">
-          <div class="card-body d-flex flex-column justify-content-between">
-            <div>
-              <h5 class="card-title">
-                <i class="bi bi-person-plus fs-5 text-primary"></i>
-                Registrar Tutor
-              </h5>
-              <div class="alert alert-info py-1 px-2 mb-1">
-                <i class="bi bi-info-circle me-1"></i>
-                Crea un nuevo registro de tutor con sus datos personales y académicos.
-              </div>
-            </div>
-            <div class="mt-1 d-flex gap-2 flex-wrap">
-              <a routerLink="/tutores/registrar" class="btn btn-primary">
-                <i class="bi bi-plus-lg me-1"></i>
-                Ir a registro
-              </a>
-              <button class="btn btn-outline-primary" (click)="toggleImportar()">
-                <i class="bi" [ngClass]="showImport ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
-                {{ showImport ? 'Ocultar Importación' : 'Importar Docentes' }}
-              </button>
-            </div>
-          </div>
+    <div class="card-body d-flex flex-column justify-content-between">
+      <div>
+        <h5 class="card-title">
+          <i class="bi bi-person-plus fs-5 text-primary"></i>
+          Registrar Tutor
+        </h5>
+        <div class="alert alert-info py-1 px-2 mb-1">
+          <i class="bi bi-info-circle me-1"></i>
+          Crea un nuevo registro de tutor con sus datos personales y académicos.
         </div>
       </div>
+      <div class="mt-1 d-flex gap-2 flex-wrap">
+        <a routerLink="/tutores/registrar" class="btn btn-primary">
+          <i class="bi bi-plus-lg me-1"></i>
+          Ir a registro
+        </a>
+        <button class="btn btn-outline-secondary" (click)="toggleImportar()">
+          <i class="bi" [ngClass]="showImport ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+          {{ showImport ? 'Ocultar Importación' : 'Importar Docentes' }}
+        </button>
+      </div>
     </div>
+  </div>
+       
 
-<!-- Modal: Editar Docente -->
-<div *ngIf="modalEditarDocenteVisible">
+  <div *ngIf="modalEditarDocenteVisible">
   <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalEditarDocenteLabel">
     <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
       <div class="modal-content">
@@ -72,7 +70,11 @@
             </div>
             <div class="col-md-6">
               <label class="form-label">Pertinencia Académica</label>
-              <input type="text" class="form-control" [(ngModel)]="editingDocente!.pertinencia" />
+              <select class="form-select" [(ngModel)]="editingDocente!.pertinencia_acad_id">
+                <option [ngValue]="null" [selected]="editingDocente?.pertinencia_acad_id == null" disabled>Seleccione pertinencia</option>
+                <option *ngFor="let p of pertinencias" [ngValue]="p.id">{{ p.nombre_pert }}</option>
+              </select>
+              <small class="text-muted">Opciones filtradas por carrera: {{ carreraSeleccionadaCodigo }}</small>
             </div>
             <div class="col-md-6">
               <label class="form-label">Celular</label>
@@ -81,8 +83,12 @@
           </div>
         </div>
         <div class="modal-footer py-2 d-flex justify-content-end gap-2">
-          <button type="button" class="btn btn-success btn-sm" (click)="guardarDocenteEditado()">
-            Guardar
+          <div class="me-auto" *ngIf="editingSaveError">
+            <span class="text-danger small">{{ editingSaveError }}</span>
+          </div>
+          <button type="button" class="btn btn-success btn-sm" (click)="guardarDocenteEditado()" [disabled]="savingDocente">
+            <i class="bi" [ngClass]="savingDocente ? 'bi-hourglass-split' : 'bi-check2'" class="me-1"></i>
+            {{ savingDocente ? 'Guardando...' : 'Guardar' }}
           </button>
           <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cerrarModalEditarDocente()">
             Cerrar
@@ -92,7 +98,31 @@
     </div>
   </div>
   <div class="modal-backdrop fade show" (click)="cerrarModalEditarDocente()"></div>
-  
+  </div>
+
+
+<!-- Modal: Éxito de guardado (colocado fuera de la card para evitar overflow hidden) -->
+<div *ngIf="successModalVisible">
+  <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalExitoDocenteLabel">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header py-2">
+          <h5 class="modal-title" id="modalExitoDocenteLabel">
+            <i class="bi bi-check-circle-fill text-success me-1"></i>
+            Guardado exitoso
+          </h5>
+          <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="cerrarModalExito()"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">{{ successMessage }}</p>
+        </div>
+        <div class="modal-footer py-2 d-flex justify-content-end">
+          <button type="button" class="btn btn-success btn-sm" (click)="cerrarModalExito()">Aceptar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop fade show" (click)="cerrarModalExito()"></div>
 </div>
 
     <!-- Fila separada para la card de Importar Docentes (no afecta la otra columna) -->
@@ -112,7 +142,8 @@
             <div class="row g-2 align-items-end mb-2">
               <div class="col-12 col-sm-6 col-md-5">
                 <label class="form-label mb-1">Carrera</label>
-                <select class="form-select" [(ngModel)]="carreraSeleccionada">
+                <select class="form-select" [(ngModel)]="carreraSeleccionada" (ngModelChange)="onCarreraChange($event)">
+                  <option [ngValue]="null" disabled>Seleccione la carrera</option>
                   <option value="mecanica">Mecánica Automotriz</option>
                   <option value="electricidad">Electricidad y Electrónica Automotriz</option>
                 </select>
@@ -165,6 +196,8 @@
                         <div class="form-check m-0">
                           <input class="form-check-input" type="checkbox" #cb
                                [checked]="isSelected(d)"
+                               [disabled]="!isDocenteSeleccionable(d)"
+                               [attr.title]="!isDocenteSeleccionable(d) ? 'Complete CI, Título, Celular y Pertinencia para seleccionar' : null"
                                (change)="toggleSelect(d, cb.checked)" />
                         </div>
                       </div>
