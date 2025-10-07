@@ -22,13 +22,17 @@
         </div>
       </div>
       <div class="mt-1 d-flex gap-2 flex-wrap">
-        <a routerLink="/tutores/registrar" class="btn btn-primary">
+        <button class="btn btn-primary" (click)="abrirModalRegistrar()">
           <i class="bi bi-plus-lg me-1"></i>
-          Ir a registro
-        </a>
+          Registrar Nuevo Tutor
+        </button>
         <button class="btn btn-outline-secondary" (click)="toggleImportar()">
           <i class="bi" [ngClass]="showImport ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
           {{ showImport ? 'Ocultar Importación' : 'Importar Docentes' }}
+        </button>
+        <button class="btn btn-outline-secondary" (click)="toggleRegistrados()">
+          <i class="bi bi-people-fill me-1"></i>
+          {{ showRegistrados ? 'Ocultar tutores' : 'Tutores registrados' }}
         </button>
       </div>
     </div>
@@ -42,19 +46,26 @@
         <div class="modal-header py-2">
           <h5 class="modal-title" id="modalEditarDocenteLabel">
             <i class="bi bi-person-vcard me-2"></i>
-            Editar docente
+            {{ isCreateMode ? 'Registrar tutor' : 'Editar docente' }}
           </h5>
           <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="cerrarModalEditarDocente()"></button>
         </div>
         <div class="modal-body">
           <div class="row g-3">
+            <div class="col-md-6" *ngIf="isCreateMode">
+              <label class="form-label">Carrera</label>
+              <select class="form-select" [(ngModel)]="modalCarreraCode" (ngModelChange)="onModalCarreraChange($event)">
+                <option [ngValue]="'MEA'">MEA - Mecánica Automotriz</option>
+                <option [ngValue]="'EEA'">EEA - Electricidad y Electrónica</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Gestión</label>
+              <input type="text" class="form-control" [value]="modalGestion || gestionActual" disabled />
+            </div>
             <div class="col-md-6">
               <label class="form-label">Nombres</label>
               <input type="text" class="form-control" [(ngModel)]="editingDocente!.nombre" />
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">CI</label>
-              <input type="text" class="form-control" [(ngModel)]="editingDocente!.ci" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Apellido Paterno</label>
@@ -63,6 +74,14 @@
             <div class="col-md-6">
               <label class="form-label">Apellido Materno</label>
               <input type="text" class="form-control" [(ngModel)]="editingDocente!.apellido_m" />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">CI</label>
+              <input type="text" class="form-control" [(ngModel)]="editingDocente!.ci" />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Celular</label>
+              <input type="text" class="form-control" [(ngModel)]="editingDocente!.celular" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Título(s)</label>
@@ -74,11 +93,7 @@
                 <option [ngValue]="null" [selected]="editingDocente?.pertinencia_acad_id == null" disabled>Seleccione pertinencia</option>
                 <option *ngFor="let p of pertinencias" [ngValue]="p.id">{{ p.nombre_pert }}</option>
               </select>
-              <small class="text-muted">Opciones filtradas por carrera: {{ carreraSeleccionadaCodigo }}</small>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Celular</label>
-              <input type="text" class="form-control" [(ngModel)]="editingDocente!.celular" />
+              <small class="text-muted" *ngIf="isCreateMode">Opciones filtradas por carrera: {{ modalCarreraCode }}</small>
             </div>
           </div>
         </div>
@@ -86,9 +101,13 @@
           <div class="me-auto" *ngIf="editingSaveError">
             <span class="text-danger small">{{ editingSaveError }}</span>
           </div>
-          <button type="button" class="btn btn-success btn-sm" (click)="guardarDocenteEditado()" [disabled]="savingDocente">
-            <i class="bi" [ngClass]="savingDocente ? 'bi-hourglass-split' : 'bi-check2'" class="me-1"></i>
-            {{ savingDocente ? 'Guardando...' : 'Guardar' }}
+          <button *ngIf="isCreateMode" type="button" class="btn btn-primary btn-sm" (click)="registrarYActivarTutor()" [disabled]="savingDocente">
+            <i class="bi" [ngClass]="savingDocente ? 'bi-hourglass-split' : 'bi-person-badge'" class="me-1"></i>
+            {{ savingDocente ? 'Procesando...' : 'Registrar y activar como Tutor' }}
+          </button>
+          <button *ngIf="!isCreateMode" type="button" class="btn btn-success btn-sm" (click)="guardarDocenteEditado()" [disabled]="savingDocente">
+            <i class="bi" [ngClass]="savingDocente ? 'bi-hourglass-split' : (isCreateMode ? 'bi-person-plus' : 'bi-check2')" class="me-1"></i>
+            {{ savingDocente ? 'Guardando...' : (isCreateMode ? 'Registrar' : 'Guardar') }}
           </button>
           <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cerrarModalEditarDocente()">
             Cerrar
@@ -100,6 +119,84 @@
   <div class="modal-backdrop fade show" (click)="cerrarModalEditarDocente()"></div>
   </div>
 
+  <!-- Lista de Tutores Registrados -->
+  <div class="row g-3 align-items-start" *ngIf="showRegistrados">
+    <div class="col-12">
+      <div class="card action-card">
+        <div class="card-body">
+          <h5 class="card-title d-flex align-items-center gap-2">
+            <i class="bi bi-people-fill text-primary"></i>
+            Tutores registrados
+          </h5>
+          <div class="filters-bar d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+              <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small">Carrera</span>
+                <select class="form-select form-select-sm w-auto" [(ngModel)]="carreraFiltroCode" (ngModelChange)="onCarreraFiltroChange($event)">
+                  <option [ngValue]="'MEA'">MEA</option>
+                  <option [ngValue]="'EEA'">EEA</option>
+                </select>
+              </div>
+              <div class="d-none d-sm-block vr"></div>
+              <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small">Gestión</span>
+                <div class="input-group input-group-sm gestion-group w-auto">
+                  <span class="input-group-text"><i class="bi bi-calendar2"></i></span>
+                  <select class="form-select" [(ngModel)]="gestionFiltro" (ngModelChange)="onGestionFiltroChange($event)">
+                    <option [ngValue]="gestionActual">{{ gestionActual }}</option>
+                    <option [ngValue]="gestionAlternaActual">{{ gestionAlternaActual }}</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+              <small class="text-muted">Total: <strong>{{ tutores?.length || 0 }}</strong></small>
+              <button class="btn btn-outline-secondary btn-sm" (click)="loadTutores()" [disabled]="loadingTutores">
+                <i class="bi" [ngClass]="loadingTutores ? 'bi-arrow-repeat spin' : 'bi-arrow-clockwise'"></i>
+                {{ loadingTutores ? 'Actualizando...' : 'Actualizar' }}
+              </button>
+            </div>
+          </div>
+
+          <div *ngIf="errorTutores" class="alert alert-danger py-2">{{ errorTutores }}</div>
+          <div *ngIf="loadingTutores" class="text-muted small">Cargando tutores...</div>
+
+          <div class="table-responsive" *ngIf="!loadingTutores && tutores.length">
+            <table class="table table-sm table-striped align-middle">
+              <thead class="table-dark">
+                <tr>
+                  <th>Nombres</th>
+                  <th>Apellido Paterno</th>
+                  <th>Apellido Materno</th>
+                  <th>CI</th>
+                  <th>Celular</th>
+                  <th>Carrera</th>
+                  <th>Pertinencia</th>
+                  <th>Gestión</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let t of tutores">
+                  <td>{{ t.nombre }}</td>
+                  <td>{{ t.apellido_p || '-' }}</td>
+                  <td>{{ t.apellido_m || '-' }}</td>
+                  <td>{{ t.ci }}</td>
+                  <td>{{ t.celular || '-' }}</td>
+                  <td>{{ t.cod_carrera }}</td>
+                  <td>{{ t.pertinencia || '-' }}</td>
+                  <td>{{ t.gestion_registro || '-' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div *ngIf="!loadingTutores && !tutores.length && !errorTutores" class="text-muted small">
+            Sin tutores registrados.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
 <!-- Modal: Éxito de guardado (colocado fuera de la card para evitar overflow hidden) -->
 <div *ngIf="successModalVisible">
@@ -155,12 +252,14 @@
                 </button>
               </div>
               <div class="col-12 col-sm-auto">
-                <button class="btn btn-success" (click)="registrarTutores()" [disabled]="!hasSeleccion">
-                  <i class="bi bi-person-plus"></i>
-                  Registrar tutores
+                <button class="btn btn-success" (click)="registrarTutores()" [disabled]="!hasSeleccion || bulkSaving">
+                  <i class="bi" [ngClass]="bulkSaving ? 'bi-hourglass-split' : 'bi-person-plus'"></i>
+                  {{ bulkSaving ? 'Registrando...' : 'Registrar tutores' }}
                 </button>
               </div>
             </div>
+
+            <div *ngIf="bulkError" class="alert alert-danger py-2">{{ bulkError }}</div>
 
             <div *ngIf="errorDocentes" class="alert alert-danger py-2">{{ errorDocentes }}</div>
             <div *ngIf="loadingDocentes" class="text-muted small">Cargando docentes...</div>
@@ -173,9 +272,10 @@
                     <th>Apellido Paterno</th>
                     <th>Apellido Materno</th>
                     <th>CI</th>
+                    <th>Celular</th>
                     <th>Título(s)</th>
                     <th>Pertinencia Académica</th>
-                    <th>Celular</th>
+                    <th>Estado</th>
                     <th class="text-end">Acciones</th>
                   </tr>
                 </thead>
@@ -185,9 +285,13 @@
                     <td>{{ d.apellido_p }}</td>
                     <td>{{ d.apellido_m }}</td>
                     <td>{{ d.ci }}</td>
+                    <td>{{ d.celular }}</td>
                     <td>{{ d.profesion || '-' }}</td>
                     <td>{{ d.pertinencia || '-' }}</td>
-                    <td>{{ d.celular }}</td>
+                    <td>
+                      <span *ngIf="isRegistradoGestionActual(d)" class="badge bg-success">Registrado</span>
+                      <span *ngIf="!isRegistradoGestionActual(d)" class="badge bg-secondary">Disponible</span>
+                    </td>
                     <td class="text-end">
                       <div class="d-flex justify-content-end align-items-center gap-2">
                         <button class="btn btn-sm btn-primary" (click)="editarDocente(d)">
@@ -197,7 +301,7 @@
                           <input class="form-check-input" type="checkbox" #cb
                                [checked]="isSelected(d)"
                                [disabled]="!isDocenteSeleccionable(d)"
-                               [attr.title]="!isDocenteSeleccionable(d) ? 'Complete CI, Título, Celular y Pertinencia para seleccionar' : null"
+                               [attr.title]="!isDocenteSeleccionable(d) ? (isRegistradoGestionActual(d) ? 'Ya registrado en la gestión actual' : 'Complete CI, Título, Celular y Pertinencia para seleccionar') : null"
                                (change)="toggleSelect(d, cb.checked)" />
                         </div>
                       </div>

@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
-import { SgaService, Docente, ApiResponse, Pertinencia } from '../../../shared/services/sga.service';
+import { SgaService, Docente, ApiResponse, Pertinencia, TutorReg } from '../../../shared/services/sga.service';
 import { forkJoin } from 'rxjs';
 
 @Component({
@@ -25,6 +25,10 @@ export class TutoresHomeComponent implements OnInit {
   // Modal de edición de docente
   modalEditarDocenteVisible: boolean = false;
   editingDocente: Partial<Docente> | null = null;
+  isCreateMode: boolean = false;
+  // Controles del modal
+  modalCarreraCode: string | null = null; // 'MEA' | 'EEA'
+  modalGestion: string | null = null;     // 1/YYYY o 2/YYYY (solo visual)
   // Pertinencias académicas filtradas por carrera
   pertinencias: Pertinencia[] = [];
   // Guardado
@@ -32,6 +36,20 @@ export class TutoresHomeComponent implements OnInit {
   successModalVisible: boolean = false;
   successMessage: string = 'Docente guardado correctamente';
   editingSaveError: string | null = null;
+  // Registro masivo
+  bulkSaving: boolean = false;
+  bulkError: string | null = null;
+  // Tutores registrados
+  showRegistrados: boolean = false;
+  loadingTutores: boolean = false;
+  errorTutores: string | null = null;
+  tutores: TutorReg[] = [];
+  // Set de CIs de tutores ya registrados en gestión actual (para evitar duplicado)
+  registradosSet: Set<string> = new Set<string>();
+  // Filtro de gestión para el panel de "Tutores registrados"
+  gestionFiltro: string | null = this.gestionActual;
+  // Filtro de carrera (MEA/EEA) para el panel de "Tutores registrados"
+  carreraFiltroCode: string | null = null;
 
   constructor(private sga: SgaService, private router: Router) {}
 
@@ -39,10 +57,62 @@ export class TutoresHomeComponent implements OnInit {
     this.loadPertinencias();
   }
 
+  // Registrar y activar directamente como Tutor (usa register_bulk con un item)
+  registrarYActivarTutor() {
+    if (!this.editingDocente) return;
+    this.editingSaveError = null;
+    // Validaciones mínimas
+    const ci = (this.editingDocente.ci || '').toString().trim();
+    const nombre = (this.editingDocente.nombre || '').toString().trim();
+    const celular = (this.editingDocente.celular || '').toString().trim();
+    if (!ci || !nombre || !celular) {
+      this.editingSaveError = 'Complete CI, Nombres y Celular';
+      return;
+    }
+    const codCarr = (this.modalCarreraCode === 'MEA' || this.modalCarreraCode === 'EEA') ? this.modalCarreraCode : undefined;
+    const item = {
+      ci,
+      nombre,
+      apellido_p: this.editingDocente.apellido_p || undefined,
+      apellido_m: this.editingDocente.apellido_m || undefined,
+      celular,
+      profesion: this.editingDocente.profesion || undefined,
+      cod_carrera: codCarr,
+      pertinencia_acad_id: this.editingDocente.pertinencia_acad_id ?? null,
+      pertinencia: this.editingDocente.pertinencia || undefined,
+    } as any;
+    this.savingDocente = true;
+    this.sga.registerTutoresBulk([item]).subscribe({
+      next: (resp) => {
+        this.savingDocente = false;
+        if (resp?.success) {
+          const gestion = (resp as any)?.gestion ?? this.gestionActual;
+          this.successMessage = `Tutor registrado y activado. Gestión: ${gestion}`;
+          this.successModalVisible = true;
+          // Marcar en set de registrados
+          this.registradosSet.add(ci);
+          this.modalEditarDocenteVisible = false;
+          // Si panel de registrados está visible, refrescar
+          if (this.showRegistrados) this.loadTutores();
+        } else {
+          this.editingSaveError = resp?.message || 'No se pudo registrar el tutor';
+        }
+      },
+      error: (err) => {
+        this.savingDocente = false;
+        this.editingSaveError = err?.message || 'Error al registrar tutor';
+      }
+    });
+  }
+
   onCarreraChange(_: any) {
     this.loadPertinencias();
     if (this.editingDocente) {
       this.editingDocente.pertinencia_acad_id = null;
+    }
+    // Si se está mostrando la lista de tutores, recargar con el nuevo filtro
+    if (this.showRegistrados) {
+      this.loadTutores();
     }
   }
 
@@ -66,9 +136,13 @@ export class TutoresHomeComponent implements OnInit {
   }
 
   toggleImportar() {
-    this.showImport = !this.showImport;
-    // Limpia estado al ocultar
-    if (!this.showImport) {
+    const newVal = !this.showImport;
+    this.showImport = newVal;
+    if (newVal) {
+      // Mostrar Importar -> ocultar panel de registrados
+      this.showRegistrados = false;
+    } else {
+      // Limpia estado al ocultar
       this.errorDocentes = null;
     }
   }
@@ -81,11 +155,16 @@ export class TutoresHomeComponent implements OnInit {
     this.errorDocentes = null;
     this.loadingDocentes = true;
     this.docentes = [];
+    const params: any = {};
+    const codigo = this.carreraSeleccionadaCodigo;
+    if (codigo && codigo !== '—') params.carrera = codigo;
+    params.gestion = this.gestionActual;
     forkJoin({
       sga: this.sga.getDocentes(this.carreraSeleccionada),
-      local: this.sga.getDocentesLocales(this.carreraSeleccionada)
+      local: this.sga.getDocentesLocales(this.carreraSeleccionada),
+      reg: this.sga.getTutores(params)
     }).subscribe({
-      next: ({ sga, local }) => {
+      next: ({ sga, local, reg }) => {
         this.loadingDocentes = false;
         const map = new Map<string, Docente>();
         const normCi = (v: any) => (v == null ? '' : String(v)).trim();
@@ -132,6 +211,17 @@ export class TutoresHomeComponent implements OnInit {
           }
         }
 
+        // 3) Construir set de registrados en gestión actual
+        if (reg?.success && Array.isArray(reg.data)) {
+          this.registradosSet = new Set(
+            (reg.data as any[])
+              .map(t => normCi((t as any).ci))
+              .filter(x => !!x)
+          );
+        } else {
+          this.registradosSet = new Set<string>();
+        }
+
         this.docentes = Array.from(map.values());
       },
       error: (err) => {
@@ -143,6 +233,7 @@ export class TutoresHomeComponent implements OnInit {
 
   editarDocente(doc: Docente) {
     // Abrir modal de edición en lugar de navegar
+    this.isCreateMode = false;
     this.editingDocente = {
       nombre: doc.nombre,
       apellido_p: doc.apellido_p,
@@ -153,6 +244,31 @@ export class TutoresHomeComponent implements OnInit {
       pertinencia: doc.pertinencia || '',
       pertinencia_acad_id: (doc.pertinencia_acad_id ?? null)
     } as Partial<Docente>;
+    // Inicializar carrera/gestión del modal
+    const codSel = this.carreraSeleccionadaCodigo;
+    this.modalCarreraCode = (codSel === 'MEA' || codSel === 'EEA') ? codSel : 'MEA';
+    this.modalGestion = this.gestionActual;
+    // cargar pertinencias para la carrera del modal
+    this.onModalCarreraChange(this.modalCarreraCode);
+    this.modalEditarDocenteVisible = true;
+  }
+
+  // Abrir modal en modo creación (Registrar tutor)
+  abrirModalRegistrar() {
+    this.isCreateMode = true;
+    this.editingDocente = {
+      nombre: '',
+      apellido_p: '',
+      apellido_m: '',
+      ci: '',
+      profesion: '',
+      celular: '',
+      pertinencia: '',
+      pertinencia_acad_id: null
+    } as Partial<Docente>;
+    const codSel = this.carreraSeleccionadaCodigo;
+    this.modalCarreraCode = (codSel === 'MEA' || codSel === 'EEA') ? codSel : 'MEA';
+    this.modalGestion = this.gestionActual;
     this.modalEditarDocenteVisible = true;
   }
 
@@ -179,7 +295,9 @@ export class TutoresHomeComponent implements OnInit {
       const p = this.pertinencias.find(x => x.id === this.editingDocente!.pertinencia_acad_id);
       if (p) pertNombre = p.nombre_pert;
     }
-    const codCarr = (this.carreraSeleccionada && this.carreraSeleccionadaCodigo !== '—') ? this.carreraSeleccionadaCodigo : null;
+    const codCarr = (this.modalCarreraCode === 'MEA' || this.modalCarreraCode === 'EEA')
+      ? this.modalCarreraCode
+      : ((this.carreraSeleccionada && this.carreraSeleccionadaCodigo !== '—') ? this.carreraSeleccionadaCodigo : null);
     const payload = {
       ci: ciKey,
       nombre: this.editingDocente.nombre || '',
@@ -250,13 +368,140 @@ export class TutoresHomeComponent implements OnInit {
     const hasTitulo = !!(doc.profesion && String(doc.profesion).trim());
     const hasCelular = !!(doc.celular && String(doc.celular).trim());
     const hasPert = (doc as any).pertinencia_acad_id != null || !!(doc.pertinencia && String(doc.pertinencia).trim());
-    return hasCi && hasTitulo && hasCelular && hasPert;
+    const notRegistrado = !this.isRegistradoGestionActual(doc);
+    return hasCi && hasTitulo && hasCelular && hasPert && notRegistrado;
+  }
+
+  isRegistradoGestionActual(doc: Docente): boolean {
+    const ci = (doc?.ci || '').toString().trim();
+    if (!ci) return false;
+    return this.registradosSet.has(ci);
   }
 
   registrarTutores() {
-    // Por ahora, navega al registro con el primer docente seleccionado
     const seleccionados = this.docentes.filter(d => this.selectedCis.has(d.ci));
     if (!seleccionados.length) return;
-    this.editarDocente(seleccionados[0]);
+    this.bulkError = null;
+    this.bulkSaving = true;
+    const codCarr = (this.carreraSeleccionada && this.carreraSeleccionadaCodigo !== '—') ? this.carreraSeleccionadaCodigo : undefined;
+    const items = seleccionados.map(d => ({
+      ci: (d.ci || '').toString().trim(),
+      nombre: d.nombre || '',
+      apellido_p: d.apellido_p || '',
+      apellido_m: d.apellido_m || '',
+      celular: d.celular || '',
+      profesion: d.profesion || '',
+      cod_carrera: codCarr,
+      pertinencia_acad_id: (d as any).pertinencia_acad_id ?? null,
+      pertinencia: d.pertinencia || undefined,
+    }));
+    this.sga.registerTutoresBulk(items as any).subscribe({
+      next: (resp) => {
+        this.bulkSaving = false;
+        if (resp?.success) {
+          const created = (resp as any)?.counts?.created ?? 0;
+          const updated = (resp as any)?.counts?.updated ?? 0;
+          const gestion = (resp as any)?.gestion ?? '';
+          this.successMessage = `Tutores registrados correctamente. Nuevos: ${created}, Actualizados: ${updated}. Gestión: ${gestion}`;
+          this.successModalVisible = true;
+          // Limpiar selección
+          this.selectedCis.clear();
+          // Marcar inmediatamente como registrados en esta gestión para bloquear re-registro
+          for (const d of seleccionados) {
+            const ci = (d.ci || '').toString().trim();
+            if (!ci) continue;
+            this.registradosSet.add(ci);
+          }
+        } else {
+          this.bulkError = resp?.message || 'No se pudo registrar tutores';
+        }
+      },
+      error: (err) => {
+        this.bulkSaving = false;
+        this.bulkError = err?.message || 'Error al registrar tutores';
+      }
+    });
+  }
+
+  // =====================
+  // Tutores registrados
+  // =====================
+  toggleRegistrados() {
+    this.showRegistrados = !this.showRegistrados;
+    if (this.showRegistrados) {
+      // Mostrar Registrados -> ocultar panel de importar
+      this.showImport = false;
+      // Inicializar carrera por defecto al abrir el panel
+      if (!this.carreraFiltroCode || this.carreraFiltroCode === '—') {
+        const codSel = this.carreraSeleccionadaCodigo;
+        this.carreraFiltroCode = (codSel === 'MEA' || codSel === 'EEA') ? codSel : 'MEA';
+      }
+      this.loadTutores();
+    }
+  }
+
+  loadTutores() {
+    this.loadingTutores = true;
+    this.errorTutores = null;
+    this.tutores = [];
+    const params: any = {};
+    const codigo = this.carreraFiltroCode || (this.carreraSeleccionadaCodigo !== '—' ? this.carreraSeleccionadaCodigo : undefined);
+    if (codigo) params.carrera = codigo;
+    if (this.gestionFiltro) params.gestion = this.gestionFiltro;
+    this.sga.getTutores(params).subscribe({
+      next: (resp) => {
+        this.loadingTutores = false;
+        if (resp?.success && Array.isArray(resp.data)) {
+          this.tutores = resp.data as TutorReg[];
+        } else {
+          this.tutores = [];
+        }
+      },
+      error: (err) => {
+        this.loadingTutores = false;
+        this.errorTutores = err?.message || 'Error al cargar tutores';
+      }
+    });
+  }
+
+  // Gestión actual (1/YYYY o 2/YYYY) igual que backend (mes >= 7 -> 2)
+  get gestionActual(): string {
+    const now = new Date();
+    const periodo = (now.getMonth() + 1) >= 7 ? '2' : '1';
+    return `${periodo}/${now.getFullYear()}`;
+  }
+
+  // Gestión alterna del mismo año (si actual es 1/AAAA => 2/AAAA, y viceversa)
+  get gestionAlternaActual(): string {
+    const [periodo, anio] = this.gestionActual.split('/');
+    const alt = periodo === '1' ? '2' : '1';
+    return `${alt}/${anio}`;
+  }
+
+  onGestionFiltroChange(_: any) {
+    if (this.showRegistrados) this.loadTutores();
+  }
+
+  onCarreraFiltroChange(_: any) {
+    if (this.showRegistrados) this.loadTutores();
+  }
+
+  // Cambiar carrera dentro del modal y recargar pertinencias
+  onModalCarreraChange(code: string | null) {
+    // Limpiar selección de pertinencia para evitar inconsistencia
+    if (this.editingDocente) this.editingDocente.pertinencia_acad_id = null;
+    let carreraStr: 'mecanica' | 'electricidad' | undefined = undefined;
+    if (code === 'MEA') carreraStr = 'mecanica';
+    if (code === 'EEA') carreraStr = 'electricidad';
+    if (!carreraStr) {
+      this.pertinencias = [];
+      return;
+    }
+    this.sga.getPertinencias(carreraStr).subscribe({
+      next: (resp) => {
+        if (resp?.success) this.pertinencias = resp.data || []; else this.pertinencias = [];
+      },
+      error: () => { this.pertinencias = []; }
+    });
   }
 }

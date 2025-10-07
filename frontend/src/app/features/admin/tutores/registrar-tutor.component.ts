@@ -6,9 +6,10 @@ import { HeaderComponent } from '../../../shared/components/header/header.compon
 @Component({
   selector: 'app-registrar-tutor',
   standalone: true,
-  imports: [CommonModule, FormsModule, HeaderComponent],
-  templateUrl: './registrar-tutor.component.html',
-  styleUrls: ['./registrar-tutor.component.scss']
+  // Componente DEPRECADO: el registro ahora se realiza desde el modal en TutoresHomeComponent
+  // Dejamos plantilla inline vacía para evitar NG2008 por falta de archivo HTML
+  template: '<!-- Componente deprecated: usar modal en Tutores -->',
+  styles: []
 })
 export class RegistrarTutorComponent {
   // Placeholder de modelo

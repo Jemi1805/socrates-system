@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\GradosTraspController;
 use App\Http\Controllers\Api\CarreraController;
 use App\Http\Controllers\Api\PensumController;
 use App\Http\Controllers\Api\DocenteController;
+use App\Http\Controllers\Api\TutorController;
 
 // 🔐 RUTAS DE AUTENTICACIÓN (Sin middleware)
 Route::prefix('auth')->group(function () {
@@ -113,17 +114,21 @@ Route::middleware('auth:sanctum')->group(function () {
     // Catálogos base
     Route::apiResource('carrera', CarreraController::class);
     Route::apiResource('pensum', PensumController::class);
-    // Docentes: Upsert por CI
+    // Docentes: upsert por CI
     Route::post('docentes/upsert_by_ci', [DocenteController::class, 'upsertByCi']);
-    // Docentes locales: listado
-    Route::get('docentes', [DocenteController::class, 'index']);
-});
+        // Docentes locales: listado
+        Route::get('docentes', [DocenteController::class, 'index']);
+
+        // Tutores: registro masivo desde docentes seleccionados
+        Route::post('tutores/register_bulk', [TutorController::class, 'registerBulk']);
+        // Tutores: listado
+        Route::get('tutores', [TutorController::class, 'index']);
+    });
 
 // 📦 RUTAS DE PRODUCTOS (Mantener existentes)
 Route::get('/productos', [ProductosController::class, 'index']);
 Route::post('/productos', [ProductosController::class, 'store']);
 Route::get('/productos/{id}', [ProductosController::class, 'show']);
-Route::put('/productos/{id}', [ProductosController::class, 'update']);
 Route::delete('/productos/{id}', [ProductosController::class, 'destroy']);
 
 // 👨‍🎓 RUTAS PARA POSTULANTES (Mantener existentes)

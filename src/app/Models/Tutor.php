@@ -14,6 +14,17 @@ class Tutor extends Model
     protected $fillable = [
         'docente_id',
         'activo',
+        // Snapshot de datos del docente al momento de registro
+        'nombre',
+        'apellido_p',
+        'apellido_m',
+        'celular',
+        'cod_carrera',
+        'ci',
+        'pertinencia_acad_id',
+        'pertinencia_nom',
+        // Gestión de registro ("1/YYYY" o "2/YYYY")
+        'gestion_registro',
     ];
 
     public function docente()

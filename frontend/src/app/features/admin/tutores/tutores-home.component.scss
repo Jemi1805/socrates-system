@@ -36,6 +36,28 @@ $transition: all 0.3s ease;
     }
   }
 
+  // Barra de filtros (panel Tutores registrados)
+  .filters-bar {
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(76, 157, 189, 0.25);
+    border-radius: 10px;
+    padding: 6px 10px;
+  }
+  .filters-bar .vr {
+    width: 1px;
+    min-height: 18px;
+    background-color: rgba(5, 37, 68, 0.15);
+  }
+  .filters-bar .gestion-group .form-select {
+    min-width: 110px;
+  }
+  .filters-bar .badge {
+    font-weight: 600;
+    border-color: rgba(76, 157, 189, 0.35) !important;
+  }
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+
 .card-title {
   color: #052544;
   margin: 0 0 20px 0;
@@ -97,6 +119,18 @@ $transition: all 0.3s ease;
 }
 
 .btn-outline-secondary {
+  .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+    color: $primary-color !important;
+  }
+
+  &:hover {
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+      color: white !important;
+    }
+  }  
+}
+
+.filters-bar{
   .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
     color: $primary-color !important;
   }

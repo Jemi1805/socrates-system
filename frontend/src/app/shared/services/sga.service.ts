@@ -63,6 +63,33 @@ export interface Pertinencia {
   cod_carrera?: string;
 }
 
+export interface TutorBulkItem {
+  ci: string;
+  nombre: string;
+  apellido_p?: string;
+  apellido_m?: string;
+  celular: string;
+  profesion?: string;
+  cod_carrera?: string; // MEA/EEA
+  pertinencia_acad_id?: number | null;
+  pertinencia?: string; // nombre de pertinencia si viene del SGA
+}
+
+export interface TutorReg {
+  id: number;
+  nombre: string;
+  apellido_p?: string;
+  apellido_m?: string;
+  ci: string;
+  celular?: string;
+  cod_carrera?: string;
+  carrera?: string;
+  pertinencia?: string;
+  pertinencia_acad_id?: number | null;
+  gestion_registro?: string; // 1/YYYY o 2/YYYY
+  activo?: boolean;
+}
+
 export interface ArancelEst {
   id: number;
   cod_ceta_est: number;
@@ -240,6 +267,22 @@ export class SgaService {
   saveDocenteByCi(data: Partial<Docente> & { ci: string; cod_carrera?: string | null }): Observable<ApiResponse<Docente>> {
     const url = `${environment.apiUrl}/docentes/upsert_by_ci`;
     return this.http.post<ApiResponse<Docente>>(url, data)
+      .pipe(catchError(this.handleError));
+  }
+
+  // --- TUTORES: registro masivo ---
+  registerTutoresBulk(items: TutorBulkItem[]): Observable<ApiResponse<any>> {
+    const url = `${environment.apiUrl}/tutores/register_bulk`;
+    return this.http.post<ApiResponse<any>>(url, { items })
+      .pipe(catchError(this.handleError));
+  }
+
+  // --- TUTORES: listado ---
+  getTutores(params?: { carrera?: string; gestion?: string }): Observable<ApiResponse<TutorReg[]>> {
+    let httpParams = new HttpParams();
+    if (params?.carrera) httpParams = httpParams.set('carrera', params.carrera);
+    if (params?.gestion) httpParams = httpParams.set('gestion', params.gestion);
+    return this.http.get<ApiResponse<TutorReg[]>>(`${environment.apiUrl}/tutores`, { params: httpParams })
       .pipe(catchError(this.handleError));
   }
 
