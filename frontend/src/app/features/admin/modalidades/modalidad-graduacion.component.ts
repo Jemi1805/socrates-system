@@ -618,6 +618,25 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.router.navigate(['/registro-tema'], { queryParams: { cod_ceta: cod, ver: 'resumen' } });
   }
 
+  // Navegar a Designar Tutor con contexto del estudiante y proyecto actual
+  irADesignarTutor() {
+    if (!this.estudiante) return;
+    const modalidad = this.inscripcionActual
+      ? { id: this.inscripcionActual.modalidad_id, nombre: this.inscripcionActual.nombre, descripcion: '', monto_arancel: '' }
+      : null;
+    const datosPostulacion = { estudiante: this.estudiante, modalidad };
+    try {
+      sessionStorage.setItem('datos_postulacion', JSON.stringify(datosPostulacion));
+      if (this.proyectoActual) {
+        sessionStorage.setItem('proyecto_cache', JSON.stringify(this.proyectoActual));
+      }
+    } catch {}
+    const cod = (this.estudiante as any)?.cod_ceta || (this.estudiante as any)?.codCeta || (this.estudiante as any)?.codigo_ceta;
+    const carreraKey = this.normalizeCarreraKey(((this.estudiante as any)?.carrera || (this.estudiante as any)?.carrera_nombre) ?? this.carreraSeleccionada) || this.carreraSeleccionada as any;
+    this.cerrarModal();
+    this.router.navigate(['/tutores/designar'], { queryParams: { cod_ceta: cod, carrera: carreraKey } });
+  }
+
   // --- Helpers de validación/sanitización ---
   onCodigoCetaInput(ev: Event) {
     const input = ev.target as HTMLInputElement;

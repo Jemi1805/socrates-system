@@ -443,6 +443,16 @@
               Registrar tema
             </button>
 
+            <!-- Si hay inscripción activa y tema registrado, mostrar CTA Designar tutor -->
+            <button
+              *ngIf="inscripcionActual && proyectoActual"
+              type="button"
+              class="btn btn-sm btn-success"
+              (click)="irADesignarTutor()">
+              <i class="bi bi-person-check me-2"></i>
+              Designar tutor
+            </button>
+
             <!-- Si no hay inscripción previa, flujo normal de selección -->
             <button
               *ngIf="!inscripcionActual"

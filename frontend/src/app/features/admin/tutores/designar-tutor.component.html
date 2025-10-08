@@ -8,74 +8,99 @@
   </app-header>
 
   <div class="content-wrapper">
-    <!-- Tarjeta de búsqueda (alineada al estilo de Modalidades) -->
+    <!-- Resumen de estudiante y tema -->
     <div class="modalidad-card mb-3">
       <div class="card-body">
         <h5 class="card-title d-flex align-items-center gap-2">
-          <i class="bi bi-search"></i>
-          Búsqueda de Estudiantes
+          <i class="bi bi-person-vcard"></i>
+          Estudiante y Tema
         </h5>
-
-        <ul class="nav nav-pills mb-3">
-          <li class="nav-item">
-            <button class="nav-link" [class.active]="criterio==='ceta'" (click)="criterio='ceta'">
-              <i class="bi bi-credit-card-2-front me-1"></i> Por Código CETA
-            </button>
-          </li>
-          <li class="nav-item">
-            <button class="nav-link" [class.active]="criterio==='nombre'" (click)="criterio='nombre'">
-              <i class="bi bi-person-lines-fill me-1"></i> Por Nombre
-            </button>
-          </li>
-        </ul>
-
-        <div *ngIf="criterio==='ceta'">
-          <div class="row g-2 align-items-end">
-            <div class="col-md-4">
-              <label class="form-label">Código CETA</label>
-              <input class="form-control" [(ngModel)]="codigoCeta" maxlength="9" />
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="d-flex align-items-start gap-3 border rounded p-2 bg-light">
+              <div class="student-avatar me-1"><i class="bi bi-person-circle fs-2"></i></div>
+              <div>
+                <div class="fw-semibold mb-1">{{ (estudiante?.ap_pat || '') + ' ' + (estudiante?.ap_mat || '') + ' ' + (estudiante?.nombres || '') }}</div>
+                <div class="text-muted small" *ngIf="codCeta"><i class="bi bi-person-badge me-1"></i> CETA: {{ codCeta }}</div>
+                <div class="text-muted small" *ngIf="estudiante?.carrera"><i class="bi bi-building me-1"></i> {{ estudiante?.carrera }}</div>
+                <div class="text-muted small" *ngIf="estudiante?.pensum"><i class="bi bi-list-check me-1"></i> Pensum: {{ estudiante?.pensum }}</div>
+              </div>
             </div>
-            <div class="col-auto">
-              <button class="btn btn-sm btn-primary" (click)="buscar()">
-                <i class="bi bi-search me-1"></i> Buscar
-              </button>
+          </div>
+          <div class="col-md-6">
+            <div class="border rounded p-2 bg-light">
+              <div class="fw-semibold mb-1"><i class="bi bi-journal-text me-1"></i> Tema registrado</div>
+              <div class="small"><span class="text-muted">Nombre:</span> {{ proyecto?.nombre || proyecto?.tema || '-' }}</div>
+              <div class="small" *ngIf="proyecto?.tipo"><span class="text-muted">Modalidad:</span> {{ proyecto?.tipo }}</div>
+              <div class="small" *ngIf="proyecto?.estado"><span class="text-muted">Estado:</span> {{ proyecto?.estado }}</div>
             </div>
           </div>
         </div>
-
-        <div *ngIf="criterio==='nombre'">
-          <div class="row g-2 align-items-end">
-            <div class="col-md-4">
-              <label class="form-label">Nombres</label>
-              <input class="form-control" [(ngModel)]="nombres" />
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Apellido Paterno</label>
-              <input class="form-control" [(ngModel)]="ap_pat" />
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Apellido Materno</label>
-              <input class="form-control" [(ngModel)]="ap_mat" />
-            </div>
-            <div class="col-auto">
-              <button class="btn btn-sm btn-primary" (click)="buscar()">
-                <i class="bi bi-search me-1"></i> Buscar
-              </button>
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
 
-    <!-- Tarjeta de resultados (placeholder) -->
+    <!-- Filtro por Áreas (Pertinencias) -->
+    <div class="modalidad-card mb-3">
+      <div class="card-body">
+        <h5 class="card-title d-flex align-items-center gap-2">
+          <i class="bi bi-diagram-3"></i>
+          Filtrar por Áreas
+        </h5>
+        <div class="row g-2 align-items-center">
+          <div class="col-12">
+            <div class="d-flex flex-wrap gap-3">
+              <label class="form-check" *ngFor="let a of areas">
+                <input class="form-check-input me-1" type="checkbox" [checked]="selectedAreaIds.includes(a.id)" (change)="onToggleArea($event, a.id)" />
+                <span class="form-check-label">{{ a.nombre_pert }}</span>
+              </label>
+            </div>
+          </div>
+          <div class="col-12 d-flex justify-content-end">
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearAreas()"><i class="bi bi-x-circle me-1"></i> Limpiar selección</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tutores filtrados -->
     <div class="student-table-card">
       <div class="card-body">
         <h5 class="card-title d-flex align-items-center gap-2">
           <i class="bi bi-people"></i>
-          Estudiantes encontrados
+          Tutores registrados
         </h5>
-        <div class="alert alert-info mb-0">Pendiente de conectar a la API. Aquí se listarán los estudiantes y un botón "Designar" para elegir tutor.</div>
+        <div *ngIf="loadingTutores" class="text-muted small"><i class="bi bi-arrow-repeat spin me-1"></i> Cargando tutores...</div>
+        <div class="table-responsive" *ngIf="!loadingTutores && filteredTutores.length">
+          <table class="table table-sm table-striped align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th>Nombres</th>
+                <th>Ap. Paterno</th>
+                <th>Ap. Materno</th>
+                <th>CI</th>
+                <th>Celular</th>
+                <th>Carrera</th>
+                <th>Áreas</th>
+                <th class="text-end">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let t of filteredTutores">
+                <td>{{ t.nombre }}</td>
+                <td>{{ t.apellido_p || '-' }}</td>
+                <td>{{ t.apellido_m || '-' }}</td>
+                <td>{{ t.ci }}</td>
+                <td>{{ t.celular || '-' }}</td>
+                <td>{{ t.cod_carrera }}</td>
+                <td>{{ areasText(t) }}</td>
+                <td class="text-end">
+                  <button class="btn btn-sm btn-success" (click)="designarTutor(t)"><i class="bi bi-check2-circle me-1"></i> Designar</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div *ngIf="!loadingTutores && !filteredTutores.length" class="text-muted small">Sin tutores que coincidan con el filtro.</div>
       </div>
     </div>
 
