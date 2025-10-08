@@ -70,6 +70,12 @@ $transition: all 0.3s ease;
   }
 }
 
+.input-group {
+  .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+    color: $primary-color !important;
+  }
+}
+
 // Alertas informativas al estilo Modalidad de Graduación
 .alert.alert-info {
   background: rgba(23, 162, 184, 0.1);
@@ -118,20 +124,90 @@ $transition: all 0.3s ease;
   box-shadow: $shadow;
 }
 
+// Botón outline secundario (iconos mantienen color)
 .btn-outline-secondary {
   .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
     color: $primary-color !important;
   }
-
   &:hover {
     .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
       color: white !important;
     }
-  }  
-}
-
-.filters-bar{
-  .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
-    color: $primary-color !important;
   }
 }
+
+// Multiselect (chips + dropdown)
+.ms-control {
+  position: relative;
+  background: #fff;
+  border: 1px solid rgba(5, 37, 68, 0.15);
+  border-radius: 8px;
+  padding: 6px 36px 6px 8px;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  overflow: visible; // permitir que el dropdown se desborde del contenedor
+}
+.ms-control.open {
+  border-color: $primary-color;
+  box-shadow: 0 0 0 3px rgba(76, 157, 189, 0.2);
+}
+.ms-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; flex: 1; }
+.ms-chip {
+  background: color.scale($primary-color, $lightness: 35%);
+  color: #052544;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ms-input {
+  border: none;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.25rem;
+  height: 1.75rem;
+  padding: 0;
+  flex: 1 1 auto; // ocupar todo el espacio disponible
+  min-width: 0;   // permitir que crezca más allá del mínimo
+  width: 100%;
+}
+.ms-chips.has-chips .ms-input { flex: 1 1 auto; min-width: 0; }
+.ms-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: $primary-color !important;
+  color: #fff !important;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+  transition: $transition;
+}
+.ms-clear:hover { filter: brightness(0.95); }
+.ms-clear .bi { font-size: 1rem; line-height: 1; }
+.ms-dropdown {
+  position: absolute;
+  left: 0; right: 0; top: calc(100% + 4px);
+  background: #fff;
+  border: 1px solid rgba(5, 37, 68, 0.15);
+  border-radius: 8px;
+  max-height: 220px;
+  overflow: auto;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+  z-index: 1060; // por encima de elementos del modal
+}
+.ms-option { padding: 8px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+.ms-option:hover { background: #f6fbfe; }
+.ms-option.selected { background: #e8f4f9; }
+.ms-empty, .ms-hint { padding: 8px 12px; color: #777; font-size: 12px; }

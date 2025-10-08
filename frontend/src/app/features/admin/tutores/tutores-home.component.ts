@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ElementRef, ViewChild, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -33,6 +33,13 @@ export class TutoresHomeComponent implements OnInit {
   showFieldErrors: boolean = false;        // activa estilos is-invalid
   // Pertinencias académicas filtradas por carrera
   pertinencias: Pertinencia[] = [];
+  // Selección múltiple de pertinencias en el modal
+  selectedPertIds: number[] = [];
+  // UI del multiselect con chips
+  pertDropdownOpen = false;
+  pertSearch = '';
+  pertMax: number | null = null; // sin límite de selección
+  @ViewChild('msRoot') msRoot?: ElementRef;
   // Guardado
   savingDocente: boolean = false;
   successModalVisible: boolean = false;
@@ -61,10 +68,165 @@ export class TutoresHomeComponent implements OnInit {
     this.loadPertinencias();
   }
 
+  // -------- Multiselect Pertinencias (UI) --------
+  togglePertDropdown() {
+    this.pertDropdownOpen = !this.pertDropdownOpen;
+  }
+
+  openPertDropdown() {
+    this.pertDropdownOpen = true;
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocClick(ev: MouseEvent) {
+    if (!this.pertDropdownOpen) return;
+    if (this.msRoot && !this.msRoot.nativeElement.contains(ev.target)) {
+      this.pertDropdownOpen = false;
+    }
+  }
+
+  get filteredPertinencias(): Pertinencia[] {
+    const term = (this.pertSearch || '').toLowerCase().trim();
+    const list = this.pertinencias || [];
+    if (!term) return list;
+    return list.filter(p => (p.nombre_pert || '').toLowerCase().includes(term));
+  }
+
+  // ===== Validaciones y sanitización: nombres/apellidos y celular =====
+  private sanitizeNameChars(v: string): string {
+    if (!v) return '';
+    // Permitir letras (incluye acentos/ñ/ü), espacios, guiones y apóstrofes
+    return v.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ'\-\s]/g, '');
+  }
+
+  private toTitleCase(v: string): string {
+    const s = (v || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    // Mayúscula al inicio y después de espacio o guion
+    return s.replace(/(^|[\s-])([a-záéíóúüñ])/g, (m, p1, p2) => p1 + p2.toUpperCase());
+  }
+
+  onNameInput(field: 'nombre' | 'apellido_p' | 'apellido_m', ev: Event) {
+    if (!this.editingDocente) return;
+    const el = ev.target as HTMLInputElement;
+    let val = this.sanitizeNameChars(el.value || '');
+    val = val.replace(/\s+/g, ' ');
+    // eliminar espacios iniciales
+    if (val.startsWith(' ')) val = val.replace(/^\s+/, '');
+    // Mayúscula inmediata del primer carácter (resto se mantiene como esté)
+    if (val.length > 0) {
+      const pos = el.selectionStart ?? val.length;
+      const first = val.charAt(0);
+      const upperFirst = first.toLocaleUpperCase();
+      if (first !== upperFirst) {
+        val = upperFirst + val.slice(1);
+        // restaurar caret lo mejor posible
+        setTimeout(() => { try { el.setSelectionRange(pos, pos); } catch {} }, 0);
+      }
+    }
+    // reflejar inmediatamente en el input
+    if (el.value !== val) el.value = val;
+    this.editingDocente[field] = val as any;
+  }
+
+  onNameBlur(field: 'nombre' | 'apellido_p' | 'apellido_m') {
+    if (!this.editingDocente) return;
+    const current = (this.editingDocente[field] || '').toString();
+    this.editingDocente[field] = this.toTitleCase(current) as any;
+  }
+
+  isValidNombre(v: any, required: boolean = true): boolean {
+    const s = (v == null ? '' : String(v)).trim();
+    if (required && !s) return false;
+    if (!s) return true;
+    if (/[0-9]/.test(s)) return false; // no números
+    // Debe iniciar con mayúscula
+    return /^[A-ZÁÉÍÓÚÜÑ]/.test(s);
+  }
+
+  onCelularInput(ev: Event) {
+    if (!this.editingDocente) return;
+    const el = ev.target as HTMLInputElement;
+    const digits = (el.value || '').replace(/\D/g, '').slice(0, 8);
+    if (el.value !== digits) el.value = digits;
+    this.editingDocente.celular = digits as any;
+  }
+
+  // Bloquear teclas no permitidas (experiencia inmediata)
+  onlyLettersKeypress(e: KeyboardEvent) {
+    const k = e.key;
+    if (k.length > 1) return; // teclas de control (Backspace, Tab, flechas) permitidas
+    if (!/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ'\-\s]/.test(k)) e.preventDefault();
+  }
+
+  onlyDigitsKeypress(e: KeyboardEvent) {
+    const k = e.key;
+    if (k.length > 1) return; // control keys
+    if (!/[0-9]/.test(k)) e.preventDefault();
+  }
+
+  onNamePaste(field: 'nombre' | 'apellido_p' | 'apellido_m', ev: ClipboardEvent) {
+    if (!this.editingDocente) return;
+    const el = ev.target as HTMLInputElement;
+    const text = (ev.clipboardData?.getData('text') || '');
+    const clean = this.sanitizeNameChars(text).replace(/\s+/g, ' ');
+    ev.preventDefault();
+    el.value = clean;
+    this.editingDocente[field] = clean as any;
+  }
+
+  onCelularPaste(ev: ClipboardEvent) {
+    if (!this.editingDocente) return;
+    const el = ev.target as HTMLInputElement;
+    const text = (ev.clipboardData?.getData('text') || '');
+    const digits = text.replace(/\D/g, '').slice(0, 8);
+    ev.preventDefault();
+    el.value = digits;
+    this.editingDocente.celular = digits as any;
+  }
+
+  isValidCelular(v: any): boolean {
+    const s = (v == null ? '' : String(v)).trim();
+    return /^\d{8}$/.test(s);
+  }
+
+  isPertSelected(id: number): boolean {
+    return this.selectedPertIds.includes(id);
+  }
+
+  selectPert(p: Pertinencia) {
+    const id = p.id;
+    if (this.isPertSelected(id)) {
+      this.selectedPertIds = this.selectedPertIds.filter(x => x !== id);
+      return;
+    }
+    if (this.pertMax != null && this.selectedPertIds.length >= this.pertMax) {
+      // opcional: mostrar un mini error local (no bloqueante)
+      return;
+    }
+    this.selectedPertIds = [...this.selectedPertIds, id];
+  }
+
+  removePert(id: number) {
+    this.selectedPertIds = this.selectedPertIds.filter(x => x !== id);
+  }
+
+  clearPert() {
+    this.selectedPertIds = [];
+  }
+
+  get pertPlaceholder(): string {
+    return this.pertMax ? `Seleccione hasta ${this.pertMax} pertinencias` : 'Seleccione una o más pertinencias';
+  }
+
   // Registrar y activar directamente como Tutor (usa register_bulk con un item)
   registrarYActivarTutor() {
     if (!this.editingDocente) return;
     this.editingSaveError = null;
+    // Normalizar entradas antes de validar
+    this.editingDocente.nombre = this.toTitleCase(this.sanitizeNameChars(((this.editingDocente.nombre || '') as string).replace(/\s+/g, ' ').trim())) as any;
+    this.editingDocente.apellido_p = this.toTitleCase(this.sanitizeNameChars(((this.editingDocente.apellido_p || '') as string).replace(/\s+/g, ' ').trim())) as any;
+    this.editingDocente.apellido_m = this.toTitleCase(this.sanitizeNameChars(((this.editingDocente.apellido_m || '') as string).replace(/\s+/g, ' ').trim())) as any;
+    this.editingDocente.celular = ((this.editingDocente.celular || '') as string).replace(/\D/g, '').slice(0, 8) as any;
     this.showFieldErrors = true; // activar estilos de error
     // Validaciones requeridas
     const missing = this.getMissingRequiredFields();
@@ -76,6 +238,11 @@ export class TutoresHomeComponent implements OnInit {
     const nombre = (this.editingDocente.nombre || '').toString().trim();
     const celular = (this.editingDocente.celular || '').toString().trim();
     const codCarr = (this.modalCarreraCode === 'MEA' || this.modalCarreraCode === 'EEA') ? this.modalCarreraCode : undefined;
+    const primaryPertId = this.selectedPertIds?.[0] ?? null;
+    const pertNom = (this.pertinencias || [])
+      .filter(p => this.selectedPertIds.includes(p.id))
+      .map(p => p.nombre_pert)
+      .join(', ');
     const item = {
       ci,
       nombre,
@@ -84,8 +251,8 @@ export class TutoresHomeComponent implements OnInit {
       celular,
       profesion: this.editingDocente.profesion || undefined,
       cod_carrera: codCarr,
-      pertinencia_acad_id: this.editingDocente.pertinencia_acad_id ?? null,
-      pertinencia: this.editingDocente.pertinencia || undefined,
+      pertinencia_acad_id: primaryPertId,
+      pertinencia: pertNom || undefined,
     } as any;
     this.savingDocente = true;
     this.sga.registerTutoresBulk([item]).subscribe({
@@ -120,6 +287,11 @@ export class TutoresHomeComponent implements OnInit {
         const prevCi = (this.editingCiOriginal || '').toString().trim();
         const exists = !!resp?.data?.some(t => (t as any).ci === doc.ci || (!!prevCi && (t as any).ci === prevCi));
         if (!exists) return;
+        const pertNom = (this.pertinencias || [])
+          .filter(p => this.selectedPertIds.includes(p.id))
+          .map(p => p.nombre_pert)
+          .join(', ');
+        const primaryPertId = this.selectedPertIds?.[0] ?? (doc as any).pertinencia_acad_id ?? null;
         const item: any = {
           ci: (doc.ci || '').toString().trim(),
           nombre: doc.nombre || '',
@@ -128,7 +300,8 @@ export class TutoresHomeComponent implements OnInit {
           celular: doc.celular || '',
           profesion: doc.profesion || '',
           cod_carrera: (this.modalCarreraCode === 'MEA' || this.modalCarreraCode === 'EEA') ? this.modalCarreraCode : undefined,
-          pertinencia_acad_id: (doc as any).pertinencia_acad_id ?? null,
+          pertinencia_acad_id: primaryPertId,
+          pertinencia: pertNom || undefined,
         };
         this.sga.registerTutoresBulk([item], { updateOnly: true }).subscribe({ next: () => {}, error: () => {} });
       },
@@ -145,14 +318,20 @@ export class TutoresHomeComponent implements OnInit {
     const ci = (this.editingDocente?.ci || '').toString().trim();
     const celular = (this.editingDocente?.celular || '').toString().trim();
     const titulo = (this.editingDocente?.profesion || '').toString().trim();
-    const pertId = this.editingDocente?.pertinencia_acad_id;
+    const hasAnyPert = (this.selectedPertIds?.length || 0) > 0;
     if (!(cod === 'MEA' || cod === 'EEA')) miss.push('Carrera');
     if (!nombre) miss.push('Nombres');
     if (!apPat) miss.push('Apellido paterno');
     if (!ci) miss.push('CI');
     if (!celular) miss.push('Celular');
     if (!titulo) miss.push('Título(s)');
-    if (pertId == null) miss.push('Pertinencia académica');
+    if (!hasAnyPert) miss.push('Pertinencia académica');
+    // Validaciones de formato
+    if (!this.isValidNombre(nombre, true)) miss.push('Nombres (formato)');
+    if (!this.isValidNombre(apPat, true)) miss.push('Apellido paterno (formato)');
+    const apMat = (this.editingDocente?.apellido_m || '').toString().trim();
+    if (apMat && !this.isValidNombre(apMat, false)) miss.push('Apellido materno (formato)');
+    if (!this.isValidCelular(celular)) miss.push('Celular (8 dígitos)');
     return miss;
   }
 
@@ -381,6 +560,11 @@ export class TutoresHomeComponent implements OnInit {
     this.modalGestion = this.gestionActual;
     // cargar pertinencias para la carrera del modal
     this.onModalCarreraChange(this.modalCarreraCode);
+    // Inicializar multi-selección con la pertinencia actual (si existe)
+    const initPert = (doc as any).pertinencia_acad_id;
+    this.selectedPertIds = (initPert != null) ? [Number(initPert)] : [];
+    this.pertSearch = '';
+    this.pertDropdownOpen = true;
     this.modalEditarDocenteVisible = true;
   }
 
@@ -400,6 +584,9 @@ export class TutoresHomeComponent implements OnInit {
     const codSel = this.carreraSeleccionadaCodigo;
     this.modalCarreraCode = (codSel === 'MEA' || codSel === 'EEA') ? codSel : 'MEA';
     this.modalGestion = this.gestionActual;
+    this.selectedPertIds = [];
+    this.pertSearch = '';
+    this.pertDropdownOpen = true;
     this.modalEditarDocenteVisible = true;
   }
 
@@ -419,13 +606,16 @@ export class TutoresHomeComponent implements OnInit {
     if (!this.editingDocente) return;
     this.editingSaveError = null;
     this.savingDocente = true;
+    // Normalizar entradas también en edición
+    this.editingDocente.nombre = this.toTitleCase(this.sanitizeNameChars(((this.editingDocente.nombre || '') as string).replace(/\s+/g, ' ').trim())) as any;
+    this.editingDocente.apellido_p = this.toTitleCase(this.sanitizeNameChars(((this.editingDocente.apellido_p || '') as string).replace(/\s+/g, ' ').trim())) as any;
+    this.editingDocente.apellido_m = this.toTitleCase(this.sanitizeNameChars(((this.editingDocente.apellido_m || '') as string).replace(/\s+/g, ' ').trim())) as any;
+    this.editingDocente.celular = ((this.editingDocente.celular || '') as string).replace(/\D/g, '').slice(0, 8) as any;
     const ciKey = (this.editingDocente.ci || '').toString().trim();
-    // Determinar nombre de pertinencia desde el id seleccionado
-    let pertNombre = this.editingDocente.pertinencia || '';
-    if (this.editingDocente.pertinencia_acad_id != null) {
-      const p = this.pertinencias.find(x => x.id === this.editingDocente!.pertinencia_acad_id);
-      if (p) pertNombre = p.nombre_pert;
-    }
+    // Determinar nombre(s) de pertinencia desde los ids seleccionados (multi)
+    const selectedP = (this.pertinencias || []).filter(p => this.selectedPertIds.includes(p.id));
+    const pertNombre = selectedP.map(p => p.nombre_pert).join(', ');
+    const primaryPertId = this.selectedPertIds?.[0] ?? null;
     const codCarr = (this.modalCarreraCode === 'MEA' || this.modalCarreraCode === 'EEA')
       ? this.modalCarreraCode
       : ((this.carreraSeleccionada && this.carreraSeleccionadaCodigo !== '—') ? this.carreraSeleccionadaCodigo : null);
@@ -437,7 +627,7 @@ export class TutoresHomeComponent implements OnInit {
       apellido_m: this.editingDocente.apellido_m || '',
       profesion: this.editingDocente.profesion || '',
       celular: this.editingDocente.celular || '',
-      pertinencia_acad_id: this.editingDocente.pertinencia_acad_id ?? null,
+      pertinencia_acad_id: primaryPertId,
       cod_carrera: codCarr,
       ci_original: this.isCreateMode ? null : (this.editingCiOriginal || null),
       activo: true,
@@ -456,7 +646,7 @@ export class TutoresHomeComponent implements OnInit {
             profesion: saved.profesion || this.editingDocente!.profesion || '',
             celular: saved.celular || this.editingDocente!.celular || '',
             pertinencia: (saved.pertinenciaAcad?.nombre_pert) || pertNombre,
-            pertinencia_acad_id: saved.pertinencia_acad_id ?? this.editingDocente!.pertinencia_acad_id ?? null,
+            pertinencia_acad_id: saved.pertinencia_acad_id ?? primaryPertId,
           } as Docente;
           // localizar por CI previo y actualizar en lista
           const prevKey = (this.editingCiOriginal || ciKey) as string;
@@ -640,6 +830,7 @@ export class TutoresHomeComponent implements OnInit {
   onModalCarreraChange(code: string | null) {
     // Limpiar selección de pertinencia para evitar inconsistencia
     if (this.editingDocente) this.editingDocente.pertinencia_acad_id = null;
+    this.selectedPertIds = [];
     let carreraStr: 'mecanica' | 'electricidad' | undefined = undefined;
     if (code === 'MEA') carreraStr = 'mecanica';
     if (code === 'EEA') carreraStr = 'electricidad';
@@ -650,6 +841,8 @@ export class TutoresHomeComponent implements OnInit {
     this.sga.getPertinencias(carreraStr).subscribe({
       next: (resp) => {
         if (resp?.success) this.pertinencias = resp.data || []; else this.pertinencias = [];
+        // abrir el dropdown al cargar opciones
+        this.pertDropdownOpen = true;
       },
       error: () => { this.pertinencias = []; }
     });

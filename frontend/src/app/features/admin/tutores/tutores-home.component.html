@@ -68,18 +68,29 @@
             <div class="col-md-6">
               <label class="form-label">Nombres <span class="text-danger">*</span></label>
               <input type="text" class="form-control" [(ngModel)]="editingDocente!.nombre" [required]="true"
-                     [ngClass]="{'is-invalid': showFieldErrors && !((editingDocente?.nombre ?? '').trim())}" />
-              <div class="invalid-feedback">Ingrese nombres</div>
+                     (keypress)="onlyLettersKeypress($event)"
+                     (paste)="onNamePaste('nombre', $event)"
+                     (input)="onNameInput('nombre', $event)" (blur)="onNameBlur('nombre')"
+                     [ngClass]="{'is-invalid': showFieldErrors && !isValidNombre(editingDocente?.nombre, true)}" />
+              <div class="invalid-feedback">Ingrese nombres (inician en mayúscula y sin números)</div>
             </div>
             <div class="col-md-6">
               <label class="form-label">Apellido Paterno <span class="text-danger">*</span></label>
               <input type="text" class="form-control" [(ngModel)]="editingDocente!.apellido_p" [required]="true"
-                     [ngClass]="{'is-invalid': showFieldErrors && !((editingDocente?.apellido_p ?? '').trim())}" />
-              <div class="invalid-feedback">Ingrese apellido paterno</div>
+                     (keypress)="onlyLettersKeypress($event)"
+                     (paste)="onNamePaste('apellido_p', $event)"
+                     (input)="onNameInput('apellido_p', $event)" (blur)="onNameBlur('apellido_p')"
+                     [ngClass]="{'is-invalid': showFieldErrors && !isValidNombre(editingDocente?.apellido_p, true)}" />
+              <div class="invalid-feedback">Ingrese apellido paterno (inicia en mayúscula y sin números)</div>
             </div>
             <div class="col-md-6">
               <label class="form-label">Apellido Materno</label>
-              <input type="text" class="form-control" [(ngModel)]="editingDocente!.apellido_m" />
+              <input type="text" class="form-control" [(ngModel)]="editingDocente!.apellido_m"
+                     (keypress)="onlyLettersKeypress($event)"
+                     (paste)="onNamePaste('apellido_m', $event)"
+                     (input)="onNameInput('apellido_m', $event)" (blur)="onNameBlur('apellido_m')"
+                     [ngClass]="{'is-invalid': showFieldErrors && !isValidNombre(editingDocente?.apellido_m, false)}" />
+              <div class="invalid-feedback">Formato inválido (inicia en mayúscula y sin números)</div>
             </div>
             <div class="col-md-6">
               <label class="form-label">CI <span class="text-danger">*</span></label>
@@ -90,8 +101,12 @@
             <div class="col-md-6">
               <label class="form-label">Celular <span class="text-danger">*</span></label>
               <input type="text" class="form-control" [(ngModel)]="editingDocente!.celular" [required]="true"
-                     [ngClass]="{'is-invalid': showFieldErrors && !(('' + (editingDocente?.celular ?? '')).trim())}" />
-              <div class="invalid-feedback">Ingrese celular</div>
+                     inputmode="numeric" maxlength="8" pattern="[0-9]{8}"
+                     (keypress)="onlyDigitsKeypress($event)"
+                     (paste)="onCelularPaste($event)"
+                     (input)="onCelularInput($event)"
+                     [ngClass]="{'is-invalid': showFieldErrors && !isValidCelular(editingDocente?.celular)}" />
+              <div class="invalid-feedback">Ingrese 8 dígitos</div>
             </div>
             <div class="col-md-6">
               <label class="form-label">Título(s) <span class="text-danger">*</span></label>
@@ -100,13 +115,30 @@
               <div class="invalid-feedback">Ingrese título o profesión</div>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Pertinencia Académica <span class="text-danger">*</span></label>
-              <select class="form-select" [(ngModel)]="editingDocente!.pertinencia_acad_id" [required]="true"
-                      [ngClass]="{'is-invalid': showFieldErrors && (editingDocente?.pertinencia_acad_id == null)}">
-                <option [ngValue]="null" [selected]="editingDocente?.pertinencia_acad_id == null" disabled>Seleccione pertinencia</option>
-                <option *ngFor="let p of pertinencias" [ngValue]="p.id">{{ p.nombre_pert }}</option>
-              </select>
-              <div class="invalid-feedback">Seleccione una pertinencia</div>
+              <label class="form-label">Pertinencia Académica(s) <span class="text-danger">*</span></label>
+              <div #msRoot class="ms-control" [class.open]="pertDropdownOpen">
+                <div class="ms-chips" (click)="togglePertDropdown()" [class.has-chips]="(selectedPertIds?.length || 0) > 0">
+                  <span class="ms-chip" *ngFor="let p of pertinencias" [hidden]="!(selectedPertIds || []).includes(p.id)" (click)="removePert(p.id); $event.stopPropagation()">
+                    {{ p.nombre_pert }} <i class="bi bi-x ms-1"></i>
+                  </span>
+                  <input class="ms-input" type="text" [placeholder]="pertPlaceholder" [(ngModel)]="pertSearch"
+                         (click)="$event.stopPropagation(); openPertDropdown()"
+                         (focus)="openPertDropdown()"
+                         (keydown)="openPertDropdown()"
+                         (input)="openPertDropdown(); $event.stopPropagation()">
+                </div>
+                <button class="ms-clear btn btn-link p-0" *ngIf="(selectedPertIds?.length || 0) > 0" (click)="clearPert(); $event.stopPropagation()" type="button">
+                  <i class="bi bi-x"></i>
+                </button>
+                <div class="ms-dropdown" *ngIf="pertDropdownOpen">
+                  <div class="ms-option" *ngFor="let p of filteredPertinencias" [class.selected]="isPertSelected(p.id)" (click)="selectPert(p); $event.stopPropagation()">
+                    <span>{{ p.nombre_pert }}</span>
+                  </div>
+                  <div class="ms-empty" *ngIf="!filteredPertinencias.length">Sin resultados</div>
+                  <div class="ms-hint">Presione para seleccionar</div>
+                </div>
+              </div>
+              <div class="invalid-feedback d-block" *ngIf="showFieldErrors && (!selectedPertIds || selectedPertIds.length === 0)">Seleccione la(s) pertinencia(s)</div>
               <small class="text-muted" *ngIf="isCreateMode">Opciones filtradas por carrera: {{ modalCarreraCode }}</small>
             </div>
           </div>
