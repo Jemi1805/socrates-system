@@ -56,6 +56,8 @@ export interface Docente {
   celular: string;
   pertinencia?: string;
   pertinencia_acad_id?: number | null;
+  pertinencia_ids?: number[];
+  pertinencias?: string[];
 }
 
 export interface Pertinencia {
@@ -73,6 +75,7 @@ export interface TutorBulkItem {
   profesion?: string;
   cod_carrera?: string; // MEA/EEA
   pertinencia_acad_id?: number | null;
+  pertinencia_acad_ids?: number[]; // soporte multi-pertinencias
   pertinencia?: string; // nombre de pertinencia si viene del SGA
 }
 
@@ -87,6 +90,8 @@ export interface TutorReg {
   carrera?: string;
   pertinencia?: string;
   pertinencia_acad_id?: number | null;
+  pertinencia_ids?: number[];
+  pertinencias?: string[];
   gestion_registro?: string; // 1/YYYY o 2/YYYY
   activo?: boolean;
 }

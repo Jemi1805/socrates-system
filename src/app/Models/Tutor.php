@@ -38,4 +38,11 @@ class Tutor extends Model
             ->withPivot(['fecha_designacion', 'user_id'])
             ->withTimestamps();
     }
+
+    // Relación N:M con pertinencias académicas
+    public function pertinencias()
+    {
+        return $this->belongsToMany(PertinenciaAcad::class, 'tutor_pertinencia', 'tutor_id', 'pertinencia_acad_id')
+            ->withTimestamps();
+    }
 }

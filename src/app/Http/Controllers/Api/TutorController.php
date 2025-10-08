@@ -24,7 +24,8 @@ class TutorController extends Controller
 
         $query = Tutor::query()
             ->leftJoin('carrera', 'tutores.cod_carrera', '=', 'carrera.cod_carrera')
-            ->select('tutores.*', 'carrera.nombre_carrera as carrera_nom');
+            ->select('tutores.*', 'carrera.nombre_carrera as carrera_nom')
+            ->with(['pertinencias:id,nombre_pert']);
 
         if ($carrera) {
             $c = trim(strtolower($carrera));
@@ -51,6 +52,8 @@ class TutorController extends Controller
         $rows = $query->orderBy('tutores.nombre')->get();
 
         $data = $rows->map(function ($t) {
+            $pertIds = method_exists($t, 'pertinencias') ? $t->pertinencias->pluck('id')->values()->all() : [];
+            $pertNoms = method_exists($t, 'pertinencias') ? $t->pertinencias->pluck('nombre_pert')->values()->all() : [];
             return [
                 'id' => $t->id,
                 'nombre' => $t->nombre,
@@ -62,6 +65,8 @@ class TutorController extends Controller
                 'carrera' => $t->carrera_nom,
                 'pertinencia_acad_id' => $t->pertinencia_acad_id,
                 'pertinencia' => $t->pertinencia_nom,
+                'pertinencia_ids' => $pertIds,
+                'pertinencias' => $pertNoms,
                 'gestion_registro' => $t->gestion_registro,
                 'activo' => (bool)$t->activo,
             ];
@@ -90,6 +95,8 @@ class TutorController extends Controller
             'items.*.profesion' => 'nullable|string|max:255',
             'items.*.cod_carrera' => 'nullable|string|max:10',
             'items.*.pertinencia_acad_id' => 'nullable|integer|exists:pertinencia_acad,id',
+            'items.*.pertinencia_acad_ids' => 'nullable|array',
+            'items.*.pertinencia_acad_ids.*' => 'integer|exists:pertinencia_acad,id',
             'items.*.pertinencia' => 'nullable|string|max:255',
         ]);
 
@@ -113,6 +120,12 @@ class TutorController extends Controller
         try {
             foreach ($items as $i) {
                 $ci = strtoupper(trim((string)(isset($i['ci']) ? $i['ci'] : '')));
+                $idsMulti = [];
+                if (isset($i['pertinencia_acad_ids']) && is_array($i['pertinencia_acad_ids'])) {
+                    $idsMulti = array_values(array_unique(array_map('intval', $i['pertinencia_acad_ids'])));
+                    $idsMulti = array_filter($idsMulti, fn($v) => $v > 0);
+                }
+                $primaryId = isset($i['pertinencia_acad_id']) ? (int)$i['pertinencia_acad_id'] : ( ($idsMulti[0] ?? null) );
                 // Construir data parcial para Docente
                 $docData = [];
                 if (isset($i['nombre'])) $docData['nombre'] = $i['nombre'];
@@ -120,7 +133,7 @@ class TutorController extends Controller
                 if (isset($i['apellido_m'])) $docData['apellido_m'] = $i['apellido_m'];
                 if (isset($i['celular'])) $docData['celular'] = $i['celular'];
                 if (isset($i['profesion'])) $docData['profesion'] = $i['profesion'];
-                if (isset($i['pertinencia_acad_id'])) $docData['pertinencia_acad_id'] = $i['pertinencia_acad_id'];
+                if (!is_null($primaryId)) $docData['pertinencia_acad_id'] = $primaryId;
                 if (isset($i['cod_carrera'])) $docData['cod_carrera'] = $i['cod_carrera'];
                 $docData['activo'] = true;
                 if ($updateOnly) {
@@ -145,11 +158,15 @@ class TutorController extends Controller
                     }
                 }
 
-                // Resolver nombre de pertinencia
+                // Resolver nombre(s) de pertinencia
                 $pertNom = isset($i['pertinencia']) ? $i['pertinencia'] : null;
-                if ((isset($i['pertinencia_acad_id']) ? $i['pertinencia_acad_id'] : null) && !$pertNom) {
-                    $p = PertinenciaAcad::find($i['pertinencia_acad_id']);
-                    if ($p) $pertNom = $p->nombre_pert;
+                if (!$pertNom) {
+                    $idsForNames = $idsMulti;
+                    if (!count($idsForNames) && !is_null($primaryId)) $idsForNames = [$primaryId];
+                    if (count($idsForNames)) {
+                        $names = PertinenciaAcad::whereIn('id', $idsForNames)->pluck('nombre_pert')->toArray();
+                        if (count($names)) $pertNom = implode(', ', $names);
+                    }
                 }
 
                 // Construir snapshot parcial para Tutor (si no existe no se sobreescriben con null)
@@ -159,7 +176,7 @@ class TutorController extends Controller
                 if (isset($i['apellido_m'])) $snapBase['apellido_m'] = $i['apellido_m'];
                 if (isset($i['celular'])) $snapBase['celular'] = $i['celular'];
                 if (isset($i['cod_carrera'])) $snapBase['cod_carrera'] = $i['cod_carrera'];
-                if (isset($i['pertinencia_acad_id'])) $snapBase['pertinencia_acad_id'] = $i['pertinencia_acad_id'];
+                if (!is_null($primaryId)) $snapBase['pertinencia_acad_id'] = $primaryId;
                 if (!is_null($pertNom)) $snapBase['pertinencia_nom'] = $pertNom;
 
                 $existing = Tutor::where('docente_id', $doc->id)
@@ -169,6 +186,10 @@ class TutorController extends Controller
                     // No cambiar gestion_registro en actualización
                     $existing->fill($snapBase);
                     $existing->save();
+                    // Sincronizar multi-pertinencias si se envía el arreglo
+                    if (array_key_exists('pertinencia_acad_ids', $i)) {
+                        $existing->pertinencias()->sync($idsMulti);
+                    }
                     $updated++;
                     $tutor = $existing;
                 } else {
@@ -179,6 +200,12 @@ class TutorController extends Controller
                     }
                     // Crear con gestión actual
                     $tutor = Tutor::create(array_merge(['docente_id' => $doc->id], $snapBase, ['gestion_registro' => $gestion]));
+                    // Registrar multi-pertinencias
+                    if (count($idsMulti)) {
+                        $tutor->pertinencias()->sync($idsMulti);
+                    } elseif (!is_null($primaryId)) {
+                        $tutor->pertinencias()->sync([$primaryId]);
+                    }
                     $created++;
                 }
 

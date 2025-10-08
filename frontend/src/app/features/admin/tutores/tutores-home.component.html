@@ -333,7 +333,7 @@
                     <td>{{ d.ci }}</td>
                     <td>{{ d.celular }}</td>
                     <td>{{ d.profesion || '-' }}</td>
-                    <td>{{ d.pertinencia || '-' }}</td>
+                    <td>{{ (d.pertinencias && d.pertinencias.length) ? d.pertinencias.join(', ') : (d.pertinencia || '-') }}</td>
                     <td>
                       <span *ngIf="isRegistradoGestionActual(d)" class="badge bg-success">Registrado</span>
                       <span *ngIf="!isRegistradoGestionActual(d)" class="badge bg-secondary">Disponible</span>

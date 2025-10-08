@@ -252,6 +252,7 @@ export class TutoresHomeComponent implements OnInit {
       profesion: this.editingDocente.profesion || undefined,
       cod_carrera: codCarr,
       pertinencia_acad_id: primaryPertId,
+      pertinencia_acad_ids: this.selectedPertIds,
       pertinencia: pertNom || undefined,
     } as any;
     this.savingDocente = true;
@@ -301,6 +302,7 @@ export class TutoresHomeComponent implements OnInit {
           profesion: doc.profesion || '',
           cod_carrera: (this.modalCarreraCode === 'MEA' || this.modalCarreraCode === 'EEA') ? this.modalCarreraCode : undefined,
           pertinencia_acad_id: primaryPertId,
+          pertinencia_acad_ids: this.selectedPertIds,
           pertinencia: pertNom || undefined,
         };
         this.sga.registerTutoresBulk([item], { updateOnly: true }).subscribe({ next: () => {}, error: () => {} });
@@ -390,8 +392,8 @@ export class TutoresHomeComponent implements OnInit {
     params.gestion = this.gestionActual;
     forkJoin({
       sga: this.sga.getDocentes(this.carreraSeleccionada),
-      // Traer todos los locales para poder fusionar por nombre aunque la carrera difiera
-      local: this.sga.getDocentesLocales(),
+      // Traer SOLO los locales de la carrera seleccionada
+      local: this.sga.getDocentesLocales(this.carreraSeleccionada),
       // Dos consultas de tutores: gestión actual, alterna y sin filtro (cualquier gestión)
       reg: this.sga.getTutores({ gestion: this.gestionActual }),
       regAlt: this.sga.getTutores({ gestion: this.gestionAlternaActual }),
@@ -507,7 +509,7 @@ export class TutoresHomeComponent implements OnInit {
           }
         }
 
-        // 3) Construir set de registrados en gestión actual
+        // 3) Construir set de registrados en gestión actual y mapa de pertinencias por CI
         if ((reg?.success && Array.isArray(reg.data)) || (regAlt?.success && Array.isArray(regAlt.data)) || (regAll?.success && Array.isArray(regAll.data))) {
           const regArr = ([...(reg?.data as any[] || []), ...(regAlt?.data as any[] || []), ...(regAll?.data as any[] || [])]);
           this.registradosSet = new Set(
@@ -524,6 +526,33 @@ export class TutoresHomeComponent implements OnInit {
           this.registradosNameSet = new Set(
             regArr.map(t => fullNameKey(t)).filter(x => !!x)
           );
+
+          // Mapa CI -> listas de pertinencias (nombres e ids) provenientes del snapshot de tutores
+          const pertMap = new Map<string, { ids: number[]; noms: string[] }>();
+          for (const t of regArr) {
+            const ciKey = normCi((t as any).ci);
+            if (!ciKey) continue;
+            const ids = Array.isArray((t as any).pertinencia_ids) ? ((t as any).pertinencia_ids as number[]) : (((t as any).pertinencia_acad_id != null) ? [Number((t as any).pertinencia_acad_id)] : []);
+            const noms = Array.isArray((t as any).pertinencias) ? ((t as any).pertinencias as string[]) : (((t as any).pertinencia ? String((t as any).pertinencia).split(',').map((s: string) => s.trim()).filter(Boolean) : []));
+            if (ids.length || noms.length) {
+              const prev = pertMap.get(ciKey) || { ids: [], noms: [] };
+              const newIds = Array.from(new Set([...prev.ids, ...ids]));
+              const newNoms = Array.from(new Set([...prev.noms, ...noms]));
+              pertMap.set(ciKey, { ids: newIds, noms: newNoms });
+            }
+          }
+
+          // Enriquecer docentes con todas las pertinencias registradas en tutores
+          for (const [ciKey, docVal] of map.entries()) {
+            const entry = pertMap.get(ciKey);
+            if (entry) {
+              (docVal as any).pertinencia_ids = entry.ids;
+              (docVal as any).pertinencias = entry.noms;
+              if (!docVal.pertinencia && entry.noms.length) {
+                (docVal as any).pertinencia = entry.noms.join(', ');
+              }
+            }
+          }
         } else {
           this.registradosSet = new Set<string>();
           this.registradosNameSet = new Set<string>();
@@ -733,7 +762,10 @@ export class TutoresHomeComponent implements OnInit {
       profesion: d.profesion || '',
       cod_carrera: codCarr,
       pertinencia_acad_id: (d as any).pertinencia_acad_id ?? null,
-      pertinencia: d.pertinencia || undefined,
+      pertinencia_acad_ids: (d as any).pertinencia_ids,
+      pertinencia: (Array.isArray((d as any).pertinencias) && (d as any).pertinencias.length)
+        ? (d as any).pertinencias.join(', ')
+        : (d.pertinencia || undefined),
     }));
     this.sga.registerTutoresBulk(items as any).subscribe({
       next: (resp) => {
