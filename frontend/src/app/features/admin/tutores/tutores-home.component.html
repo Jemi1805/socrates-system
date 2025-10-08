@@ -18,7 +18,7 @@
         </h5>
         <div class="alert alert-info py-1 px-2 mb-1">
           <i class="bi bi-info-circle me-1"></i>
-          Crea un nuevo registro de tutor con sus datos personales y académicos.
+          Crea un nuevo registro de tutor con sus datos personales y académicos o importalos desde el SGA.
         </div>
       </div>
       <div class="mt-1 d-flex gap-2 flex-wrap">
@@ -53,46 +53,60 @@
         <div class="modal-body">
           <div class="row g-3">
             <div class="col-md-6" *ngIf="isCreateMode">
-              <label class="form-label">Carrera</label>
-              <select class="form-select" [(ngModel)]="modalCarreraCode" (ngModelChange)="onModalCarreraChange($event)">
+              <label class="form-label">Carrera <span class="text-danger">*</span></label>
+              <select class="form-select" [(ngModel)]="modalCarreraCode" (ngModelChange)="onModalCarreraChange($event)" [required]="isCreateMode"
+                      [ngClass]="{'is-invalid': showFieldErrors && !(modalCarreraCode==='MEA' || modalCarreraCode==='EEA')}">
                 <option [ngValue]="'MEA'">MEA - Mecánica Automotriz</option>
                 <option [ngValue]="'EEA'">EEA - Electricidad y Electrónica</option>
               </select>
+              <div class="invalid-feedback">Seleccione la carrera</div>
             </div>
             <div class="col-md-6">
               <label class="form-label">Gestión</label>
               <input type="text" class="form-control" [value]="modalGestion || gestionActual" disabled />
             </div>
             <div class="col-md-6">
-              <label class="form-label">Nombres</label>
-              <input type="text" class="form-control" [(ngModel)]="editingDocente!.nombre" />
+              <label class="form-label">Nombres <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" [(ngModel)]="editingDocente!.nombre" [required]="true"
+                     [ngClass]="{'is-invalid': showFieldErrors && !((editingDocente?.nombre ?? '').trim())}" />
+              <div class="invalid-feedback">Ingrese nombres</div>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Apellido Paterno</label>
-              <input type="text" class="form-control" [(ngModel)]="editingDocente!.apellido_p" />
+              <label class="form-label">Apellido Paterno <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" [(ngModel)]="editingDocente!.apellido_p" [required]="true"
+                     [ngClass]="{'is-invalid': showFieldErrors && !((editingDocente?.apellido_p ?? '').trim())}" />
+              <div class="invalid-feedback">Ingrese apellido paterno</div>
             </div>
             <div class="col-md-6">
               <label class="form-label">Apellido Materno</label>
               <input type="text" class="form-control" [(ngModel)]="editingDocente!.apellido_m" />
             </div>
             <div class="col-md-6">
-              <label class="form-label">CI</label>
-              <input type="text" class="form-control" [(ngModel)]="editingDocente!.ci" />
+              <label class="form-label">CI <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" [(ngModel)]="editingDocente!.ci" [required]="true"
+                     [ngClass]="{'is-invalid': showFieldErrors && !(('' + (editingDocente?.ci ?? '')).trim())}" />
+              <div class="invalid-feedback">Ingrese CI</div>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Celular</label>
-              <input type="text" class="form-control" [(ngModel)]="editingDocente!.celular" />
+              <label class="form-label">Celular <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" [(ngModel)]="editingDocente!.celular" [required]="true"
+                     [ngClass]="{'is-invalid': showFieldErrors && !(('' + (editingDocente?.celular ?? '')).trim())}" />
+              <div class="invalid-feedback">Ingrese celular</div>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Título(s)</label>
-              <input type="text" class="form-control" [(ngModel)]="editingDocente!.profesion" />
+              <label class="form-label">Título(s) <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" [(ngModel)]="editingDocente!.profesion" [required]="true"
+                     [ngClass]="{'is-invalid': showFieldErrors && !((editingDocente?.profesion ?? '').trim())}" />
+              <div class="invalid-feedback">Ingrese título o profesión</div>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Pertinencia Académica</label>
-              <select class="form-select" [(ngModel)]="editingDocente!.pertinencia_acad_id">
+              <label class="form-label">Pertinencia Académica <span class="text-danger">*</span></label>
+              <select class="form-select" [(ngModel)]="editingDocente!.pertinencia_acad_id" [required]="true"
+                      [ngClass]="{'is-invalid': showFieldErrors && (editingDocente?.pertinencia_acad_id == null)}">
                 <option [ngValue]="null" [selected]="editingDocente?.pertinencia_acad_id == null" disabled>Seleccione pertinencia</option>
                 <option *ngFor="let p of pertinencias" [ngValue]="p.id">{{ p.nombre_pert }}</option>
               </select>
+              <div class="invalid-feedback">Seleccione una pertinencia</div>
               <small class="text-muted" *ngIf="isCreateMode">Opciones filtradas por carrera: {{ modalCarreraCode }}</small>
             </div>
           </div>
@@ -101,7 +115,7 @@
           <div class="me-auto" *ngIf="editingSaveError">
             <span class="text-danger small">{{ editingSaveError }}</span>
           </div>
-          <button *ngIf="isCreateMode" type="button" class="btn btn-primary btn-sm" (click)="registrarYActivarTutor()" [disabled]="savingDocente">
+          <button *ngIf="isCreateMode" type="button" class="btn btn-success btn-sm" (click)="registrarYActivarTutor()" [disabled]="savingDocente">
             <i class="bi" [ngClass]="savingDocente ? 'bi-hourglass-split' : 'bi-person-badge'" class="me-1"></i>
             {{ savingDocente ? 'Procesando...' : 'Registrar y activar como Tutor' }}
           </button>

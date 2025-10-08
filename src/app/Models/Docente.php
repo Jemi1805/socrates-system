@@ -23,6 +23,12 @@ class Docente extends Model
         'activo',
     ];
 
+    // Normalizar CI en cada escritura (evita duplicados por espacios/caso)
+    public function setCiAttribute($value)
+    {
+        $this->attributes['ci'] = strtoupper(trim((string)$value));
+    }
+
     // Un Docente puede pertenecer a varias carreras
     public function carreras()
     {

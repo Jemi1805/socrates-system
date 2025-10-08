@@ -47,6 +47,7 @@ export interface Carrera {
 }
 
 export interface Docente {
+  id?: number; // id local (si existe en BD)
   nombre: string;
   apellido_p: string;
   apellido_m: string;
@@ -264,16 +265,20 @@ export class SgaService {
   }
 
   // Guardar/actualizar Docente por CI (fuera de /sga)
-  saveDocenteByCi(data: Partial<Docente> & { ci: string; cod_carrera?: string | null }): Observable<ApiResponse<Docente>> {
+  // Acepta opcionalmente ci_original para permitir cambio de CI
+  saveDocenteByCi(data: Partial<Docente> & { ci: string; cod_carrera?: string | null; ci_original?: string | null }): Observable<ApiResponse<Docente>> {
     const url = `${environment.apiUrl}/docentes/upsert_by_ci`;
     return this.http.post<ApiResponse<Docente>>(url, data)
       .pipe(catchError(this.handleError));
   }
 
   // --- TUTORES: registro masivo ---
-  registerTutoresBulk(items: TutorBulkItem[]): Observable<ApiResponse<any>> {
+  // options.updateOnly => si true, el backend no crea nuevos, solo actualiza existentes
+  registerTutoresBulk(items: TutorBulkItem[], options?: { updateOnly?: boolean }): Observable<ApiResponse<any>> {
     const url = `${environment.apiUrl}/tutores/register_bulk`;
-    return this.http.post<ApiResponse<any>>(url, { items })
+    const body: any = { items };
+    if (options?.updateOnly) body.update_only = true;
+    return this.http.post<ApiResponse<any>>(url, body)
       .pipe(catchError(this.handleError));
   }
 

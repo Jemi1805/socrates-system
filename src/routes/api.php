@@ -118,6 +118,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('docentes/upsert_by_ci', [DocenteController::class, 'upsertByCi']);
         // Docentes locales: listado
         Route::get('docentes', [DocenteController::class, 'index']);
+        // Docentes: actualizar por ID (y sincroniza tutor)
+        Route::put('docentes/{id}', [DocenteController::class, 'update']);
+        Route::patch('docentes/{id}', [DocenteController::class, 'update']);
 
         // Tutores: registro masivo desde docentes seleccionados
         Route::post('tutores/register_bulk', [TutorController::class, 'registerBulk']);
@@ -126,10 +129,10 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
 // 📦 RUTAS DE PRODUCTOS (Mantener existentes)
-Route::get('/productos', [ProductosController::class, 'index']);
-Route::post('/productos', [ProductosController::class, 'store']);
-Route::get('/productos/{id}', [ProductosController::class, 'show']);
-Route::delete('/productos/{id}', [ProductosController::class, 'destroy']);
+// Route::get('/productos', [ProductosController::class, 'index']);
+// Route::post('/productos', [ProductosController::class, 'store']);
+// Route::get('/productos/{id}', [ProductosController::class, 'show']);
+// Route::delete('/productos/{id}', [ProductosController::class, 'destroy']);
 
 // 👨‍🎓 RUTAS PARA POSTULANTES (Mantener existentes)
 Route::apiResource('postulantes', PostulanteController::class);
