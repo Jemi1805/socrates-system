@@ -52,7 +52,7 @@ class UserController extends Controller
      */
     public function show($id)
     {
-        $user = User::with(['role.permissions'])->find($id);
+        $user = Usuario::with(['rol.permisos'])->find($id);
 
         if (!$user) {
             return response()->json([
@@ -63,35 +63,7 @@ class UserController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'full_name' => $user->full_name,
-                'first_name' => $user->first_name,
-                'last_name' => $user->last_name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'avatar' => $user->avatar,
-                'is_active' => $user->is_active,
-                'last_login_at' => $user->last_login_at,
-                'last_login_ip' => $user->last_login_ip,
-                'created_at' => $user->created_at,
-                'role' => $user->role ? [
-                    'id' => $user->role->id,
-                    'name' => $user->role->name,
-                    'display_name' => $user->role->display_name,
-                    'description' => $user->role->description,
-                ] : null,
-                'permissions' => $user->getPermissions()->map(function ($permission) {
-                    return [
-                        'id' => $permission->id,
-                        'name' => $permission->name,
-                        'display_name' => $permission->display_name,
-                        'module' => $permission->module,
-                        'action' => $permission->action,
-                    ];
-                }),
-            ]
+            'data' => $user
         ]);
     }
 
@@ -101,9 +73,12 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
+            'nombre' => 'required|string|max:150',
+            'apellido_p' => 'nullable|string|max:150',
+            'apellido_m' => 'nullable|string|max:150',
             'nombre_usuario' => 'required|string|max:255|unique:usuario',
             'email' => 'required|string|email|max:255|unique:usuario',
-            'contrasena' => 'required|string|min:8',
+            'contrasena' => 'required|string|min:8|confirmed',
             'rol_id' => 'required|exists:rol,id',
             'activo' => 'boolean',
         ]);
@@ -117,6 +92,9 @@ class UserController extends Controller
         }
 
         $usuario = Usuario::create([
+            'nombre' => $request->nombre,
+            'apellido_p' => $request->apellido_p,
+            'apellido_m' => $request->apellido_m,
             'nombre_usuario' => $request->nombre_usuario,
             'email' => $request->email,
             'contrasena' => $request->contrasena,
@@ -148,9 +126,12 @@ class UserController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
+            'nombre' => 'required|string|max:150',
+            'apellido_p' => 'nullable|string|max:150',
+            'apellido_m' => 'nullable|string|max:150',
             'nombre_usuario' => 'required|string|max:255',
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('usuario')->ignore($usuario->id)],
-            'contrasena' => 'nullable|string|min:8',
+            'contrasena' => 'nullable|string|min:8|confirmed',
             'rol_id' => 'required|exists:rol,id',
             'activo' => 'boolean',
         ]);
@@ -164,6 +145,9 @@ class UserController extends Controller
         }
 
         $updateData = [
+            'nombre' => $request->nombre,
+            'apellido_p' => $request->apellido_p,
+            'apellido_m' => $request->apellido_m,
             'nombre_usuario' => $request->nombre_usuario,
             'email' => $request->email,
             'rol_id' => $request->rol_id,
@@ -220,7 +204,7 @@ class UserController extends Controller
      */
     public function toggleStatus($id)
     {
-        $user = User::find($id);
+        $user = Usuario::find($id);
 
         if (!$user) {
             return response()->json([
@@ -237,11 +221,11 @@ class UserController extends Controller
             ], 422);
         }
 
-        $user->update(['is_active' => !$user->is_active]);
+        $user->update(['activo' => !$user->activo]);
 
         return response()->json([
             'success' => true,
-            'message' => $user->is_active ? 'Usuario activado' : 'Usuario desactivado',
+            'message' => $user->activo ? 'Usuario activado' : 'Usuario desactivado',
             'data' => $user
         ]);
     }
@@ -251,7 +235,7 @@ class UserController extends Controller
      */
     public function getRoles()
     {
-        $roles = Role::active()->orderBy('display_name')->get();
+        $roles = Rol::activo()->orderBy('nombre')->get();
 
         return response()->json([
             'success' => true,

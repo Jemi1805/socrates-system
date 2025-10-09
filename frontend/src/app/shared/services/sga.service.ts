@@ -13,10 +13,14 @@ export interface Rol {
 
 export interface Usuario {
   id: number;
+  nombre?: string;
+  apellido_p?: string;
+  apellido_m?: string;
   nombre_usuario: string;
-  contrasena: string;
+  contrasena?: string;
   email: string;
   rol_id: number;
+  rol?: Rol;
   activo: boolean;
 }
 
@@ -146,35 +150,43 @@ export class SgaService {
 
   constructor(private http: HttpClient) {}
 
-  // --- ROL ---
+  // --- ROLES (Local BD) ---
   getRoles(): Observable<ApiResponse<Rol[]>> {
-    return this.http.get<ApiResponse<Rol[]>>(`${this.baseUrl}/roles`)
+    return this.http.get<ApiResponse<Rol[]>>(`${environment.apiUrl}/roles`)
       .pipe(catchError(this.handleError));
   }
 
-  // --- USUARIO ---
-  getUsuarios(): Observable<ApiResponse<Usuario[]>> {
-    return this.http.get<ApiResponse<Usuario[]>>(`${this.baseUrl}/usuarios`)
+  // --- USUARIOS (Local BD) ---
+  getUsuarios(params?: Record<string, any>): Observable<ApiResponse<Usuario[]>> {
+    let httpParams = new HttpParams();
+    if (params) {
+      Object.keys(params).forEach(key => {
+        if (params[key] !== undefined && params[key] !== null) {
+          httpParams = httpParams.set(key, params[key]);
+        }
+      });
+    }
+    return this.http.get<ApiResponse<Usuario[]>>(`${environment.apiUrl}/users`, { params: httpParams })
       .pipe(catchError(this.handleError));
   }
 
   getUsuarioById(id: number): Observable<ApiResponse<Usuario>> {
-    return this.http.get<ApiResponse<Usuario>>(`${this.baseUrl}/usuarios/${id}`)
+    return this.http.get<ApiResponse<Usuario>>(`${environment.apiUrl}/users/${id}`)
       .pipe(catchError(this.handleError));
   }
 
-  createUsuario(data: Usuario): Observable<ApiResponse<Usuario>> {
-    return this.http.post<ApiResponse<Usuario>>(`${this.baseUrl}/usuarios`, data)
+  createUsuario(data: Partial<Usuario> & { contrasena: string; contrasena_confirmation?: string }): Observable<ApiResponse<Usuario>> {
+    return this.http.post<ApiResponse<Usuario>>(`${environment.apiUrl}/users`, data)
       .pipe(catchError(this.handleError));
   }
 
   updateUsuario(id: number, data: Partial<Usuario>): Observable<ApiResponse<Usuario>> {
-    return this.http.put<ApiResponse<Usuario>>(`${this.baseUrl}/usuarios/${id}`, data)
+    return this.http.put<ApiResponse<Usuario>>(`${environment.apiUrl}/users/${id}`, data)
       .pipe(catchError(this.handleError));
   }
 
   deleteUsuario(id: number): Observable<ApiResponse<any>> {
-    return this.http.delete<ApiResponse<any>>(`${this.baseUrl}/usuarios/${id}`)
+    return this.http.delete<ApiResponse<any>>(`${environment.apiUrl}/users/${id}`)
       .pipe(catchError(this.handleError));
   }
 

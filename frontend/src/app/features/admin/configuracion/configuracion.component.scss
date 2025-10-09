@@ -1,0 +1,122 @@
+@use "sass:color";
+
+// Variables
+$primary-color: #4C9DBD;
+$secondary-color: #FF9800;
+$success-color: #4CAF50;
+$danger-color: #F44336;
+$info-color: #17a2b8;
+$light-gray: #f5f5f5;
+$border-color: #e0e0e0;
+$text-dark-blue: #052544;
+$text-light: #666;
+$shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+$border-radius: 12px;
+$transition: all 0.3s ease;
+
+.config-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #052544 0%, #4C9DBD 100%);
+  padding: 0;
+  .content-wrapper {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+  }
+  
+  .config-card {
+    background: #ffffffd2;
+    border-radius: $border-radius;
+    box-shadow: $shadow;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem;
+    color: #fff;
+    transition: $transition;
+    overflow: visible; // evitar recorte de overlays internos
+
+    &:hover {
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+      transform: translateY(-5px);
+    }
+  }
+
+  .card-title {
+    color: #052544;
+    margin: 0 0 1rem 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+    border-bottom: 2px solid #4C9DBD;
+    padding-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+      color: $primary-color !important;
+    }
+  }
+  .cfg-item {
+    background: $primary-color;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  .cfg-icon {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(145, 201, 224, 0.25);
+    color: $primary-color;
+    font-size: 1.1rem;
+  }
+  .cfg-title {
+    font-weight: 600;
+    color: #fff;
+  }
+  .cfg-desc {
+    font-size: .9rem;
+  }
+
+  // Botón outline secundario (iconos mantienen color)
+  .btn-outline-secondary {
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+      color: $primary-color !important;
+    }
+    &:hover {
+      .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+        color: white !important;
+      }
+    }
+  }
+}
+
+// Modal: estilos consistentes con Tutores
+.modal .modal-header {
+  background: $primary-color;
+  color: white;
+  .modal-title { font-weight: 600; }
+  .btn-close {
+    filter: invert(1) grayscale(100%);
+    opacity: 1;
+    &:hover { opacity: 0.85; }
+  }
+}
+
+.modal .modal-content {
+  border-radius: $border-radius;
+  box-shadow: $shadow;
+}
+
+// Ajustar opacidad del backdrop para mejor contraste
+.modal-backdrop.show {
+  opacity: .6;
+  backdrop-filter: blur(2px);
+}
+
+// Asegurar superposición por encima de cualquier card/overlay local
+.modal { z-index: 1065; }
+.modal-backdrop { z-index: 1060; }
+
+// Asegurar contraste de etiquetas en el modal
+.modal .form-label { color: $text-dark-blue; }

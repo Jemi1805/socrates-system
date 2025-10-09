@@ -53,14 +53,15 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     
     // 👤 GESTIÓN DE USUARIOS (Requiere permisos)
+    // Nota: Los códigos de permiso se generan como 'usuarios.*' en el seeder
     Route::prefix('users')->group(function () {
-        Route::get('/', [UserController::class, 'index'])->middleware('permission:users.read');
-        Route::post('/', [UserController::class, 'store'])->middleware('permission:users.create');
-        Route::get('/roles', [UserController::class, 'getRoles'])->middleware('permission:users.read');
-        Route::get('/{id}', [UserController::class, 'show'])->middleware('permission:users.read');
-        Route::put('/{id}', [UserController::class, 'update'])->middleware('permission:users.update');
-        Route::delete('/{id}', [UserController::class, 'destroy'])->middleware('permission:users.delete');
-        Route::patch('/{id}/toggle-status', [UserController::class, 'toggleStatus'])->middleware('permission:users.activate_deactivate');
+        Route::get('/', [UserController::class, 'index'])->middleware('permission:usuarios.leer');
+        Route::post('/', [UserController::class, 'store'])->middleware('permission:usuarios.crear');
+        Route::get('/roles', [UserController::class, 'getRoles'])->middleware('permission:usuarios.leer');
+        Route::get('/{id}', [UserController::class, 'show'])->middleware('permission:usuarios.leer');
+        Route::put('/{id}', [UserController::class, 'update'])->middleware('permission:usuarios.actualizar');
+        Route::delete('/{id}', [UserController::class, 'destroy'])->middleware('permission:usuarios.eliminar');
+        Route::patch('/{id}/toggle-status', [UserController::class, 'toggleStatus'])->middleware('permission:usuarios.activar_desactivar');
     });
     
     // 🛡️ GESTIÓN DE ROLES (Requiere permisos)

@@ -6,6 +6,7 @@ import { TutoresHomeComponent } from './features/admin/tutores/tutores-home.comp
 
 import { DesignarTutorComponent } from './features/admin/tutores/designar-tutor.component';
 import { RegistroTemaComponent } from './features/admin/proyectos/registro-tema.component';
+import { ConfiguracionComponent } from './features/admin/configuracion/configuracion.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/login', pathMatch: 'full' },
@@ -15,6 +16,7 @@ export const routes: Routes = [
   { path: 'registro-tema', component: RegistroTemaComponent },
   { path: 'tutores', component: TutoresHomeComponent },
   { path: 'tutores/designar', component: DesignarTutorComponent },
+  { path: 'configuracion', component: ConfiguracionComponent },
 
   // Puedes agregar más rutas aquí
 ];

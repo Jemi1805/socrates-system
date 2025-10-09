@@ -26,6 +26,9 @@ class Usuario extends Authenticatable
      * The attributes that are mass assignable.
      */
     protected $fillable = [
+        'nombre',
+        'apellido_p',
+        'apellido_m',
         'nombre_usuario',
         'contrasena',
         'email',
@@ -189,7 +192,10 @@ class Usuario extends Authenticatable
     {
         return $query->where(function ($q) use ($termino) {
             $q->where('nombre_usuario', 'like', "%{$termino}%")
-              ->orWhere('email', 'like', "%{$termino}%");
+              ->orWhere('email', 'like', "%{$termino}%")
+              ->orWhere('nombre', 'like', "%{$termino}%")
+              ->orWhere('apellido_p', 'like', "%{$termino}%")
+              ->orWhere('apellido_m', 'like', "%{$termino}%");
         });
     }
 
