@@ -14,6 +14,11 @@ class PertinenciaAcad extends Model
     protected $fillable = [
         'nombre_pert',
         'cod_carrera',
+        'activo',
+    ];
+
+    protected $casts = [
+        'activo' => 'boolean',
     ];
 
     public function docentes()

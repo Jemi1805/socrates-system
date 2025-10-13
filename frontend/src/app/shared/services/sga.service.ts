@@ -45,7 +45,7 @@ export interface PostulanteCarrera {
 }
 
 export interface Carrera {
-  cod_carrera: number;
+  cod_carrera: string | number;
   nom_carrera: string;
   num_materias: number;
 }
@@ -68,6 +68,7 @@ export interface Pertinencia {
   id: number;
   nombre_pert: string;
   cod_carrera?: string;
+  activo?: boolean;
 }
 
 export interface TutorBulkItem {
@@ -315,6 +316,16 @@ export class SgaService {
       params = params.set('carrera', carrera);
     }
     return this.http.get<ApiResponse<Pertinencia[]>>(`${this.baseUrl}/pertinencias`, { params })
+      .pipe(catchError(this.handleError));
+  }
+
+  createPertinencia(data: Partial<Pertinencia>): Observable<ApiResponse<Pertinencia>> {
+    return this.http.post<ApiResponse<Pertinencia>>(`${environment.apiUrl}/pertinencias`, data)
+      .pipe(catchError(this.handleError));
+  }
+
+  updatePertinencia(id: number, data: Partial<Pertinencia>): Observable<ApiResponse<Pertinencia>> {
+    return this.http.put<ApiResponse<Pertinencia>>(`${environment.apiUrl}/pertinencias/${id}`, data)
       .pipe(catchError(this.handleError));
   }
 

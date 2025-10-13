@@ -1,6 +1,8 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, HostListener, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
+import { AuthService } from '../../../core/services/auth.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-header',
@@ -9,16 +11,55 @@ import { RouterModule } from '@angular/router';
   templateUrl: './header.component.html',
   styleUrls: ['./header.component.scss']
 })
-export class HeaderComponent {
+export class HeaderComponent implements OnInit, OnDestroy {
   @Input() pageTitle: string = '';
   @Input() showBreadcrumb: boolean = false;
   @Input() breadcrumbItems: Array<{label: string, route?: string}> = [];
   @Output() toggleSidebarEvent = new EventEmitter<void>();
 
-  currentUser = {
-    name: 'Administrador',
-    role: 'Admin'
-  };
+  currentUser = { name: '', role: '' };
+
+  private authSub?: Subscription;
+  dropdownOpen = false;
+
+  constructor(private auth: AuthService, private router: Router, private elRef: ElementRef) {}
+
+  ngOnInit(): void {
+    this.refreshCurrentUser();
+    this.authSub = this.auth.isAuthenticated$.subscribe(() => {
+      this.refreshCurrentUser();
+    });
+    // Refrescar desde backend si hay token
+    if (this.auth.isLoggedIn()) {
+      this.auth.me().subscribe({
+        next: () => this.refreshCurrentUser(),
+        error: () => {/* silencioso */}
+      });
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.authSub?.unsubscribe();
+  }
+
+  private refreshCurrentUser(): void {
+    const u = this.auth.getUser();
+    this.currentUser = {
+      name: this.computeDisplayName(u),
+      role: this.computeDisplayRole(u)
+    };
+  }
+
+  private computeDisplayName(u: any): string {
+    if (!u) return 'Invitado';
+    const fullName = [u?.nombre, u?.apellido_p, u?.apellido_m].filter(Boolean).join(' ').trim();
+    return u?.nombre_usuario || fullName || u?.name || u?.email || 'Invitado';
+  }
+
+  private computeDisplayRole(u: any): string {
+    if (!u) return '-';
+    return u?.rol?.nombre || u?.role?.display_name || u?.role?.name || '-';
+  }
 
   // Menú de navegación
   menuItems = [
@@ -33,9 +74,20 @@ export class HeaderComponent {
     this.toggleSidebarEvent.emit();
   }
 
+  toggleUserMenu() {
+    this.dropdownOpen = !this.dropdownOpen;
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent) {
+    if (this.dropdownOpen && this.elRef && !this.elRef.nativeElement.contains(event.target)) {
+      this.dropdownOpen = false;
+    }
+  }
+
   logout() {
-    // Aquí puedes implementar la lógica de logout
-    console.log('Logout');
+    this.auth.logout();
+    this.router.navigate(['/login']);
   }
 
   setActiveItem(route: string) {

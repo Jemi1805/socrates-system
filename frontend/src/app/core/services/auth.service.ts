@@ -13,7 +13,8 @@ export interface AuthResponse {
   success: boolean;
   message: string;
   data: {
-    user: any;
+    usuario?: any; // backend actual
+    user?: any;    // compatibilidad
     token: string;
     token_type: string;
   };
@@ -36,9 +37,12 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${this.apiUrl}/auth/login`, credentials)
       .pipe(
         tap(response => {
-          if (response.success && response.data.token) {
+          if (response.success && response.data?.token) {
             this.setToken(response.data.token);
-            this.setUser(response.data.user);
+            const user = (response.data as any).usuario ?? (response.data as any).user;
+            if (user) {
+              this.setUser(user);
+            }
             this.isAuthenticatedSubject.next(true);
           }
         })
@@ -64,8 +68,15 @@ export class AuthService {
   }
 
   getUser(): any {
-    const user = localStorage.getItem(this.userKey);
-    return user ? JSON.parse(user) : null;
+    const raw = localStorage.getItem(this.userKey);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      console.warn('auth_user inválido en localStorage, limpiando...', e);
+      localStorage.removeItem(this.userKey);
+      return null;
+    }
   }
 
   private hasToken(): boolean {
@@ -74,5 +85,17 @@ export class AuthService {
 
   isLoggedIn(): boolean {
     return this.hasToken();
+  }
+
+  // Refresca el usuario desde el backend y lo guarda en localStorage
+  me() {
+    return this.http.get<any>(`${this.apiUrl}/auth/me`).pipe(
+      tap((res) => {
+        const u = (res?.data?.usuario ?? res?.data?.user ?? res?.usuario ?? res?.user);
+        if (u) {
+          this.setUser(u);
+        }
+      })
+    );
   }
 } 

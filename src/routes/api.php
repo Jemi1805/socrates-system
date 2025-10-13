@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\CarreraController;
 use App\Http\Controllers\Api\PensumController;
 use App\Http\Controllers\Api\DocenteController;
 use App\Http\Controllers\Api\TutorController;
+use App\Http\Controllers\Api\PertinenciaController;
 
 // 🔐 RUTAS DE AUTENTICACIÓN (Sin middleware)
 Route::prefix('auth')->group(function () {
@@ -89,35 +90,35 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('documentos_requeridos', DocumentosRequeridosController::class);
     Route::apiResource('documentos_adjuntos', DocumentosAdjuntosController::class);
     Route::apiResource('diploma_bachiller', DiplomaBachillerController::class);
-    Route::post('diploma_bachiller/upsert', [DiplomaBachillerController::class, 'upsert']);
     Route::apiResource('ra_homol_ex', RaHomolExController::class);
     Route::apiResource('grado_homol', GradoHomolController::class);
     Route::apiResource('transitabilidad_edu_reg', TransitabilidadEduRegController::class);
     Route::apiResource('transitabilidad_inst_tec', TransitabilidadInstTecController::class);
     Route::apiResource('traspasos_instituto', TraspasosInstitutoController::class);
-    Route::apiResource('res_homol_cp', ResHomolCpController::class);
+        Route::apiResource('res_homol_cp', ResHomolCpController::class);
     // Eliminación por cod_ceta_est
     Route::post('transitabilidad_edu_reg/delete_by_cod', [TransitabilidadEduRegController::class, 'deleteByCodCeta']);
     Route::post('transitabilidad_inst_tec/delete_by_cod', [TransitabilidadInstTecController::class, 'deleteByCodCeta']);
     Route::post('traspasos_instituto/delete_by_cod', [TraspasosInstitutoController::class, 'deleteByCodCeta']);
     Route::post('res_homol_cp/delete_by_cod', [ResHomolCpController::class, 'deleteByCodCeta']);
-    // Upsert por cod_ceta_est
+    // upsert por cod_ceta_est
     Route::post('traspasos_instituto/upsert_by_cod', [TraspasosInstitutoController::class, 'upsertByCod']);
     Route::post('res_homol_cp/upsert_by_cod', [ResHomolCpController::class, 'upsertByCod']);
     // (Se mueven las rutas get_by_cod fuera del grupo protegido)
-    Route::apiResource('grados_homol_cp', GradosHomolCpController::class);
-    Route::apiResource('grados_trasp', GradosTraspController::class);
-    // Datos de carrera (inicio / conclusión)
-    Route::apiResource('datos_carrera', DatosCarreraController::class);
-    Route::post('datos_carrera/upsert', [DatosCarreraController::class, 'upsert']);
-    // Registro de inscripción con aranceles seleccionados
-    Route::post('inscripciones', [InscripModalidadController::class, 'storeWithAranceles']);
+        Route::apiResource('grados_homol_cp', GradosHomolCpController::class);
+        Route::apiResource('grados_trasp', GradosTraspController::class);
+        // Datos de carrera (inicio / conclusión)
+        Route::apiResource('datos_carrera', DatosCarreraController::class);
+        Route::post('datos_carrera/upsert', [DatosCarreraController::class, 'upsert']);
+        // Pertinencias académicas (CRUD local)
+        Route::apiResource('pertinencias', PertinenciaController::class);
+        // Registro de inscripción con aranceles seleccionados
+        Route::post('inscripciones', [InscripModalidadController::class, 'storeWithAranceles']);
     // Catálogos base
     Route::apiResource('carrera', CarreraController::class);
     Route::apiResource('pensum', PensumController::class);
     // Docentes: upsert por CI
     Route::post('docentes/upsert_by_ci', [DocenteController::class, 'upsertByCi']);
-        // Docentes locales: listado
         Route::get('docentes', [DocenteController::class, 'index']);
         // Docentes: actualizar por ID (y sincroniza tutor)
         Route::put('docentes/{id}', [DocenteController::class, 'update']);
