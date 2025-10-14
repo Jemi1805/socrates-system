@@ -69,7 +69,6 @@
                     <th>Nombre</th>
                     <th>Apellidos</th>
                     <th>Usuario</th>
-                    <th>Email</th>
                     <th>Rol</th>
                     <th>Activo</th>
                     <th>Acciones</th>
@@ -81,7 +80,6 @@
                     <td>{{ u.nombre || '-' }}</td>
                     <td>{{ (u.apellido_p || '') + (u.apellido_m ? ' ' + u.apellido_m : '') }}</td>
                     <td>{{ u.nombre_usuario }}</td>
-                    <td>{{ u.email }}</td>
                     <td>{{ u.rol?.nombre || '-' }}</td>
                     <td>
                       <span class="badge" [class.bg-success]="u.activo" [class.bg-secondary]="!u.activo">{{ u.activo ? 'Sí' : 'No' }}</span>
@@ -192,10 +190,7 @@
                 <label class="form-label">Nombre de Usuario <span class="text-danger">*</span></label>
                 <input class="form-control" formControlName="nombre_usuario" placeholder="usuario" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
               </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label">Email <span class="text-danger">*</span></label>
-                <input type="email" class="form-control" formControlName="email" placeholder="email@dominio.com" autocomplete="off" />
-              </div>
+              
               <div class="col-12 col-md-4">
                 <label class="form-label">Rol <span class="text-danger">*</span></label>
                 <select class="form-select" formControlName="rol_id">

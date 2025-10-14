@@ -253,7 +253,7 @@ class RolController extends Controller
     public function usuarios($id)
     {
         $rol = Rol::with(['usuarios' => function ($query) {
-            $query->select('id', 'nombre_usuario', 'email', 'activo', 'fecha_ultimo_acceso', 'rol_id');
+            $query->select('id', 'nombre_usuario', 'activo', 'fecha_ultimo_acceso', 'rol_id');
         }])->find($id);
 
         if (!$rol) {

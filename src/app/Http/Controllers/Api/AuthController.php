@@ -17,7 +17,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
+            'nombre_usuario' => 'required|string',
             'password' => 'required|string|min:6',
         ]);
 
@@ -29,8 +29,8 @@ class AuthController extends Controller
             ], 422);
         }
 
-        // Buscar usuario por email
-        $usuario = Usuario::where('email', $request->email)->first();
+        // Buscar usuario por nombre de usuario
+        $usuario = Usuario::where('nombre_usuario', $request->nombre_usuario)->first();
 
         if (!$usuario || !Hash::check($request->password, $usuario->contrasena)) {
             return response()->json([
@@ -60,7 +60,6 @@ class AuthController extends Controller
                 'usuario' => [
                     'id' => $usuario->id,
                     'nombre_usuario' => $usuario->nombre_usuario,
-                    'email' => $usuario->email,
                     'activo' => $usuario->activo,
                     'rol' => $usuario->rol ? [
                         'id' => $usuario->rol->id,
@@ -78,12 +77,11 @@ class AuthController extends Controller
 
     /**
      * Registro de usuario
-     */
+    */
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'nombre_usuario' => 'required|string|max:255|unique:usuario',
-            'email' => 'required|string|email|max:255|unique:usuario',
             'password' => 'required|string|min:8|confirmed',
             'rol_id' => 'required|exists:rol,id',
         ]);
@@ -99,7 +97,6 @@ class AuthController extends Controller
         // Crear usuario
         $usuario = Usuario::create([
             'nombre_usuario' => $request->nombre_usuario,
-            'email' => $request->email,
             'contrasena' => $request->password, // Se encripta automáticamente en el mutator
             'rol_id' => $request->rol_id,
             'activo' => true,
@@ -116,7 +113,6 @@ class AuthController extends Controller
                 'usuario' => [
                     'id' => $usuario->id,
                     'nombre_usuario' => $usuario->nombre_usuario,
-                    'email' => $usuario->email,
                     'rol' => $usuario->rol ? [
                         'id' => $usuario->rol->id,
                         'nombre' => $usuario->rol->nombre,
@@ -142,7 +138,6 @@ class AuthController extends Controller
                 'usuario' => [
                     'id' => $usuario->id,
                     'nombre_usuario' => $usuario->nombre_usuario,
-                    'email' => $usuario->email,
                     'activo' => $usuario->activo,
                     'fecha_creacion' => $usuario->fecha_creacion,
                     'fecha_actualizacion' => $usuario->fecha_actualizacion,

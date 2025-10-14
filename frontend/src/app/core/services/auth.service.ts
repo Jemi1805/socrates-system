@@ -5,7 +5,7 @@ import { tap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
 export interface LoginCredentials {
-  email: string;
+  nombre_usuario: string;
   password: string;
 }
 

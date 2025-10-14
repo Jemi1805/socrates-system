@@ -218,7 +218,7 @@ class RolPermisoSeeder extends Seeder
         // Super Admin
         if ($superAdminRol) {
             Usuario::updateOrCreate(
-                ['email' => 'admin@socrates.com'],
+                ['nombre_usuario' => 'admin'],
                 [
                     'nombre_usuario' => 'admin',
                     'contrasena' => Hash::make('admin123'),
@@ -231,7 +231,7 @@ class RolPermisoSeeder extends Seeder
         // Usuario básico
         if ($userRol) {
             Usuario::updateOrCreate(
-                ['email' => 'user@socrates.com'],
+                ['nombre_usuario' => 'usuario'],
                 [
                     'nombre_usuario' => 'usuario',
                     'contrasena' => Hash::make('user123'),

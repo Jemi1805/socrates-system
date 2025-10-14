@@ -610,8 +610,8 @@ export class TutoresHomeComponent implements OnInit {
       pertinencia: '',
       pertinencia_acad_id: null
     } as Partial<Docente>;
-    const codSel = this.carreraSeleccionadaCodigo;
-    this.modalCarreraCode = (codSel === 'MEA' || codSel === 'EEA') ? codSel : 'MEA';
+    // Mostrar placeholder "Seleccione carrera" al abrir
+    this.modalCarreraCode = null;
     this.modalGestion = this.gestionActual;
     this.selectedPertIds = [];
     this.pertSearch = '';

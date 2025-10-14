@@ -177,19 +177,16 @@ class RolePermissionSeeder extends Seeder
 
         // Variables de entorno para credenciales
         $adminUsername = env('ADMIN_USERNAME', 'admin');
-        $adminEmail = env('ADMIN_EMAIL', 'admin@socrates.com');
         $adminPassword = env('ADMIN_PASSWORD', 'admin123');
 
         $defaultUserUsername = env('DEFAULT_USER_USERNAME', 'user');
-        $defaultUserEmail = env('DEFAULT_USER_EMAIL', 'user@socrates.com');
         $defaultUserPassword = env('DEFAULT_USER_PASSWORD', 'user123');
 
         if ($superAdminRole) {
             Usuario::firstOrCreate(
-                ['email' => $adminEmail],
+                ['nombre_usuario' => $adminUsername],
                 [
                     'nombre_usuario' => $adminUsername,
-                    'email' => $adminEmail,
                     'contrasena' => $adminPassword, // Se encripta por mutator
                     'rol_id' => $superAdminRole->id,
                     'activo' => true,
@@ -200,10 +197,9 @@ class RolePermissionSeeder extends Seeder
 
         if ($userRole) {
             Usuario::firstOrCreate(
-                ['email' => $defaultUserEmail],
+                ['nombre_usuario' => $defaultUserUsername],
                 [
                     'nombre_usuario' => $defaultUserUsername,
-                    'email' => $defaultUserEmail,
                     'contrasena' => $defaultUserPassword, // Se encripta por mutator
                     'rol_id' => $userRole->id,
                     'activo' => true,

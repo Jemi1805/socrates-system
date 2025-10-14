@@ -31,7 +31,6 @@ class Usuario extends Authenticatable
         'apellido_m',
         'nombre_usuario',
         'contrasena',
-        'email',
         'rol_id',
         'activo',
         'fecha_creacion',
@@ -70,7 +69,7 @@ class Usuario extends Authenticatable
      */
     public function getAuthIdentifierName()
     {
-        return 'email'; // o 'nombre_usuario' si prefieres usar el username
+        return 'nombre_usuario';
     }
 
     /**
@@ -192,7 +191,6 @@ class Usuario extends Authenticatable
     {
         return $query->where(function ($q) use ($termino) {
             $q->where('nombre_usuario', 'like', "%{$termino}%")
-              ->orWhere('email', 'like', "%{$termino}%")
               ->orWhere('nombre', 'like', "%{$termino}%")
               ->orWhere('apellido_p', 'like', "%{$termino}%")
               ->orWhere('apellido_m', 'like', "%{$termino}%");

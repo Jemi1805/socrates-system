@@ -208,11 +208,11 @@ class InscripModalidadController extends CrudController
             if (isset($data['aranceles_completos'])) $ins->aranceles_completos = (bool)$data['aranceles_completos'];
             // Usuario registrador
             $ins->user_id = isset($data['user_id']) ? $data['user_id'] : ($user ? $user->id : null);
-            // Preferir nombre_usuario; si no, email; si el payload lo trae explícito, respetarlo
+            // Preferir nombre_usuario; si el payload lo trae explícito, respetarlo
             if (isset($data['user_name'])) {
                 $ins->user_name = $data['user_name'];
             } else if ($user) {
-                $ins->user_name = $user->nombre_usuario ? $user->nombre_usuario : $user->email;
+                $ins->user_name = $user->nombre_usuario;
             }
             // Valores por defecto
             $ins->fecha_inscripcion = now()->toDateString();

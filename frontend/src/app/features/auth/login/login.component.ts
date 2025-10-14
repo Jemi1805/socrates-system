@@ -13,7 +13,7 @@ import { AuthService } from '../../../core/services/auth.service';
 })
 export class LoginComponent {
   credentials = {
-    email: '',
+    nombre_usuario: '',
     password: ''
   };
   

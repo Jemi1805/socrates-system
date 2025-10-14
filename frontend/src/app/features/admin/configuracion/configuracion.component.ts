@@ -69,7 +69,6 @@ export class ConfiguracionComponent implements OnInit {
       apellido_p: ['', [Validators.maxLength(150)]],
       apellido_m: ['', [Validators.maxLength(150)]],
       nombre_usuario: ['', [Validators.required, Validators.maxLength(255)]],
-      email: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
       contrasena: ['', [Validators.required, Validators.minLength(8)]],
       contrasena_confirmation: ['', [Validators.required]],
       rol_id: [null, [Validators.required]],
@@ -226,7 +225,7 @@ export class ConfiguracionComponent implements OnInit {
     // Resetear formulario de creación (todos los campos vacíos)
     this.newUserForm.reset({
       nombre: '', apellido_p: '', apellido_m: '',
-      nombre_usuario: '', email: '',
+      nombre_usuario: '',
       contrasena: '', contrasena_confirmation: '',
       rol_id: null, activo: true,
     });
@@ -242,13 +241,12 @@ export class ConfiguracionComponent implements OnInit {
   private clearAutofillInputs() {
     const clearNow = () => {
       const fields = [
-        'nombre_usuario', 'email', 'contrasena', 'contrasena_confirmation'
+        'nombre_usuario', 'contrasena', 'contrasena_confirmation'
       ];
       fields.forEach(fc => this.newUserForm.get(fc)?.setValue(''));
       // Forzar limpieza visual en inputs (por si el navegador completó fuera del control)
       const selectors = [
         'input[formControlName="nombre_usuario"]',
-        'input[formControlName="email"]',
         'input[formControlName="contrasena"]',
         'input[formControlName="contrasena_confirmation"]'
       ];
@@ -300,7 +298,6 @@ export class ConfiguracionComponent implements OnInit {
         apellido_p: ['', [Validators.maxLength(150)]],
         apellido_m: ['', [Validators.maxLength(150)]],
         nombre_usuario: ['', [Validators.required, Validators.maxLength(255)]],
-        email: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
         contrasena: ['', [Validators.minLength(8)]],
         contrasena_confirmation: [''],
         rol_id: [null, [Validators.required]],
@@ -312,7 +309,6 @@ export class ConfiguracionComponent implements OnInit {
       apellido_p: user.apellido_p || '',
       apellido_m: user.apellido_m || '',
       nombre_usuario: user.nombre_usuario,
-      email: user.email,
       contrasena: '',
       contrasena_confirmation: '',
       rol_id: user.rol_id,
@@ -343,7 +339,6 @@ export class ConfiguracionComponent implements OnInit {
       apellido_p: formVal.apellido_p,
       apellido_m: formVal.apellido_m,
       nombre_usuario: formVal.nombre_usuario,
-      email: formVal.email,
       rol_id: formVal.rol_id,
       activo: formVal.activo,
     };
