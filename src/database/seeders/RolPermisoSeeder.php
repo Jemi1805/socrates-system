@@ -93,8 +93,7 @@ class RolPermisoSeeder extends Seeder
             }
         }
 
-        // Asignar permisos a roles
-        $this->asignarPermisos();
+        // Sin asignación de permisos por rol: solo permisos directos por usuario
 
         // Crear usuarios por defecto
         $this->crearUsuarios();
@@ -104,108 +103,6 @@ class RolPermisoSeeder extends Seeder
         $this->command->info('✅ Roles, permisos y usuarios creados exitosamente!');
     }
 
-    /**
-     * Asignar permisos a roles
-     */
-    private function asignarPermisos()
-    {
-        $superAdmin = Rol::where('nombre', 'super_admin')->first();
-        $admin = Rol::where('nombre', 'admin')->first();
-        $manager = Rol::where('nombre', 'manager')->first();
-        $user = Rol::where('nombre', 'user')->first();
-        $guest = Rol::where('nombre', 'guest')->first();
-
-        $todosLosPermisos = Permiso::all();
-
-        // Super Admin: todos los permisos
-        if ($superAdmin) {
-            foreach ($todosLosPermisos as $permiso) {
-                DB::table('rol_permiso')->updateOrInsert(
-                    [
-                        'rol_id' => $superAdmin->id,
-                        'permiso_id' => $permiso->id,
-                    ],
-                    [
-                        'concedido' => true,
-                    ]
-                );
-            }
-        }
-
-        // Admin: todos excepto configuración crítica
-        if ($admin) {
-            $permisosAdmin = Permiso::where('codigo', 'not like', 'configuracion.eliminar')->get();
-            foreach ($permisosAdmin as $permiso) {
-                DB::table('rol_permiso')->updateOrInsert(
-                    [
-                        'rol_id' => $admin->id,
-                        'permiso_id' => $permiso->id,
-                    ],
-                    [
-                        'concedido' => true,
-                    ]
-                );
-            }
-        }
-
-        // Manager: gestión de usuarios y reportes
-        if ($manager) {
-            $permisosManager = Permiso::whereIn('codigo', [
-                'usuarios.crear', 'usuarios.leer', 'usuarios.actualizar',
-                'roles.leer',
-                'dashboard.leer',
-                'reportes.leer', 'reportes.crear',
-            ])->get();
-
-            foreach ($permisosManager as $permiso) {
-                DB::table('rol_permiso')->updateOrInsert(
-                    [
-                        'rol_id' => $manager->id,
-                        'permiso_id' => $permiso->id,
-                    ],
-                    [
-                        'concedido' => true,
-                    ]
-                );
-            }
-        }
-
-        // User: solo lectura básica
-        if ($user) {
-            $permisosUser = Permiso::whereIn('codigo', [
-                'dashboard.leer',
-                'usuarios.leer', // solo su propio perfil
-            ])->get();
-
-            foreach ($permisosUser as $permiso) {
-                DB::table('rol_permiso')->updateOrInsert(
-                    [
-                        'rol_id' => $user->id,
-                        'permiso_id' => $permiso->id,
-                    ],
-                    [
-                        'concedido' => true,
-                    ]
-                );
-            }
-        }
-
-        // Guest: solo dashboard
-        if ($guest) {
-            $permisoGuest = Permiso::where('codigo', 'dashboard.leer')->first();
-            if ($permisoGuest) {
-                DB::table('rol_permiso')->updateOrInsert(
-                    [
-                        'rol_id' => $guest->id,
-                        'permiso_id' => $permisoGuest->id,
-                    ],
-                    [
-                        'concedido' => true,
-                    ]
-                );
-            }
-        }
-    }
 
     /**
      * Crear usuarios por defecto
@@ -217,7 +114,7 @@ class RolPermisoSeeder extends Seeder
 
         // Super Admin
         if ($superAdminRol) {
-            Usuario::updateOrCreate(
+            $adminUser = Usuario::updateOrCreate(
                 ['nombre_usuario' => 'admin'],
                 [
                     'nombre_usuario' => 'admin',
@@ -226,6 +123,11 @@ class RolPermisoSeeder extends Seeder
                     'activo' => true,
                 ]
             );
+            // Asignar TODOS los permisos DIRECTAMENTE al usuario admin
+            $permIds = Permiso::pluck('id')->all();
+            $sync = [];
+            foreach ($permIds as $pid) { $sync[$pid] = ['concedido' => true]; }
+            $adminUser->permisos()->syncWithoutDetaching($sync);
         }
 
         // Usuario básico

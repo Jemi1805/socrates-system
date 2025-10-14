@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Usuario;
 use App\Models\Rol;
+use App\Models\Permiso;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
@@ -52,7 +54,7 @@ class UserController extends Controller
      */
     public function show($id)
     {
-        $user = Usuario::with(['rol.permisos'])->find($id);
+        $user = Usuario::with(['rol', 'permisos'])->find($id);
 
         if (!$user) {
             return response()->json([
@@ -64,6 +66,79 @@ class UserController extends Controller
         return response()->json([
             'success' => true,
             'data' => $user
+        ]);
+    }
+
+    /**
+     * Listar todos los permisos y marcar los asignados (directos) para un usuario
+     */
+    public function getPermissions($id)
+    {
+        $usuario = Usuario::find($id);
+        if (!$usuario) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Usuario no encontrado'
+            ], 404);
+        }
+
+        $all = Permiso::orderBy('codigo')->get();
+        $assignedIds = DB::table('usuario_permiso')
+            ->where('usuario_id', $usuario->id)
+            ->where('concedido', true)
+            ->pluck('permiso_id')
+            ->toArray();
+
+        $data = $all->map(function ($p) use ($assignedIds) {
+            return [
+                'id' => $p->id,
+                'codigo' => $p->codigo,
+                'nombre' => $p->nombre,
+                'assigned' => in_array($p->id, $assignedIds, true),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $data
+        ]);
+    }
+
+    /**
+     * Guardar permisos directos del usuario (reemplaza el conjunto actual)
+     */
+    public function setPermissions(Request $request, $id)
+    {
+        $usuario = Usuario::find($id);
+        if (!$usuario) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Usuario no encontrado'
+            ], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'permission_ids' => 'array',
+            'permission_ids.*' => 'integer|exists:permiso,id'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Datos de validación incorrectos',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $ids = $request->get('permission_ids', []);
+        $sync = [];
+        foreach ($ids as $pid) { $sync[$pid] = ['concedido' => true]; }
+        $usuario->permisos()->sync($sync);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Permisos actualizados',
+            'data' => [ 'assigned_ids' => array_values($ids) ]
         ]);
     }
 
@@ -238,4 +313,5 @@ class UserController extends Controller
             'data' => $roles
         ]);
     }
+
 }

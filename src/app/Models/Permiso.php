@@ -40,6 +40,16 @@ class Permiso extends Model
     }
 
     /**
+     * Relación directa con usuarios (muchos a muchos)
+     */
+    public function usuarios()
+    {
+        return $this->belongsToMany(Usuario::class, 'usuario_permiso', 'permiso_id', 'usuario_id')
+                    ->withPivot('concedido')
+                    ->wherePivot('concedido', true);
+    }
+
+    /**
      * Scope para buscar por código
      */
     public function scopePorCodigo($query, $codigo)
@@ -84,11 +94,13 @@ class Permiso extends Model
         $permisos = [];
 
         foreach ($acciones as $accion => $nombreAccion) {
-            $permiso = self::create([
-                'codigo' => strtolower($modulo) . '.' . $accion,
-                'nombre' => "{$nombreAccion} {$nombreModulo}",
-                'descripcion' => "Permite {$nombreAccion} {$nombreModulo}",
-            ]);
+            $permiso = self::updateOrCreate(
+                ['codigo' => strtolower($modulo) . '.' . $accion],
+                [
+                    'nombre' => "{$nombreAccion} {$nombreModulo}",
+                    'descripcion' => "Permite {$nombreAccion} {$nombreModulo}",
+                ]
+            );
 
             $permisos[] = $permiso;
         }

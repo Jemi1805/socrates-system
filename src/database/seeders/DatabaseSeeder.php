@@ -13,9 +13,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
-        // Ejecutar seeder de roles y permisos
+        // Ejecutar seeder de permisos directos por usuario
         $this->call([
-            RolePermissionSeeder::class,
+            UsuarioPermisoSeeder::class,
             ModalidadSeeder::class,
             // Semillas base para carreras y pensums
             CarreraSeeder::class,

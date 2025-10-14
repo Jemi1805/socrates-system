@@ -81,11 +81,13 @@ class Usuario extends Authenticatable
     }
 
     /**
-     * Obtener todos los permisos del usuario a través de su rol
+     * Permisos directos del usuario (sin herencia por rol)
      */
     public function permisos()
     {
-        return $this->rol ? $this->rol->permisos : collect();
+        return $this->belongsToMany(Permiso::class, 'usuario_permiso', 'usuario_id', 'permiso_id')
+                    ->withPivot('concedido')
+                    ->wherePivot('concedido', true);
     }
 
     /**
@@ -105,27 +107,28 @@ class Usuario extends Authenticatable
     }
 
     /**
-     * Verificar si el usuario tiene un permiso específico
+     * Verificar si el usuario tiene un permiso específico (directo)
      */
     public function tienePermiso($codigoPermiso)
     {
-        return $this->rol && $this->rol->tienePermiso($codigoPermiso);
+        return $this->permisos()->where('codigo', $codigoPermiso)->exists();
     }
 
     /**
-     * Verificar si el usuario tiene alguno de los permisos especificados
+     * Verificar si el usuario tiene alguno de los permisos especificados (directos)
      */
     public function tieneAlgunPermiso(array $codigosPermisos)
     {
-        return $this->rol && $this->rol->tieneAlgunPermiso($codigosPermisos);
+        return $this->permisos()->whereIn('codigo', $codigosPermisos)->exists();
     }
 
     /**
-     * Verificar si el usuario tiene todos los permisos especificados
+     * Verificar si el usuario tiene todos los permisos especificados (directos)
      */
     public function tieneTodosLosPermisos(array $codigosPermisos)
     {
-        return $this->rol && $this->rol->tieneTodosLosPermisos($codigosPermisos);
+        $perms = $this->permisos()->whereIn('codigo', $codigosPermisos)->pluck('codigo')->toArray();
+        return count($codigosPermisos) === count($perms);
     }
 
     /**

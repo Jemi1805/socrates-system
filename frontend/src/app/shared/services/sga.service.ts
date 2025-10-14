@@ -170,6 +170,19 @@ export class SgaService {
       .pipe(catchError(this.handleError));
   }
 
+  // Permisos directos por usuario
+  getUserPermissions(userId: number): Observable<ApiResponse<Array<{ id: number; codigo: string; nombre: string; assigned: boolean }>>> {
+    return this.http
+      .get<ApiResponse<Array<{ id: number; codigo: string; nombre: string; assigned: boolean }>>>(`${environment.apiUrl}/users/${userId}/permissions`)
+      .pipe(catchError(this.handleError));
+  }
+
+  setUserPermissions(userId: number, permissionIds: number[]): Observable<ApiResponse<{ assigned_ids: number[] }>> {
+    return this.http
+      .post<ApiResponse<{ assigned_ids: number[] }>>(`${environment.apiUrl}/users/${userId}/permissions`, { permission_ids: permissionIds })
+      .pipe(catchError(this.handleError));
+  }
+
   getUsuarioById(id: number): Observable<ApiResponse<Usuario>> {
     return this.http.get<ApiResponse<Usuario>>(`${environment.apiUrl}/users/${id}`)
       .pipe(catchError(this.handleError));

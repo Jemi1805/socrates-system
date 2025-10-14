@@ -89,6 +89,10 @@
                         <i class="bi bi-pencil-square"></i>
                         Editar
                       </button>
+                      <button class="btn btn-outline-secondary btn-sm ms-1" (click)="openPerms(u)">
+                        <i class="bi bi-shield-lock"></i>
+                        Permisos
+                      </button>
                     </td>
                   </tr>
                 </tbody>
@@ -235,6 +239,49 @@
     </div>
   </div>
   <div class="modal-backdrop fade show" (click)="isCreateUserMode ? closeUserModal() : cancelEdit()"></div>
+</div>
+
+<!-- Modal Permisos por Usuario -->
+<div *ngIf="permsModalVisible">
+  <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="permsModalLabel">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header py-2">
+          <h5 class="modal-title" id="permsModalLabel">
+            <i class="bi bi-shield-lock me-2"></i>
+            Permisos de {{ permsTargetUser?.nombre_usuario }}
+          </h5>
+          <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="closePermsModal()"></button>
+        </div>
+        <div class="modal-body">
+          <div *ngIf="permsLoading" class="text-muted small">Cargando permisos...</div>
+          <div *ngIf="permsError" class="alert alert-danger py-2">{{ permsError }}</div>
+          <div class="row" *ngIf="!permsLoading && permsOptions?.length">
+            <div class="col-12">
+              <div class="list-group small">
+                <label class="list-group-item" *ngFor="let p of permsOptions">
+                  <input class="form-check-input me-1" type="checkbox" [checked]="p.assigned" (change)="onTogglePerm(p, $event)" />
+                  <span class="fw-semibold">{{ p.codigo }}</span> - {{ p.nombre }}
+                </label>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="!permsLoading && !permsOptions?.length" class="text-muted small">No hay permisos definidos.</div>
+        </div>
+        <div class="modal-footer py-2">
+          <button class="btn btn-success btn-sm" type="button" (click)="savePerms()" [disabled]="savingPerms">
+            <i class="bi bi-save"></i>
+            Guardar
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" type="button" (click)="closePermsModal()">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop fade show" (click)="closePermsModal()"></div>
+  
 </div>
 
 <!-- Modal Editar Pertinencia -->

@@ -56,6 +56,14 @@ export class ConfiguracionComponent implements OnInit {
   modalSaving = false;
   modalError: string | null = null;
 
+  // Permisos (modal)
+  permsModalVisible = false;
+  permsLoading = false;
+  permsError: string | null = null;
+  permsTargetUser: Usuario | null = null;
+  permsOptions: Array<{ id: number; codigo: string; nombre: string; assigned: boolean }> = [];
+  savingPerms = false;
+
   constructor(private sga: SgaService, private fb: FormBuilder) {}
 
   ngOnInit(): void {
@@ -373,6 +381,69 @@ export class ConfiguracionComponent implements OnInit {
     if (typeof document !== 'undefined') {
       document.body.classList.toggle('modal-open', open);
     }
+  }
+
+  // --- Permisos por Usuario ---
+  openPerms(u: Usuario) {
+    this.permsTargetUser = u;
+    this.permsModalVisible = true;
+    this.permsLoading = true;
+    this.permsError = null;
+    this.permsOptions = [];
+    this.setBodyModalOpen(true);
+    this.sga.getUserPermissions(u.id).subscribe({
+      next: (resp) => {
+        this.permsLoading = false;
+        if (resp?.success) {
+          this.permsOptions = resp.data || [];
+        } else {
+          this.permsError = resp?.message || 'No se pudo cargar permisos';
+        }
+      },
+      error: (err) => {
+        this.permsLoading = false;
+        this.permsError = err?.message || 'Error al cargar permisos';
+      }
+    });
+  }
+
+  closePermsModal() {
+    this.permsModalVisible = false;
+    this.permsLoading = false;
+    this.savingPerms = false;
+    this.permsError = null;
+    this.permsTargetUser = null;
+    this.permsOptions = [];
+    this.setBodyModalOpen(false);
+  }
+
+  onTogglePerm(item: { assigned: boolean }, ev: Event) {
+    const target = ev.target as HTMLInputElement;
+    if (target) {
+      item.assigned = !!target.checked;
+    }
+  }
+
+  savePerms() {
+    if (!this.permsTargetUser) return;
+    this.savingPerms = true;
+    const ids = this.permsOptions.filter(p => p.assigned).map(p => p.id);
+    this.sga.setUserPermissions(this.permsTargetUser.id, ids).subscribe({
+      next: (resp) => {
+        this.savingPerms = false;
+        if (resp?.success) {
+          // Opcional: refrescar usuario listado
+          this.loadUsuarios();
+          this.closePermsModal();
+        } else {
+          this.permsError = resp?.message || 'No se pudo guardar permisos';
+        }
+      },
+      error: (err) => {
+        this.savingPerms = false;
+        this.permsError = err?.message || 'Error al guardar permisos';
+      }
+    });
   }
 
   // --- Toggle y carga: Pertinencias ---

@@ -50,7 +50,7 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Información del usuario autenticado
     Route::get('/user', function (Request $request) {
-        return $request->user()->load('rol.permisos');
+        return $request->user()->load(['rol', 'permisos']);
     });
     
     // 👤 GESTIÓN DE USUARIOS (Requiere permisos)
@@ -63,17 +63,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/{id}', [UserController::class, 'update'])->middleware('permission:usuarios.actualizar');
         Route::delete('/{id}', [UserController::class, 'destroy'])->middleware('permission:usuarios.eliminar');
         Route::patch('/{id}/toggle-status', [UserController::class, 'toggleStatus'])->middleware('permission:usuarios.activar_desactivar');
+        // Permisos directos del usuario
+        Route::get('/{id}/permissions', [UserController::class, 'getPermissions'])->middleware('permission:usuarios.actualizar');
+        Route::post('/{id}/permissions', [UserController::class, 'setPermissions'])->middleware('permission:usuarios.actualizar');
     });
     
     // 🛡️ GESTIÓN DE ROLES (Requiere permisos)
     Route::prefix('roles')->group(function () {
         Route::get('/', [RolController::class, 'index'])->middleware('permission:roles.leer');
         Route::post('/', [RolController::class, 'store'])->middleware('permission:roles.crear');
-        Route::get('/permisos', [RolController::class, 'permisos'])->middleware('permission:roles.leer');
         Route::get('/{id}', [RolController::class, 'show'])->middleware('permission:roles.leer');
         Route::put('/{id}', [RolController::class, 'update'])->middleware('permission:roles.actualizar');
         Route::delete('/{id}', [RolController::class, 'destroy'])->middleware('permission:roles.eliminar');
-        Route::post('/{id}/permisos', [RolController::class, 'asignarPermisos'])->middleware('permission:roles.actualizar');
         Route::get('/{id}/usuarios', [RolController::class, 'usuarios'])->middleware('permission:roles.leer');
     });
 
