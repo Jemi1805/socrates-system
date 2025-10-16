@@ -668,7 +668,7 @@
         <div class="row g-3">
           <div class="col-md-7">
             <label class="form-label">Tipo de Regimen</label>
-            <select class="form-select" [(ngModel)]="datosConclusionCarrera.reg_con_c" [disabled]="viewInscripcion && !editConclusion">
+            <select class="form-select" [(ngModel)]="datosConclusionCarrera.reg_con_c" (ngModelChange)="setRegimenFin($event)" [disabled]="viewInscripcion && !editConclusion">
               <option [ngValue]="null" disabled>Seleccione tipo de Regimen</option>
               <option [ngValue]="'semestral'">Semestral</option>
               <option [ngValue]="'anual'">Anual</option>
@@ -740,10 +740,7 @@
         <div class="row g-2">
           <div class="col-md-2">
             <label class="form-label">Gestión</label>
-            <select class="form-select" [ngModel]="nuevoArancel.gestion" (ngModelChange)="setNuevoArancelGestion($event)">
-              <option [ngValue]="''">Seleccione gestión</option>
-              <option *ngFor="let g of gestionesOpciones" [ngValue]="g">{{ g }}</option>
-            </select>
+            <input type="text" class="form-control" [ngModel]="nuevoArancel.gestion" readonly />
           </div>
           <div class="col-md-2">
             <label class="form-label">Fecha</label>
@@ -1094,7 +1091,7 @@
           <div class="col-md-4"><strong>Tipo de bachiller:</strong> {{ r.tipo_bachiller || '-' }}</div>
           <div class="col-md-4"><strong>Estado de pago:</strong> {{ r.pago_estado }}</div>
           <div class="col-md-12">
-            <strong>Casos especiales:</strong>
+            <strong>Información adicional:</strong>
             <ul class="mb-2">
               <li *ngIf="r.es_edu_regular">Transitabilidad de Educación Regular</li>
               <li *ngIf="r.es_tecnico_medio">Transitabilidad de nivel técnico medio</li>
@@ -1104,6 +1101,7 @@
             </ul>
           </div>
           <div class="col-12" *ngIf="(r.aranceles || []).length > 0">
+            <strong>Aranceles registrados:</strong>
             <div class="table-responsive">
               <table class="table table-sm table-striped align-middle">
                 <thead>
@@ -1202,6 +1200,38 @@
     </div>
   </div>
   <div class="modal-backdrop fade show" *ngIf="modalVisible" (click)="ocultarModal()"></div>
+
+  <!-- Modal de faltantes por sección -->
+  <div *ngIf="modalFaltantesVisible">
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalFaltantesLabel">
+      <div class="modal-dialog modal-md modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h5 class="modal-title" id="modalFaltantesLabel">
+              <i class="bi bi-exclamation-triangle text-warning me-2"></i>
+              Faltan completar campos
+            </h5>
+            <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="cerrarModalFaltantes()"></button>
+          </div>
+          <div class="modal-body">
+            <div *ngIf="(faltantesSecciones || []).length === 0" class="alert alert-info py-2">
+              No se detectaron campos faltantes.
+            </div>
+            <div *ngFor="let sec of faltantesSecciones" class="mb-2">
+              <strong class="d-block mb-1">{{ sec.titulo }}</strong>
+              <ul class="mb-2">
+                <li *ngFor="let it of sec.items">{{ it }}</li>
+              </ul>
+            </div>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-primary btn-sm" (click)="cerrarModalFaltantes()">Aceptar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade show" (click)="cerrarModalFaltantes()"></div>
+  </div>
 
   <!-- Modal de Cambios Guardados (global) -->
   <div *ngIf="modalCambiosVisible && !esNuevoPostulante">

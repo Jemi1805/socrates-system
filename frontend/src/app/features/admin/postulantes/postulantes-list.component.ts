@@ -166,7 +166,11 @@ export class PostulantesListComponent implements OnInit {
 
   // --- Confirmación de guardado global ---
   abrirModalConfirmarGuardar() {
-    this.modalConfirmGuardarVisible = true;
+    this.loadingService.showModal();
+    setTimeout(() => {
+      this.modalConfirmGuardarVisible = true;
+      this.loadingService.hideModal();
+    }, 0);
   }
   cerrarModalConfirmarGuardar() {
     this.modalConfirmGuardarVisible = false;
@@ -547,6 +551,131 @@ private validarCampos(): string[] {
   return faltantes;
 }
 
+// Construye faltantes por sección con etiquetas de UI
+private validarCamposSecciones(): Array<{ titulo: string; items: string[] }> {
+  const secciones: Array<{ titulo: string; items: string[] }> = [];
+  // Datos del estudiante
+  const p: any = this.postulanteActual || {};
+  const bio: string[] = [];
+  if (!this.isNonEmpty(p.nombres_est)) bio.push('Nombres');
+  if (!this.isNonEmpty(p.ap_pat)) bio.push('Apellido Paterno');
+  if (!this.isNonEmpty(p.ap_mat)) bio.push('Apellido Materno');
+  if (!this.isNonEmpty(p.ci)) bio.push('CI');
+  if (!this.isNonEmpty(p.carrera)) bio.push('Carrera');
+  if (!this.isNonEmpty(p.pensum)) bio.push('Pensum');
+  if (!this.isNonEmpty(p.fecha_nacimiento)) bio.push('Fecha de Nacimiento');
+  if (!this.isNonEmpty(p.lugar_nacimiento)) bio.push('Lugar de Nacimiento');
+  if (!this.isNonEmpty(p.procedencia)) bio.push('Procedencia');
+  if (bio.length) secciones.push({ titulo: 'Datos del estudiante', items: bio });
+
+  // Bachillerato
+  const bach: string[] = [];
+  if (this.tipoBachiller === 'nacional') {
+    const nroSerie = (this.diplomaNacional?.nro_serie || p.nro_serie_titulo);
+    if (!this.isNonEmpty(nroSerie)) bach.push('N° de Serie (Bachiller Nacional)');
+    if (!this.isNonEmpty(this.diplomaNacional.emision)) bach.push('Emisión (Bachiller Nacional)');
+    if (!this.isNonEmpty(this.diplomaNacional.fecha_emision)) bach.push('Fecha de Emisión (Bachiller Nacional)');
+    if (!this.isNonEmpty(this.diplomaNacional.gestion_bachillerato)) bach.push('Gestión de Bachillerato');
+  } else if (this.tipoBachiller === 'extranjero') {
+    if (!this.isNonEmpty(this.homologacionExtranjero.fecha_emision)) bach.push('Fecha de Emisión (Bachiller Extranjero)');
+  }
+  if (bach.length) secciones.push({ titulo: 'Datos del Bachillerato', items: bach });
+
+  // Inicio/Conclusión
+  const ic: string[] = [];
+  if (!this.isNonEmpty(this.datosInicioCarrera.reg_ini_c)) ic.push('Tipo de Régimen (Inicio de Carrera)');
+  if (!this.isNonEmpty(this.datosConclusionCarrera.reg_con_c)) ic.push('Tipo de Régimen (Conclusión de Carrera)');
+  if (!this.isNonEmpty(this.datosInicioCarrera.gestion_ini)) ic.push('Gestión de Inicio de Carrera');
+  if (!this.isNonEmpty(this.datosConclusionCarrera.gestion_fin)) ic.push('Gestión de Conclusión de Carrera');
+  if (
+    this.isNonEmpty(this.datosInicioCarrera.reg_ini_c) &&
+    this.isNonEmpty(this.datosConclusionCarrera.reg_con_c) &&
+    this.datosInicioCarrera.reg_ini_c !== this.datosConclusionCarrera.reg_con_c
+  ) {
+    ic.push('El tipo de régimen debe ser el mismo en Inicio y Conclusión');
+  }
+  if (this.gestionErrorMessage) ic.push(this.gestionErrorMessage);
+  if (ic.length) secciones.push({ titulo: 'Datos de Inicio/Conclusión de Carrera', items: ic });
+
+  // Opciones de transitabilidad (si se seleccionó alguna)
+  const tran: string[] = [];
+  switch (this.selectedOpcion) {
+    case 'educacionRegular': {
+      const e = this.eduRegularData;
+      if (!this.isNonEmpty(e.serie_titulo_tm)) tran.push('Serie título (Educación Regular)');
+      if (!this.isNonEmpty(e.numero_titulo_tm)) tran.push('N° de Título (Educación Regular)');
+      if (!this.isNonEmpty(e.fecha_emision)) tran.push('Fecha de Emisión (Educación Regular)');
+      break;
+    }
+    case 'tecnicoMedio': {
+      const t = this.tecnicoMedioData;
+      if (!this.isNonEmpty(t.serie_titulo_tm)) tran.push('Serie título (Técnico Medio)');
+      if (!this.isNonEmpty(t.numero_titulo_tm)) tran.push('N° de Título (Técnico Medio)');
+      if (!this.isNonEmpty(t.fecha_emision)) tran.push('Fecha de Emisión (Técnico Medio)');
+      break;
+    }
+    case 'traspasoInstituto': {
+      if (!this.isNonEmpty(this.traspasoData.instituto_origen)) tran.push('Instituto de origen (Traspaso)');
+      (this.traspasoData.grados_gestiones || []).forEach((gg, i) => {
+        if (this.isNonEmpty(gg.grado) || this.isNonEmpty(gg.gestion)) {
+          if (!this.isNonEmpty(gg.grado)) tran.push(`Grado #${i + 1} (Traspaso)`);
+          if (!this.isNonEmpty(gg.gestion)) tran.push(`Gestión #${i + 1} (Traspaso)`);
+        }
+      });
+      break;
+    }
+    case 'homologacionCambioPlan': {
+      if (!this.isNonEmpty(this.homoCambioPlanData.nro_resolucion_rectoral)) tran.push('N° de Resolución Rectoral (Cambio de plan)');
+      if (!this.isNonEmpty(this.homoCambioPlanData.fecha_emision)) tran.push('Fecha de Emisión (Cambio de plan)');
+      (this.homoCambioPlanData.grados_gestiones || []).forEach((gg, i) => {
+        if (this.isNonEmpty(gg.grado) || this.isNonEmpty(gg.gestion)) {
+          if (!this.isNonEmpty(gg.grado)) tran.push(`Grado #${i + 1} (Cambio de plan)`);
+          if (!this.isNonEmpty(gg.gestion)) tran.push(`Gestión #${i + 1} (Cambio de plan)`);
+        }
+      });
+      break;
+    }
+  }
+  if (tran.length) secciones.push({ titulo: 'Transitabilidad', items: tran });
+
+  // Aranceles seleccionados
+  const ar: string[] = [];
+  if (!Array.isArray(this.selectedAranceles) || this.selectedAranceles.length === 0) {
+    ar.push('Seleccione al menos un arancel');
+    // Si es postulante nuevo y está el formulario manual visible, listar faltantes del formulario
+    if (this.esNuevoPostulante && !this.tieneArancelesSga) {
+      const n: any = this.nuevoArancel || {};
+      if (!this.isNonEmpty(n.gestion)) ar.push('Gestión');
+      if (!this.isNonEmpty(n.fecha)) ar.push('Fecha');
+      if (!this.isNonEmpty(n.concepto)) ar.push('Concepto');
+      const mn = this.toNumber(n.monto);
+      if (!(mn > 0)) ar.push('Monto (> 0)');
+      const hasFactura = !!(n.num_factura && String(n.num_factura).trim());
+      const hasRecibo = !!(n.num_comprobante && String(n.num_comprobante).trim());
+      if (!hasFactura && !hasRecibo) ar.push('N° Factura o N° Recibo');
+      if (!this.isNonEmpty(n.razon)) ar.push('Razón Social');
+      if (!this.isNonEmpty(n.nit)) ar.push('NIT');
+      if (this.isNonEmpty(n.nit) && !/^\d+$/.test(String(n.nit).trim())) ar.push('NIT (solo números)');
+    }
+  }
+  if (ar.length) secciones.push({ titulo: 'Aranceles', items: ar });
+
+  return secciones;
+}
+
+private mostrarModalFaltantes(secciones: Array<{ titulo: string; items: string[] }>) {
+  this.loadingService.showModal();
+  setTimeout(() => {
+    this.faltantesSecciones = secciones || [];
+    this.modalFaltantesVisible = true;
+    this.loadingService.hideModal();
+  }, 0);
+}
+
+cerrarModalFaltantes() {
+  this.modalFaltantesVisible = false;
+}
+
 // --- Handlers para dropdown custom ---
 setGestionInicio(g: string) {
   this.datosInicioCarrera.gestion_ini = g;
@@ -584,6 +713,7 @@ setRegimenInicio(v: 'semestral' | 'anual') {
 
 setRegimenFin(v: 'semestral' | 'anual') {
   this.datosConclusionCarrera.reg_con_c = v;
+  this.datosInicioCarrera.reg_ini_c = v;
   this.markChangedInView();
 }
 
@@ -632,6 +762,11 @@ ngOnInit() {
   this.cargarModalidades();
   // Generar lista de gestiones dinámicamente
   this.generarGestiones();
+  // Preasignar gestión actual para arancel manual
+  try {
+    const gActual = this.getGestionActual();
+    if (gActual) this.nuevoArancel.gestion = gActual;
+  } catch {}
   // Si venimos desde el modal con query ver=1, activar modo Ver inscripción
   const ver = this.route.snapshot.queryParamMap.get('ver');
   this.debeEntrarVer = (ver === '1');
@@ -1187,7 +1322,11 @@ private cargarPostulanteDesdeBD() {
         }
       });
     } else {
-      this.modalVisible = true;
+      this.loadingService.showModal();
+      setTimeout(() => {
+        this.modalVisible = true;
+        this.loadingService.hideModal();
+      }, 0);
     }
   }
 
@@ -1203,7 +1342,11 @@ private cargarPostulanteDesdeBD() {
     }
     // Para edición: pedir confirmación mostrando el cambio
     this.nuevaModalidad = modalidad;
-    this.modalConfirmCambioVisible = true;
+    this.loadingService.showModal();
+    setTimeout(() => {
+      this.modalConfirmCambioVisible = true;
+      this.loadingService.hideModal();
+    }, 0);
   }
 
   cancelarCambioModalidad() {
@@ -2553,6 +2696,14 @@ private cargarPostulanteDesdeBD() {
     return null;
   }
 
+  // Convierte cadenas con símbolos a número decimal; si es inválido devuelve 0
+  private toNumber(val: any): number {
+    if (val === null || val === undefined) return 0;
+    if (typeof val === 'number') return isFinite(val) ? val : 0;
+    const parsed = parseFloat(String(val).replace(/[^0-9,.-]/g, '').replace(',', '.'));
+    return isNaN(parsed) ? 0 : parsed;
+  }
+
   // --- Snapshot y resumen de cambios ---
   private _snapshotAntes: any = null;
 
@@ -2674,8 +2825,12 @@ private cargarPostulanteDesdeBD() {
     if (this.esNuevoPostulante) {
       return;
     }
-    this.cambiosRealizados = cambios || [];
-    this.modalCambiosVisible = true;
+    this.loadingService.showModal();
+    setTimeout(() => {
+      this.cambiosRealizados = cambios || [];
+      this.modalCambiosVisible = true;
+      this.loadingService.hideModal();
+    }, 0);
   }
 
   cerrarModalCambios() {
@@ -2769,13 +2924,13 @@ private cargarPostulanteDesdeBD() {
 
   registrarInscripcion() {
     // Validación integral antes del registro definitivo
-    const faltantes = this.validarCampos();
-    if (faltantes.length) {
-      alert('Complete los siguientes campos: ' + faltantes.join(', '));
+    const faltantesSecc = this.validarCamposSecciones();
+    if (faltantesSecc.length) {
+      this.mostrarModalFaltantes(faltantesSecc);
       return;
     }
     if (!this.puedeRegistrar()) {
-      alert('Complete los datos requeridos antes de registrar la inscripción.');
+      this.inscripcionError = 'Complete los datos requeridos antes de registrar la inscripción.';
       return;
     }
 
@@ -2938,8 +3093,12 @@ private cargarPostulanteDesdeBD() {
         // Construir resumen (se mostrará al cerrar el modal)
         this.construirResumenInscripcion();
         this.resumenVisible = false;
-        // Mostrar modal bonito de éxito
-        this.modalExitoVisible = true;
+        // Spinner antes del modal de éxito
+        this.loadingService.showModal();
+        setTimeout(() => {
+          this.modalExitoVisible = true;
+          this.loadingService.hideModal();
+        }, 0);
         this.inscripcionLoading = false;
       },
       error: (err) => {
@@ -2973,9 +3132,21 @@ private cargarPostulanteDesdeBD() {
     //   this.arancelManualError = 'El registro manual de arancel solo está disponible para nuevos postulantes.';
     //   return;
     // }
+    // Validación estricta: todos los campos requeridos, excepto que Factura o Recibo puede ser uno u otro
     const montoNum = this.toNumber(this.nuevoArancel.monto);
-    if (!this.nuevoArancel.concepto || montoNum <= 0) {
-      this.arancelManualError = 'Ingrese al menos Concepto y un Monto válido (> 0).';
+    const falt: string[] = [];
+    if (!this.nuevoArancel.gestion) falt.push('Gestión');
+    if (!this.nuevoArancel.fecha) falt.push('Fecha');
+    if (!this.nuevoArancel.concepto) falt.push('Concepto');
+    if (!(montoNum > 0)) falt.push('Monto (> 0)');
+    const hasFactura = !!(this.nuevoArancel.num_factura && String(this.nuevoArancel.num_factura).trim());
+    const hasRecibo = !!(this.nuevoArancel.num_comprobante && String(this.nuevoArancel.num_comprobante).trim());
+    if (!hasFactura && !hasRecibo) falt.push('N° Factura o N° Recibo');
+    if (!this.nuevoArancel.razon) falt.push('Razón Social');
+    if (!this.nuevoArancel.nit) falt.push('NIT');
+    if (this.nuevoArancel.nit && !/^\d+$/.test(String(this.nuevoArancel.nit).trim())) falt.push('NIT (solo números)');
+    if (falt.length) {
+      this.arancelManualError = 'Complete: ' + falt.join(', ');
       return;
     }
     const cod = Number(this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta) || null;
@@ -3089,7 +3260,7 @@ private cargarPostulanteDesdeBD() {
         this.editingArancelKey = null;
         this.editingArancelIndexTabla = null;
         this.nuevoArancel = {
-          gestion: '', fecha: '', concepto: '', monto: '', num_factura: '', num_comprobante: '', razon: '', nit: ''
+          gestion: this.getGestionActual(), fecha: '', concepto: '', monto: '', num_factura: '', num_comprobante: '', razon: '', nit: ''
         };
         },
         error: (e) => {
@@ -3127,7 +3298,7 @@ private cargarPostulanteDesdeBD() {
   cancelarEdicionArancelManual() {
     this.editingArancelIndex = null;
     this.nuevoArancel = {
-      gestion: '',
+      gestion: this.getGestionActual(),
       fecha: '',
       concepto: '',
       monto: '',
@@ -3146,7 +3317,7 @@ private cargarPostulanteDesdeBD() {
     this.editingArancelIndexTabla = null;
     this.arancelManualError = null;
     this.nuevoArancel = {
-      gestion: '',
+      gestion: this.getGestionActual(),
       fecha: '',
       concepto: '',
       monto: '',
@@ -3178,11 +3349,15 @@ private cargarPostulanteDesdeBD() {
     this.markChangedInView();
   }
 
-  private toNumber(val: any): number {
-    if (val === null || val === undefined) return 0;
-    if (typeof val === 'number') return isFinite(val) ? val : 0;
-    const parsed = parseFloat(val.toString().replace(/[^0-9,.-]/g, '').replace(',', '.'));
-    return isNaN(parsed) ? 0 : parsed;
+  // Retorna la gestión actual calculada (primer elemento de la lista o cálculo directo)
+  private getGestionActual(): string {
+    if (Array.isArray(this.gestionesOpciones) && this.gestionesOpciones.length) return this.gestionesOpciones[0];
+    const ahora = new Date();
+    let year = ahora.getFullYear();
+    const mes = ahora.getMonth() + 1;
+    let sem: 1 | 2;
+    if (mes >= 2 && mes <= 6) sem = 1; else if (mes >= 7 && mes <= 12) sem = 2; else { sem = 2; year = year - 1; }
+    return `${sem}/${year}`;
   }
 
   private normalizarCarrera(c: string | null | undefined): string | null {
