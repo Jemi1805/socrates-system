@@ -152,7 +152,7 @@ export class SgaService {
 
   // --- ROLES (Local BD) ---
   getRoles(): Observable<ApiResponse<Rol[]>> {
-    return this.http.get<ApiResponse<Rol[]>>(`${environment.apiUrl}/roles`)
+    return this.http.get<ApiResponse<Rol[]>>(`${environment.apiUrl}/users/roles`)
       .pipe(catchError(this.handleError));
   }
 
@@ -318,6 +318,12 @@ export class SgaService {
     if (params?.carrera) httpParams = httpParams.set('carrera', params.carrera);
     if (params?.gestion) httpParams = httpParams.set('gestion', params.gestion);
     return this.http.get<ApiResponse<TutorReg[]>>(`${environment.apiUrl}/tutores`, { params: httpParams })
+      .pipe(catchError(this.handleError));
+  }
+
+  // --- TUTORES: designación ---
+  designarTutor(data: { tutor_id: number; cod_ceta: number; proyecto_id?: number }): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/tutores/designar`, data)
       .pipe(catchError(this.handleError));
   }
 

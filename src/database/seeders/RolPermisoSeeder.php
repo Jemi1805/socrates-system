@@ -22,13 +22,13 @@ class RolPermisoSeeder extends Seeder
         // Crear Roles
         $roles = [
             [
-                'nombre' => 'super_admin',
+                'nombre' => 'Super Admin',
                 'descripcion' => 'Super Administrador con acceso completo al sistema',
                 'nivel_acceso' => 100,
                 'activo' => true,
             ],
             [
-                'nombre' => 'admin',
+                'nombre' => 'Admin',
                 'descripcion' => 'Administrador del sistema',
                 'nivel_acceso' => 80,
                 'activo' => true,
@@ -117,7 +117,7 @@ class RolPermisoSeeder extends Seeder
             $adminUser = Usuario::updateOrCreate(
                 ['nombre_usuario' => 'admin'],
                 [
-                    'nombre_usuario' => 'admin',
+                    'nombre_usuario' => 'Administrador',
                     'contrasena' => Hash::make('admin123'),
                     'rol_id' => $superAdminRol->id,
                     'activo' => true,

@@ -25,7 +25,10 @@
             name="nombre_usuario" 
             required
             class="form-input"
-            placeholder="Ingrese su usuario">
+            placeholder="Ingrese su usuario"
+            pattern="^[A-Za-z0-9_]+$"
+            (keydown.space)="$event.preventDefault()"
+            (input)="onUsernameInput($event)">
         </div>
 
         <div class="form-group">
@@ -38,7 +41,10 @@
               name="password" 
               required
               class="form-input"
-              placeholder="Ingrese su contraseña">
+              placeholder="Ingrese su contraseña"
+              pattern="^\S+$"
+              (keydown.space)="$event.preventDefault()"
+              (input)="onPasswordInput($event)">
             <button type="button" class="password-toggle" (click)="togglePasswordVisibility()">
               <i class="bi" [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"></i>
             </button>

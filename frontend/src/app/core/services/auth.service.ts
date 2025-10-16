@@ -27,8 +27,9 @@ export class AuthService {
   private apiUrl = environment.apiUrl;
   private tokenKey = 'auth_token';
   private userKey = 'auth_user';
+  private loginAtKey = 'auth_login_at';
   
-  private isAuthenticatedSubject = new BehaviorSubject<boolean>(this.hasToken());
+  private isAuthenticatedSubject = new BehaviorSubject<boolean>(this.isLoggedIn());
   public isAuthenticated$ = this.isAuthenticatedSubject.asObservable();
 
   constructor(private http: HttpClient) {}
@@ -43,6 +44,7 @@ export class AuthService {
             if (user) {
               this.setUser(user);
             }
+            this.setLoginAt(Date.now());
             this.isAuthenticatedSubject.next(true);
           }
         })
@@ -52,6 +54,7 @@ export class AuthService {
   logout(): void {
     localStorage.removeItem(this.tokenKey);
     localStorage.removeItem(this.userKey);
+    localStorage.removeItem(this.loginAtKey);
     this.isAuthenticatedSubject.next(false);
   }
 
@@ -84,7 +87,7 @@ export class AuthService {
   }
 
   isLoggedIn(): boolean {
-    return this.hasToken();
+    return this.hasToken() && !this.isTokenExpired();
   }
 
   // Refresca el usuario desde el backend y lo guarda en localStorage
@@ -98,4 +101,22 @@ export class AuthService {
       })
     );
   }
-} 
+
+  private setLoginAt(ts: number) {
+    localStorage.setItem(this.loginAtKey, String(ts));
+  }
+
+  private getLoginAt(): number | null {
+    const v = localStorage.getItem(this.loginAtKey);
+    if (!v) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  isTokenExpired(maxMinutes = 180): boolean {
+    const ts = this.getLoginAt();
+    if (!ts) return false;
+    const elapsedMs = Date.now() - ts;
+    return elapsedMs >= maxMinutes * 60 * 1000;
+  }
+}

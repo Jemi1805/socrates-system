@@ -16,23 +16,29 @@ class UsuarioPermisoSeeder extends Seeder
      */
     public function run()
     {
-        // 1) Crear permisos base (CRUD por módulo) y especiales
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        DB::table('usuario_permiso')->truncate();
+        DB::table('usuario')->truncate();
+        DB::table('rol')->truncate();
+        DB::table('permiso')->truncate();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+
+        $this->seedRoles();
+
         $this->seedPermisos();
 
-        // 2) Crear usuarios base (admin y usuario)
         $admin = $this->seedUsuariosBase();
 
-        // 3) Asignar TODOS los permisos DIRECTAMENTE al admin y a TODOS los super_admin
         $permIds = Permiso::pluck('id')->all();
         $sync = [];
         foreach ($permIds as $pid) { $sync[$pid] = ['concedido' => true]; }
         if ($admin) {
-            $admin->permisos()->syncWithoutDetaching($sync);
+            $admin->permisos()->sync($sync);
         }
-        $superAdminRol = class_exists(Rol::class) ? Rol::where('nombre', 'super_admin')->first() : null;
-        if ($superAdminRol) {
-            $superAdmins = Usuario::where('rol_id', $superAdminRol->id)->get();
-            foreach ($superAdmins as $u) {
+        $roleIds = Rol::whereIn('nombre', ['Super Admin', 'Administrador'])->pluck('id');
+        if ($roleIds->count()) {
+            $usuarios = Usuario::whereIn('rol_id', $roleIds)->get();
+            foreach ($usuarios as $u) {
                 $u->permisos()->syncWithoutDetaching($sync);
             }
         }
@@ -40,76 +46,68 @@ class UsuarioPermisoSeeder extends Seeder
 
     private function seedPermisos()
     {
-        $modulos = [
-            'usuarios' => 'Gestión de Usuarios',
-            'roles' => 'Gestión de Roles',
-            'permisos' => 'Gestión de Permisos',
-            'dashboard' => 'Panel de Control',
-            'reportes' => 'Reportes y Estadísticas',
-            'configuracion' => 'Configuración del Sistema',
-        ];
+        // Solo permisos generalizados solicitados por el usuario
+        $permisos = [
+            // Búsqueda de estudiantes
+            ['codigo' => 'sga.estudiantes.buscar', 'nombre' => 'Buscar Estudiantes', 'descripcion' => 'Permite buscar/consultar estudiantes en el SGA'],
 
-        foreach ($modulos as $mod => $nombre) {
-            // Crea crear/leer/actualizar/eliminar
-            Permiso::crearPermisosCrud($mod, $nombre);
-        }
+            // Inscripción de modalidad
+            ['codigo' => 'inscripciones.crear', 'nombre' => 'Inscribir Modalidad', 'descripcion' => 'Permite registrar la inscripción de modalidad'],
+            ['codigo' => 'inscrip_modalidad.actualizar', 'nombre' => 'Editar Inscripción', 'descripcion' => 'Permite editar la inscripción de modalidad'],
+            ['codigo' => 'inscrip_modalidad.leer', 'nombre' => 'Ver Inscripción de Modalidad', 'descripcion' => 'Permite ver la información de la inscripción de modalidad'],
 
-        // Permisos especiales adicionales
-        $especiales = [
-            [
-                'codigo' => 'usuarios.activar_desactivar',
-                'nombre' => 'Activar/Desactivar Usuarios',
-                'descripcion' => 'Permite activar o desactivar usuarios',
-            ],
+            // Temas (alias de Proyectos)
+            ['codigo' => 'temas.crear', 'nombre' => 'Registrar Tema', 'descripcion' => 'Permite registrar temas'],
+            ['codigo' => 'temas.actualizar', 'nombre' => 'Editar Tema', 'descripcion' => 'Permite editar temas'],
+
+            // Tutores
+            ['codigo' => 'tutores.crear', 'nombre' => 'Registrar Tutor', 'descripcion' => 'Permite registrar tutores'],
+            ['codigo' => 'tutores.leer', 'nombre' => 'Ver Tutor', 'descripcion' => 'Permite ver/listar tutores'],
+            ['codigo' => 'tutores.actualizar', 'nombre' => 'Editar Tutor', 'descripcion' => 'Permite editar tutores'],
+            ['codigo' => 'tutores.designar', 'nombre' => 'Designar Tutor', 'descripcion' => 'Permite designar tutor a un estudiante/tema'],
+
+            // Usuarios
+            ['codigo' => 'usuarios.crear', 'nombre' => 'Crear Usuario', 'descripcion' => 'Permite crear usuarios'],
+            ['codigo' => 'usuarios.actualizar', 'nombre' => 'Editar Usuario', 'descripcion' => 'Permite editar usuarios y permisos'],
+            ['codigo' => 'usuarios.activar_desactivar', 'nombre' => 'Desactivar Usuario', 'descripcion' => 'Permite activar o desactivar usuarios'],
+            ['codigo' => 'usuarios.editar_permisos', 'nombre' => 'Editar Permisos', 'descripcion' => 'Permite editar permisos de los usuarios'],
+
+            ['codigo' => 'permisos.leer', 'nombre' => 'Ver Permisos', 'descripcion' => 'Permite ver permisos'],
+            ['codigo' => 'permisos.actualizar', 'nombre' => 'Editar Permisos', 'descripcion' => 'Permite crear/editar permisos'],
+
+            // Pertinencias
+            ['codigo' => 'pertinencias.crear', 'nombre' => 'Crear Pertinencia', 'descripcion' => 'Permite crear pertinencias'],
+            ['codigo' => 'pertinencias.actualizar', 'nombre' => 'Editar Pertinencia', 'descripcion' => 'Permite editar pertinencias'],
+            ['codigo' => 'pertinencias.desactivar', 'nombre' => 'Desactivar Pertinencia', 'descripcion' => 'Permite activar/desactivar pertinencias'],
         ];
-        foreach ($especiales as $p) {
-            if (!Permiso::where('codigo', $p['codigo'])->exists()) {
-                Permiso::create($p);
-            }
+        foreach ($permisos as $p) {
+            Permiso::create($p);
         }
     }
 
     private function seedUsuariosBase()
     {
-        // Asegurar existencia de roles mínimos (no se usan para permisos, solo referencia opcional)
-        $superAdminRol = null;
-        $userRol = null;
-        if (class_exists(Rol::class)) {
-            $superAdminRol = Rol::firstOrCreate(
-                ['nombre' => 'super_admin'],
-                [
-                    'descripcion' => 'Super Administrador',
-                    'nivel_acceso' => 100,
-                    'activo' => true,
-                ]
-            );
-            $userRol = Rol::firstOrCreate(
-                ['nombre' => 'user'],
-                [
-                    'descripcion' => 'Usuario',
-                    'nivel_acceso' => 10,
-                    'activo' => true,
-                ]
-            );
-        }
+        $superAdminRol = Rol::where('nombre', 'Super Admin')->first();
+        $userRol = Rol::where('nombre', 'Usuario')->first();
 
         $admin = Usuario::updateOrCreate(
-            ['nombre_usuario' => env('ADMIN_USERNAME', 'admin')],
+            ['nombre_usuario' => env('ADMIN_USERNAME', 'Administrador')],
             [
-                'nombre_usuario' => env('ADMIN_USERNAME', 'admin'),
-                'contrasena' => env('ADMIN_PASSWORD', 'admin123'), // encripta por mutator
+                'nombre_usuario' => env('ADMIN_USERNAME', 'Administrador'),
+                'contrasena' => env('ADMIN_PASSWORD', 'admin123'),
+                'email' => env('ADMIN_EMAIL', 'admin@socrates.com'),
                 'rol_id' => $superAdminRol ? $superAdminRol->id : null,
                 'activo' => true,
                 'fecha_creacion' => now(),
             ]
         );
 
-        // Usuario básico sin permisos
         Usuario::updateOrCreate(
-            ['nombre_usuario' => env('DEFAULT_USER_USERNAME', 'usuario')],
+            ['nombre_usuario' => env('DEFAULT_USER_USERNAME', 'Usuario')],
             [
-                'nombre_usuario' => env('DEFAULT_USER_USERNAME', 'usuario'),
+                'nombre_usuario' => env('DEFAULT_USER_USERNAME', 'Usuario'),
                 'contrasena' => env('DEFAULT_USER_PASSWORD', 'user123'),
+                'email' => env('DEFAULT_USER_EMAIL', 'usuario@socrates.com'),
                 'rol_id' => $userRol ? $userRol->id : null,
                 'activo' => true,
                 'fecha_creacion' => now(),
@@ -117,5 +115,21 @@ class UsuarioPermisoSeeder extends Seeder
         );
 
         return $admin;
+    }
+
+    private function seedRoles()
+    {
+        $roles = [
+            ['nombre' => 'Super Admin', 'descripcion' => 'Super Administrador', 'nivel_acceso' => 100, 'activo' => true],
+            ['nombre' => 'Administrador', 'descripcion' => 'Administrador del sistema', 'nivel_acceso' => 90, 'activo' => true],
+            ['nombre' => 'Director académico', 'descripcion' => null, 'nivel_acceso' => 80, 'activo' => true],
+            ['nombre' => 'Auxiliar de Dirección Académica', 'descripcion' => null, 'nivel_acceso' => 70, 'activo' => true],
+            ['nombre' => 'Asistente de Dirección Académica', 'descripcion' => null, 'nivel_acceso' => 60, 'activo' => true],
+            ['nombre' => 'Responsable Gestión Académica Legal', 'descripcion' => null, 'nivel_acceso' => 50, 'activo' => true],
+            ['nombre' => 'Usuario', 'descripcion' => 'Usuario', 'nivel_acceso' => 10, 'activo' => true],
+        ];
+        foreach ($roles as $r) {
+            Rol::create($r);
+        }
     }
 }

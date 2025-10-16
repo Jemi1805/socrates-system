@@ -56,26 +56,26 @@ Route::middleware('auth:sanctum')->group(function () {
     // 👤 GESTIÓN DE USUARIOS (Requiere permisos)
     // Nota: Los códigos de permiso se generan como 'usuarios.*' en el seeder
     Route::prefix('users')->group(function () {
-        Route::get('/', [UserController::class, 'index'])->middleware('permission:usuarios.leer');
+        Route::get('/', [UserController::class, 'index'])->middleware('permission:usuarios.actualizar');
         Route::post('/', [UserController::class, 'store'])->middleware('permission:usuarios.crear');
-        Route::get('/roles', [UserController::class, 'getRoles'])->middleware('permission:usuarios.leer');
-        Route::get('/{id}', [UserController::class, 'show'])->middleware('permission:usuarios.leer');
+        Route::get('/roles', [UserController::class, 'getRoles'])->middleware('permission:usuarios.actualizar');
+        Route::get('/{id}', [UserController::class, 'show'])->middleware('permission:usuarios.actualizar');
         Route::put('/{id}', [UserController::class, 'update'])->middleware('permission:usuarios.actualizar');
-        Route::delete('/{id}', [UserController::class, 'destroy'])->middleware('permission:usuarios.eliminar');
+        Route::delete('/{id}', [UserController::class, 'destroy'])->middleware('permission:usuarios.actualizar');
         Route::patch('/{id}/toggle-status', [UserController::class, 'toggleStatus'])->middleware('permission:usuarios.activar_desactivar');
         // Permisos directos del usuario
-        Route::get('/{id}/permissions', [UserController::class, 'getPermissions'])->middleware('permission:usuarios.actualizar');
-        Route::post('/{id}/permissions', [UserController::class, 'setPermissions'])->middleware('permission:usuarios.actualizar');
+        Route::get('/{id}/permissions', [UserController::class, 'getPermissions'])->middleware('permission:usuarios.editar_permisos');
+        Route::post('/{id}/permissions', [UserController::class, 'setPermissions'])->middleware('permission:usuarios.editar_permisos');
     });
     
     // 🛡️ GESTIÓN DE ROLES (Requiere permisos)
     Route::prefix('roles')->group(function () {
-        Route::get('/', [RolController::class, 'index'])->middleware('permission:roles.leer');
-        Route::post('/', [RolController::class, 'store'])->middleware('permission:roles.crear');
-        Route::get('/{id}', [RolController::class, 'show'])->middleware('permission:roles.leer');
-        Route::put('/{id}', [RolController::class, 'update'])->middleware('permission:roles.actualizar');
-        Route::delete('/{id}', [RolController::class, 'destroy'])->middleware('permission:roles.eliminar');
-        Route::get('/{id}/usuarios', [RolController::class, 'usuarios'])->middleware('permission:roles.leer');
+        Route::get('/', [RolController::class, 'index'])->middleware('permission:permisos.leer');
+        Route::post('/', [RolController::class, 'store'])->middleware('permission:permisos.actualizar');
+        Route::get('/{id}', [RolController::class, 'show'])->middleware('permission:permisos.leer');
+        Route::put('/{id}', [RolController::class, 'update'])->middleware('permission:permisos.actualizar');
+        Route::delete('/{id}', [RolController::class, 'destroy'])->middleware('permission:permisos.actualizar');
+        Route::get('/{id}/usuarios', [RolController::class, 'usuarios'])->middleware('permission:permisos.leer');
     });
 
     // 📚 CRUD API RESOURCES (protegidos)
@@ -85,9 +85,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('aranceles_est/upsert_by_cod', [ArancelesEstController::class, 'upsertByCod']);
     Route::apiResource('modalidad', ModalidadController::class);
     Route::apiResource('pract_ind', PractIndController::class);
+    // Proyectos/Temas con permisos granulares
     Route::apiResource('proyecto', ProyectoController::class)
-        ->where(['proyecto' => '\d+']); // evita colisión con 'by_cod'
-    Route::apiResource('inscrip_modalidad', InscripModalidadController::class);
+        ->only(['store'])
+        ->middleware('permission:temas.crear');
+    Route::apiResource('proyecto', ProyectoController::class)
+        ->except(['store'])
+        ->where(['proyecto' => '\\d+']) // evita colisión con 'by_cod'
+        ->middleware('permission:temas.actualizar');
+    Route::apiResource('inscrip_modalidad', InscripModalidadController::class)
+        ->middleware('permission:inscrip_modalidad.actualizar');
     Route::apiResource('documentos_requeridos', DocumentosRequeridosController::class);
     Route::apiResource('documentos_adjuntos', DocumentosAdjuntosController::class);
     Route::apiResource('diploma_bachiller', DiplomaBachillerController::class);
@@ -112,9 +119,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('datos_carrera', DatosCarreraController::class);
         Route::post('datos_carrera/upsert', [DatosCarreraController::class, 'upsert']);
         // Pertinencias académicas (CRUD local)
-        Route::apiResource('pertinencias', PertinenciaController::class);
+        Route::apiResource('pertinencias', PertinenciaController::class)
+            ->middleware('permission:pertinencias.actualizar');
         // Registro de inscripción con aranceles seleccionados
-        Route::post('inscripciones', [InscripModalidadController::class, 'storeWithAranceles']);
+        Route::post('inscripciones', [InscripModalidadController::class, 'storeWithAranceles'])
+            ->middleware('permission:inscripciones.crear');
     // Catálogos base
     Route::apiResource('carrera', CarreraController::class);
     Route::apiResource('pensum', PensumController::class);
@@ -126,9 +135,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('docentes/{id}', [DocenteController::class, 'update']);
 
         // Tutores: registro masivo desde docentes seleccionados
-        Route::post('tutores/register_bulk', [TutorController::class, 'registerBulk']);
-        // Tutores: listado
-        Route::get('tutores', [TutorController::class, 'index']);
+    Route::post('tutores/register_bulk', [TutorController::class, 'registerBulk'])
+        ->middleware('permission:tutores.crear');
+    // Tutores: listado
+    Route::get('tutores', [TutorController::class, 'index'])
+        ->middleware('permission:tutores.leer');
+    // Tutores: designación
+    Route::post('tutores/designar', [TutorController::class, 'designar'])
+        ->middleware('permission:tutores.designar');
     });
 
 // 📦 RUTAS DE PRODUCTOS (Mantener existentes)
@@ -160,7 +174,8 @@ Route::prefix('sga')->group(function () {
     // Rutas de estudiantes
     Route::get('estudiantes', [SgaController::class, 'getEstudiantes']);
     Route::get('estudiantes/{codCeta}', [SgaController::class, 'getEstudianteByCodigo']);
-    Route::post('buscar-estudiantes', [SgaController::class, 'buscarEstudiantes']);
+        Route::post('buscar-estudiantes', [SgaController::class, 'buscarEstudiantes'])
+            ->middleware(['auth:sanctum', 'permission:sga.estudiantes.buscar']);
     // Pagos de Material Extra por estudiante
     Route::get('estudiantes/{codCeta}/pagos/material-extra', [SgaController::class, 'getPagosMaterialExtra']);
     

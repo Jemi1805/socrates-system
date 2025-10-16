@@ -17,8 +17,8 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'nombre_usuario' => 'required|string',
-            'password' => 'required|string|min:6',
+            'nombre_usuario' => 'required|string|regex:/^[A-Za-z0-9_]+$/',
+            'password' => 'required|string|min:6|regex:/^\S+$/',
         ]);
 
         if ($validator->fails()) {
@@ -81,8 +81,8 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'nombre_usuario' => 'required|string|max:255|unique:usuario',
-            'password' => 'required|string|min:8|confirmed',
+            'nombre_usuario' => 'required|string|max:255|regex:/^[A-Za-z0-9_]+$/|unique:usuario',
+            'password' => 'required|string|min:8|confirmed|regex:/^\S+$/',
             'rol_id' => 'required|exists:rol,id',
         ]);
 
@@ -147,7 +147,7 @@ class AuthController extends Controller
                         'descripcion' => $usuario->rol->descripcion,
                         'nivel_acceso' => $usuario->rol->nivel_acceso,
                     ] : null,
-                    'permisos' => $usuario->permisos()->map(function ($permiso) {
+                    'permisos' => $usuario->permisos()->get()->map(function ($permiso) {
                         return [
                             'id' => $permiso->id,
                             'codigo' => $permiso->codigo,

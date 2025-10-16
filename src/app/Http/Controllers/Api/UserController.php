@@ -151,8 +151,8 @@ class UserController extends Controller
             'nombre' => 'required|string|max:150',
             'apellido_p' => 'nullable|string|max:150',
             'apellido_m' => 'nullable|string|max:150',
-            'nombre_usuario' => 'required|string|max:255|unique:usuario',
-            'contrasena' => 'required|string|min:8|confirmed',
+            'nombre_usuario' => 'required|string|max:255|regex:/^[A-Za-z0-9_]+$/|unique:usuario',
+            'contrasena' => 'required|string|min:8|confirmed|regex:/^\\S+$/',
             'rol_id' => 'required|exists:rol,id',
             'activo' => 'boolean',
         ]);
@@ -202,8 +202,8 @@ class UserController extends Controller
             'nombre' => 'required|string|max:150',
             'apellido_p' => 'nullable|string|max:150',
             'apellido_m' => 'nullable|string|max:150',
-            'nombre_usuario' => ['required', 'string', 'max:255', Rule::unique('usuario')->ignore($usuario->id)],
-            'contrasena' => 'nullable|string|min:8|confirmed',
+            'nombre_usuario' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z0-9_]+$/', Rule::unique('usuario')->ignore($usuario->id)],
+            'contrasena' => 'nullable|string|min:8|confirmed|regex:/^\\S+$/',
             'rol_id' => 'required|exists:rol,id',
             'activo' => 'boolean',
         ]);

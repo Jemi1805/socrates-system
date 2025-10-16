@@ -120,3 +120,22 @@ $transition: all 0.3s ease;
 
 // Asegurar contraste de etiquetas en el modal
 .modal .form-label { color: $text-dark-blue; }
+
+// Grid de permisos en dos columnas (responsivo)
+.perms-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .5rem .75rem;
+}
+
+.perms-grid .list-group-item {
+  display: flex;
+  align-items: center;
+  margin: 0; // evitar espacios verticales propios del list-group
+}
+
+@media (max-width: 576px) {
+  .perms-grid {
+    grid-template-columns: 1fr; // una columna en móviles
+  }
+}

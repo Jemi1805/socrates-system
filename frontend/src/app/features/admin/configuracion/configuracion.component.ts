@@ -76,9 +76,9 @@ export class ConfiguracionComponent implements OnInit {
       nombre: ['', [Validators.required, Validators.maxLength(150)]],
       apellido_p: ['', [Validators.maxLength(150)]],
       apellido_m: ['', [Validators.maxLength(150)]],
-      nombre_usuario: ['', [Validators.required, Validators.maxLength(255)]],
-      contrasena: ['', [Validators.required, Validators.minLength(8)]],
-      contrasena_confirmation: ['', [Validators.required]],
+      nombre_usuario: ['', [Validators.required, Validators.maxLength(255), Validators.pattern(/^[A-Za-z0-9_]+$/)]],
+      contrasena: ['', [Validators.required, Validators.minLength(8), Validators.pattern(/^\S+$/)]],
+      contrasena_confirmation: ['', [Validators.required, Validators.pattern(/^\S+$/)]],
       rol_id: [null, [Validators.required]],
       activo: [true],
     });
@@ -244,6 +244,10 @@ export class ConfiguracionComponent implements OnInit {
 
     // Mitigar autofill del navegador: limpiar valores tras el render del modal
     this.clearAutofillInputs();
+
+    if (!this.roles.length) {
+      this.loadRoles();
+    }
   }
 
   private clearAutofillInputs() {
@@ -305,9 +309,9 @@ export class ConfiguracionComponent implements OnInit {
         nombre: ['', [Validators.required, Validators.maxLength(150)]],
         apellido_p: ['', [Validators.maxLength(150)]],
         apellido_m: ['', [Validators.maxLength(150)]],
-        nombre_usuario: ['', [Validators.required, Validators.maxLength(255)]],
-        contrasena: ['', [Validators.minLength(8)]],
-        contrasena_confirmation: [''],
+        nombre_usuario: ['', [Validators.required, Validators.maxLength(255), Validators.pattern(/^[A-Za-z0-9_]+$/)]],
+        contrasena: ['', [Validators.minLength(8), Validators.pattern(/^\S+$/)]],
+        contrasena_confirmation: ['', [Validators.pattern(/^\S+$/)]],
         rol_id: [null, [Validators.required]],
         activo: [true],
       });
@@ -327,6 +331,10 @@ export class ConfiguracionComponent implements OnInit {
     this.userModalVisible = true;
     this.modalError = null;
     this.setBodyModalOpen(true);
+
+    if (!this.roles.length) {
+      this.loadRoles();
+    }
   }
 
   cancelEdit() {
@@ -525,5 +533,33 @@ export class ConfiguracionComponent implements OnInit {
         this.errorPertinencias = err?.message || 'Error al actualizar la pertinencia';
       }
     });
+  }
+
+  onNewUsernameInput(ev: Event) {
+    const el = ev.target as HTMLInputElement;
+    const v = (el.value || '').replace(/[^A-Za-z0-9_]/g, '');
+    if (v !== el.value) el.value = v;
+    this.newUserForm.get('nombre_usuario')?.setValue(v);
+  }
+
+  onEditUsernameInput(ev: Event) {
+    const el = ev.target as HTMLInputElement;
+    const v = (el.value || '').replace(/[^A-Za-z0-9_]/g, '');
+    if (v !== el.value) el.value = v;
+    this.editUserForm.get('nombre_usuario')?.setValue(v);
+  }
+
+  onNewPasswordInput(ev: Event, control: 'contrasena' | 'contrasena_confirmation') {
+    const el = ev.target as HTMLInputElement;
+    const v = (el.value || '').replace(/\s+/g, '');
+    if (v !== el.value) el.value = v;
+    this.newUserForm.get(control)?.setValue(v);
+  }
+
+  onEditPasswordInput(ev: Event, control: 'contrasena' | 'contrasena_confirmation') {
+    const el = ev.target as HTMLInputElement;
+    const v = (el.value || '').replace(/\s+/g, '');
+    if (v !== el.value) el.value = v;
+    this.editUserForm.get(control)?.setValue(v);
   }
 }

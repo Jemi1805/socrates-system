@@ -192,7 +192,7 @@
 
               <div class="col-12 col-md-4">
                 <label class="form-label">Nombre de Usuario <span class="text-danger">*</span></label>
-                <input class="form-control" formControlName="nombre_usuario" placeholder="usuario" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+                <input class="form-control" formControlName="nombre_usuario" placeholder="usuario" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" pattern="^[A-Za-z0-9_]+$" (keydown.space)="$event.preventDefault()" (input)="isCreateUserMode ? onNewUsernameInput($event) : onEditUsernameInput($event)" />
               </div>
               
               <div class="col-12 col-md-4">
@@ -205,17 +205,17 @@
 
               <div class="col-12 col-md-4" *ngIf="isCreateUserMode; else editPwd">
                 <label class="form-label">Contraseña <span class="text-danger">*</span></label>
-                <input type="password" class="form-control" formControlName="contrasena" placeholder="********" autocomplete="new-password" />
+                <input type="password" class="form-control" formControlName="contrasena" placeholder="********" autocomplete="new-password" pattern="^\S+$" (keydown.space)="$event.preventDefault()" (input)="onNewPasswordInput($event, 'contrasena')" />
               </div>
               <ng-template #editPwd>
                 <div class="col-12 col-md-4">
                   <label class="form-label">Contraseña (opcional)</label>
-                  <input type="password" class="form-control" formControlName="contrasena" placeholder="********" autocomplete="new-password" />
+                  <input type="password" class="form-control" formControlName="contrasena" placeholder="********" autocomplete="new-password" pattern="^\S+$" (keydown.space)="$event.preventDefault()" (input)="onEditPasswordInput($event, 'contrasena')" />
                 </div>
               </ng-template>
               <div class="col-12 col-md-4">
                 <label class="form-label">Confirmar Contraseña <span *ngIf="isCreateUserMode" class="text-danger">*</span></label>
-                <input type="password" class="form-control" formControlName="contrasena_confirmation" placeholder="********" autocomplete="new-password" />
+                <input type="password" class="form-control" formControlName="contrasena_confirmation" placeholder="********" autocomplete="new-password" pattern="^\S+$" (keydown.space)="$event.preventDefault()" (input)="isCreateUserMode ? onNewPasswordInput($event, 'contrasena_confirmation') : onEditPasswordInput($event, 'contrasena_confirmation')" />
               </div>
               <div class="col-12 col-md-4 d-flex align-items-end">
                 <div class="form-check">
@@ -244,7 +244,7 @@
 <!-- Modal Permisos por Usuario -->
 <div *ngIf="permsModalVisible">
   <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="permsModalLabel">
-    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div class="modal-dialog modal-xl modal-dialog-centered" role="document">
       <div class="modal-content">
         <div class="modal-header py-2">
           <h5 class="modal-title" id="permsModalLabel">
@@ -258,7 +258,7 @@
           <div *ngIf="permsError" class="alert alert-danger py-2">{{ permsError }}</div>
           <div class="row" *ngIf="!permsLoading && permsOptions?.length">
             <div class="col-12">
-              <div class="list-group small">
+              <div class="list-group small perms-grid">
                 <label class="list-group-item" *ngFor="let p of permsOptions">
                   <input class="form-check-input me-1" type="checkbox" [checked]="p.assigned" (change)="onTogglePerm(p, $event)" />
                   <span class="fw-semibold">{{ p.codigo }}</span> - {{ p.nombre }}
