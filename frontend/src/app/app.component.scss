@@ -2,3 +2,39 @@
     display: block;
     height: 100%;
 }
+
+.global-loading-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.global-loading-modal {
+  background: #fff;
+  padding: 16px 24px;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  text-align: center;
+}
+
+.global-loading-modal .spinner-border {
+  width: 3rem;
+  height: 3rem;
+}
+
+/* Asegurar que el loader modal global quede por encima de cualquier header/nav */
+.cascade-loader.modal-backdrop {
+  z-index: 3000;
+}
+.cascade-loader.modal {
+  z-index: 3010;
+}
+
+/* Color y tamaño del spinner del loader modal */
+.cascade-loader .spinner-border {
+  color: #4C9DBD;
+}

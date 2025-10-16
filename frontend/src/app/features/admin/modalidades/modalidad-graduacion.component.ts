@@ -1,6 +1,7 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { Observable, of } from 'rxjs';
-import { tap, catchError, finalize, map } from 'rxjs/operators';
+import { tap, catchError, finalize, map, switchMap } from 'rxjs/operators';
+
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -9,6 +10,7 @@ import { Estudiante, EstudianteService } from '../../../core/services/estudiante
 import { PostulanteService } from '../postulantes/postulante.service';
 import { Postulante } from '../postulantes/postulante.model';
 import { ProyectoService } from '../proyectos/proyecto.service';
+import { LoadingService } from '../../../core/services/loading.service';
 
 interface ModalidadGraduacion {
   id: number;
@@ -71,7 +73,8 @@ export class ModalidadGraduacionComponent implements OnInit {
     private router: Router,
     private postulanteService: PostulanteService,
     private cdr: ChangeDetectorRef,
-    private proyectoService: ProyectoService
+    private proyectoService: ProyectoService,
+    private loadingService: LoadingService
   ) {}
 
   ngOnInit() {
@@ -150,6 +153,24 @@ export class ModalidadGraduacionComponent implements OnInit {
         this.proyectoActual = null;
       }
     });
+  }
+
+  private cargarProyectoActual$(codCeta: string | number): Observable<void> {
+    if (!codCeta) {
+      this.proyectoActual = null;
+      return of(void 0);
+    }
+    this.proyectoActual = null;
+    return this.proyectoService.getByCod(codCeta).pipe(
+      tap((res) => {
+        let p: any = null;
+        if (!res) p = null; else if (Array.isArray(res)) p = res[0] || null; else if ((res as any).data) p = Array.isArray((res as any).data) ? (res as any).data[0] : (res as any).data; else if ((res as any).proyecto) p = (res as any).proyecto; else p = res;
+        const hasMeaningful = !!(p && (p.id || p.nombre || (p.cod_ceta ?? (p as any).codCeta ?? (p as any).codigo_ceta)));
+        this.proyectoActual = hasMeaningful ? p : null;
+      }),
+      catchError(() => { this.proyectoActual = null; return of(void 0); }),
+      map(() => void 0)
+    );
   }
 
   // --- Utilidades de mapeo/merge ---
@@ -525,14 +546,15 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.seleccionarEstudiante(estudiante);
     const cod = (estudiante as any)?.cod_ceta || (estudiante as any)?.codCeta || (estudiante as any)?.codigo_ceta;
     if (cod) {
-      this.cargarInscripcionActual$(cod).subscribe({
-        next: () => {},
-        complete: () => {
-          // Cargar proyecto/tema existente para bloquear doble registro
-          this.cargarProyectoActual(String(cod));
-          this.abrirModal();
-        }
-      });
+      this.loadingService.showModal();
+      this.cargarInscripcionActual$(cod)
+        .pipe(
+          switchMap(() => this.cargarProyectoActual$(String(cod)))
+        )
+        .subscribe({
+          error: () => { this.loadingService.hideModal(); this.abrirModal(); },
+          complete: () => { this.loadingService.hideModal(); this.abrirModal(); }
+        });
     } else {
       this.inscripcionActual = null;
       this.proyectoActual = null;

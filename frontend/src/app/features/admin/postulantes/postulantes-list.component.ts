@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { forkJoin, of } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { PostulanteService, DocumentoPostulante, ModalidadPostulante } from './postulante.service';
@@ -9,6 +10,7 @@ import { HeaderComponent } from '../../../shared/components/header/header.compon
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { SgaService } from '../../../shared/services/sga.service';
+import { LoadingService } from '../../../core/services/loading.service';
 
 interface Estudiante {
   cod_ceta: string;
@@ -565,6 +567,7 @@ readonly regimenOptions: { value: 'semestral' | 'anual'; label: string }[] = [
 
 setRegimenInicio(v: 'semestral' | 'anual') {
   this.datosInicioCarrera.reg_ini_c = v;
+  this.datosConclusionCarrera.reg_con_c = v;
   this.markChangedInView();
 }
 
@@ -596,7 +599,7 @@ get labelNuevoArancelGestion(): string {
   return this.nuevoArancel?.gestion || 'Seleccione gestión';
 }
 
-constructor(private postulanteService: PostulanteService, private sgaService: SgaService, private router: Router, private route: ActivatedRoute) {}
+constructor(private postulanteService: PostulanteService, private sgaService: SgaService, private router: Router, private route: ActivatedRoute, private loadingService: LoadingService) {}
 
 // Normalizador para Tipo de Bachiller: siempre 'Nacional' o 'Extranjero'
 private formatTipoBachiller(v: string | null | undefined): string | null {
@@ -1132,7 +1135,23 @@ private cargarPostulanteDesdeBD() {
   
   // Métodos para gestión de modalidades
   mostrarModal() {
-    this.modalVisible = true;
+    if (!this.modalidades || this.modalidades.length === 0) {
+      this.loadingService.showModal();
+      this.postulanteService.getModalidades()
+        .pipe(finalize(() => this.loadingService.hideModal()))
+        .subscribe({
+        next: (res: any) => {
+          const data = res?.data || res || [];
+          this.modalidades = Array.isArray(data) ? data : [];
+          this.modalVisible = true;
+        },
+        error: () => {
+          this.modalVisible = true; // mostrar modal aunque haya error para informar
+        }
+      });
+    } else {
+      this.modalVisible = true;
+    }
   }
 
   ocultarModal() {

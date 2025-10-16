@@ -622,7 +622,7 @@
         <div class="row g-3">
           <div class="col-md-7">
             <label class="form-label">Tipo de Regimen</label>
-            <select class="form-select" [(ngModel)]="datosInicioCarrera.reg_ini_c" [disabled]="viewInscripcion && !editInicio">
+            <select class="form-select" [(ngModel)]="datosInicioCarrera.reg_ini_c" (ngModelChange)="setRegimenInicio($event)" [disabled]="viewInscripcion && !editInicio">
               <option [ngValue]="null" disabled>Seleccione tipo de Regimen</option>
               <option [ngValue]="'semestral'">Semestral</option>
               <option [ngValue]="'anual'">Anual</option>
@@ -736,7 +736,7 @@
       <!-- Registro manual de aranceles
            - En ver-inscripción: mostrar solo en edición y si permiteEdicionArancelesEnVista (nuevo postulante o CETA inicia con 9)
            - Fuera de ver-inscripción: siempre visible -->
-      <div class="manual-arancel my-3 border rounded" *ngIf="!viewInscripcion || (viewInscripcion && editAranceles && permiteEdicionArancelesEnVista)">
+      <div class="manual-arancel my-3 border rounded" *ngIf="esNuevoPostulante && (!viewInscripcion || (viewInscripcion && editAranceles))">
         <div class="row g-2">
           <div class="col-md-2">
             <label class="form-label">Gestión</label>
@@ -989,7 +989,7 @@
             <span class="badge rounded-pill px-2 py-1"
                   [ngClass]="pagoCompletoSeleccionados ? 'bg-secondary-subtle text-secondary' : 'bg-warning text-dark-blue'">
               <i class="bi bi-exclamation-triangle me-1"></i>
-              Con deuda
+              Pago incompleto
             </span>
             <div class="form-check form-switch mb-0">
               <input class="form-check-input" type="checkbox" id="pagoSwitch"
@@ -1173,87 +1173,78 @@
               </div>
             </div>
           </div>
-          <div class="modal-footer py-2">
-            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cancelarCambioModalidad()">Cancelar</button>
-            <button type="button" class="btn btn-primary btn-sm" (click)="confirmarCambioModalidad()">Confirmar cambio</button>
-          </div>
         </div>
       </div>
     </div>
-    <div class="modal-backdrop fade show" (click)="cancelarCambioModalidad()"></div>
   </div>
 
   <!-- Modal de selección de modalidad -->
-  <div class="modal-overlay" *ngIf="modalVisible">
-    <div class="modal-container">
-      <div class="modal-header">
-        <h3 class="modal-title">Seleccionar Modalidad de Graduación</h3>
-        <button class="btn-close" (click)="ocultarModal()">
-          <i class="bi bi-x"></i>
-        </button>
-      </div>
-      <div class="modal-body">
-        <p class="modal-description">Seleccione la modalidad de graduación para el estudiante:</p>
-        
-        <div class="modalidades-grid">
-          <div *ngFor="let mod of modalidades" class="modalidad-card-item" (click)="seleccionarModalidad(mod)">
-            <div class="modalidad-icon">
-              <i class="bi" [ngClass]="mod.icono || 'bi-award'"></i>
-            </div>
-            <h4 class="modalidad-nombre">{{mod.nombre}}</h4>
-            <button class="btn btn-outline-primary btn-sm mt-2">Seleccionar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Modal de Cambios Guardados (global, al final para evitar clipping) -->
-<div *ngIf="modalCambiosVisible && !esNuevoPostulante">
-  <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalCambiosLabel">
+  <div class="modal fade show d-block" *ngIf="modalVisible" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalSeleccionLabel">
     <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
       <div class="modal-content">
         <div class="modal-header py-2">
-          <h5 class="modal-title" id="modalCambiosLabel">
-            <i class="bi bi-clipboard-check text-success me-2"></i>
-            Cambios guardados
-          </h5>
-          <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="cerrarModalCambios()"></button>
+          <h5 class="modal-title" id="modalSeleccionLabel">Seleccionar Modalidad de Graduación</h5>
+          <button type="button" class="btn-close" aria-label="Close" (click)="ocultarModal()"></button>
         </div>
         <div class="modal-body">
-          <div *ngIf="(cambiosRealizados || []).length === 0" class="alert alert-info py-2">
-            No se detectaron cambios respecto a la información anterior.
+          <p class="modal-description">Seleccione la modalidad de graduación para el estudiante:</p>
+          <div class="modalidades-grid">
+            <div *ngFor="let mod of modalidades" class="modalidad-card-item" (click)="seleccionarModalidad(mod)">
+              <div class="modalidad-icon">
+                <i class="bi" [ngClass]="mod.icono || 'bi-award'"></i>
+              </div>
+              <h4 class="modalidad-nombre">{{mod.nombre}}</h4>
+              <button class="btn btn-outline-primary btn-sm mt-2">Seleccionar</button>
+            </div>
           </div>
-          <div class="table-responsive" *ngIf="(cambiosRealizados || []).length > 0">
-            <table class="table table-sm table-striped align-middle">
-              <thead>
-                <tr>
-                  <th>Campo</th>
-                  <th>Anterior</th>
-                  <th>Nuevo</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let c of cambiosRealizados">
-                  <td>{{ c.campo }}</td>
-                  <td>{{ c.anterior || '-' }}</td>
-                  <td>{{ c.nuevo || '-' }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="modal-footer py-2 d-flex justify-content-end gap-2">
-          <button type="button" class="btn btn-success btn-sm" (click)="continuarCambios()">
-            Continuar cambios
-          </button>
-          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cerrarModalCambios()">
-            Cerrar cambios
-          </button>
         </div>
       </div>
     </div>
   </div>
-  <div class="modal-backdrop fade show" (click)="cerrarModalCambios()"></div>
+  <div class="modal-backdrop fade show" *ngIf="modalVisible" (click)="ocultarModal()"></div>
+
+  <!-- Modal de Cambios Guardados (global) -->
+  <div *ngIf="modalCambiosVisible && !esNuevoPostulante">
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalCambiosLabel">
+      <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h5 class="modal-title" id="modalCambiosLabel">
+              <i class="bi bi-clipboard-check text-success me-2"></i>
+              Cambios guardados
+            </h5>
+            <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="cerrarModalCambios()"></button>
+          </div>
+          <div class="modal-body">
+            <div *ngIf="(cambiosRealizados || []).length === 0" class="alert alert-info py-2">
+              No se detectaron cambios respecto a la información anterior.
+            </div>
+            <div class="table-responsive" *ngIf="(cambiosRealizados || []).length > 0">
+              <table class="table table-sm table-striped align-middle">
+                <thead>
+                  <tr>
+                    <th>Campo</th>
+                    <th>Anterior</th>
+                    <th>Nuevo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let c of cambiosRealizados">
+                    <td>{{ c.campo }}</td>
+                    <td>{{ c.anterior || '-' }}</td>
+                    <td>{{ c.nuevo || '-' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer py-2 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-success btn-sm" (click)="continuarCambios()">Continuar cambios</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cerrarModalCambios()">Cerrar cambios</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade show" (click)="cerrarModalCambios()"></div>
+  </div>
 </div>
