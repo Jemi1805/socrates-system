@@ -29,6 +29,12 @@ export class DesignarTutorComponent implements OnInit {
   tutores: TutorReg[] = [];
   filteredTutores: TutorReg[] = [];
 
+  // UI State
+  isSaving = false;
+  showSuccessModal = false;
+  selectedTutor: TutorReg | null = null;
+  lastDesignation: any = null;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -133,8 +139,27 @@ export class DesignarTutorComponent implements OnInit {
 
   // Acción de designar (placeholder para futura integración)
   designarTutor(t: TutorReg) {
-    console.log('[Designar] tutor seleccionado', t, 'para estudiante', this.codCeta || this.estudiante);
-    // TODO: implementar endpoint de asignación y navegación de confirmación
+    if (!t || (!this.codCeta && !this.estudiante?.cod_ceta)) {
+      console.warn('Falta cod_ceta o tutor');
+      return;
+    }
+    const cod = Number(this.codCeta || this.estudiante?.cod_ceta);
+    const proyectoId = this.proyecto?.id ? Number(this.proyecto.id) : undefined;
+    this.isSaving = true;
+    this.sga.designarTutor({ tutor_id: Number(t.id), cod_ceta: cod, proyecto_id: proyectoId }).subscribe({
+      next: (resp) => {
+        this.isSaving = false;
+        if (resp?.success) {
+          this.selectedTutor = t;
+          this.lastDesignation = resp?.data || null;
+          this.showSuccessModal = true;
+        }
+      },
+      error: (err) => {
+        this.isSaving = false;
+        alert('No se pudo designar el tutor. ' + (err?.message || ''));
+      }
+    });
   }
 
   // Texto de áreas mostrado en la tabla
@@ -160,5 +185,19 @@ export class DesignarTutorComponent implements OnInit {
   clearAreas() {
     this.selectedAreaIds = [];
     this.applyFilter();
+  }
+
+  // Helpers de UI
+  estudianteNombre(): string {
+    const e = this.estudiante || {} as any;
+    const nombres = e.nombres || e.nombres_est || '';
+    const apPat = e.ap_pat || e.apellido_p || '';
+    const apMat = e.ap_mat || e.apellido_m || '';
+    const full = `${apPat} ${apMat} ${nombres}`.trim();
+    return full || String(this.codCeta || '');
+  }
+
+  closeSuccessModal() {
+    this.showSuccessModal = false;
   }
 }

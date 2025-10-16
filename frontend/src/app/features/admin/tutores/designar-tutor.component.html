@@ -94,7 +94,10 @@
                 <td>{{ t.cod_carrera }}</td>
                 <td>{{ areasText(t) }}</td>
                 <td class="text-end">
-                  <button class="btn btn-sm btn-success" (click)="designarTutor(t)"><i class="bi bi-check2-circle me-1"></i> Designar</button>
+                  <button class="btn btn-sm btn-success" [disabled]="isSaving" (click)="designarTutor(t)">
+                    <i class="bi" [ngClass]="isSaving ? 'bi-arrow-repeat spin' : 'bi-check2-circle'"></i>
+                    <span class="ms-1">{{ isSaving ? 'Guardando...' : 'Designar' }}</span>
+                  </button>
                 </td>
               </tr>
             </tbody>
@@ -105,4 +108,26 @@
     </div>
 
   </div>
+</div>
+
+<!-- Modal de éxito -->
+<div class="modal fade show d-block" tabindex="-1" *ngIf="showSuccessModal" style="background: rgba(0,0,0,.5);" (click)="closeSuccessModal()">
+  <div class="modal-dialog modal-dialog-centered" (click)="$event.stopPropagation()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-check-circle text-success me-2"></i>Designación exitosa</h5>
+        <button type="button" class="btn-close" aria-label="Close" (click)="closeSuccessModal()"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Se designó correctamente al tutor:</p>
+        <div class="mb-2"><strong>Tutor:</strong> {{ selectedTutor?.nombre }} {{ selectedTutor?.apellido_p }} {{ selectedTutor?.apellido_m }}</div>
+        <div class="mb-2"><strong>Estudiante:</strong> {{ estudianteNombre() }}</div>
+        <div class="text-muted small" *ngIf="lastDesignation?.fecha_designacion"><i class="bi bi-calendar-check me-1"></i>Fecha: {{ lastDesignation?.fecha_designacion }}</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" (click)="closeSuccessModal()">Aceptar</button>
+      </div>
+    </div>
+  </div>
+  
 </div>

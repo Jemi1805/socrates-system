@@ -228,4 +228,83 @@ class TutorController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Designar un tutor a un estudiante (y opcionalmente a un proyecto/tema)
+     * Body esperado: { tutor_id: number, cod_ceta: number, proyecto_id?: number }
+     */
+    public function designar(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'tutor_id' => 'required|integer|exists:tutores,id',
+            'cod_ceta' => 'required|integer|exists:postulantes,cod_ceta',
+            'proyecto_id' => 'nullable|integer|exists:proyecto,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Datos inválidos',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $data = $validator->validated();
+
+        DB::beginTransaction();
+        try {
+            $now = Carbon::now();
+
+            // Asegurar unicidad por proyecto si se envía
+            if (!empty($data['proyecto_id'])) {
+                $exist = DB::table('designacion_tutor')
+                    ->where('proyecto_id', $data['proyecto_id'])
+                    ->first();
+                if ($exist && ($exist->tutor_id != $data['tutor_id'] || $exist->cod_ceta != $data['cod_ceta'])) {
+                    DB::table('designacion_tutor')->where('id', $exist->id)->delete();
+                }
+            }
+
+            // Fallback de nombres (por si los triggers no están disponibles)
+            $p = DB::table('postulantes')->where('cod_ceta', $data['cod_ceta'])
+                ->first(['nombres_est', 'ap_pat', 'ap_mat']);
+            $t = DB::table('tutores')->where('id', $data['tutor_id'])
+                ->first(['nombre', 'apellido_p', 'apellido_m']);
+            $estNombre = $p ? trim(implode(' ', array_filter([$p->nombres_est, $p->ap_pat, $p->ap_mat]))) : null;
+            $tutNombre = $t ? trim(implode(' ', array_filter([$t->nombre, $t->apellido_p, $t->apellido_m]))) : null;
+
+            DB::table('designacion_tutor')->updateOrInsert(
+                [
+                    'tutor_id' => $data['tutor_id'],
+                    'cod_ceta' => $data['cod_ceta'],
+                ],
+                [
+                    'proyecto_id' => $data['proyecto_id'] ?? null,
+                    'fecha_designacion' => $now->toDateString(),
+                    'tutor_nombre' => $tutNombre,
+                    'estudiante_nombre' => $estNombre,
+                    'updated_at' => $now,
+                    'created_at' => $now,
+                ]
+            );
+
+            $row = DB::table('designacion_tutor')
+                ->where('tutor_id', $data['tutor_id'])
+                ->where('cod_ceta', $data['cod_ceta'])
+                ->first();
+
+            DB::commit();
+            return response()->json([
+                'success' => true,
+                'message' => 'Tutor designado correctamente',
+                'data' => $row,
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al designar tutor',
+            ], 500);
+        }
+    }
 }

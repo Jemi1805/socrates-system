@@ -113,7 +113,7 @@ class Postulante extends Model
     public function tutores()
     {
         return $this->belongsToMany(Tutor::class, 'designacion_tutor', 'cod_ceta', 'tutor_id', 'cod_ceta', 'id')
-            ->withPivot(['proyecto_id', 'fecha_designacion', 'user_id'])
+            ->withPivot(['proyecto_id', 'fecha_designacion', 'user_id', 'estudiante_nombre', 'tutor_nombre'])
             ->withTimestamps();
     }
 }
