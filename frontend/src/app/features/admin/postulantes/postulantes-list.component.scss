@@ -801,6 +801,18 @@ input {
     color: white !important;
   }
 }
+
+.btn-warning {
+  color: $text-dark-blue !important;
+  border-color: #fcbe03;
+  background: #fcd45f;
+  .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+    color: white !important;
+  }
+  &:hover {
+    background: #fcd45f;
+  }
+}
 // .docs-card {
 // }
 

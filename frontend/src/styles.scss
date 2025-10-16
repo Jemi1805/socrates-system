@@ -4,7 +4,7 @@
 $primary-color: #4C9DBD;
 $secondary-color: #FF9800;
 $success-color: #4CAF50;
-$danger-color: #F44336;
+$danger-color: #DC3545;
 $info-color: #17a2b8;
 $light-gray: #f5f5f5;
 $border-color: #e0e0e0;
@@ -232,6 +232,7 @@ body {
   
   .btn-primary{
     color: $primary-color !important;
+
   }
   
   .btn {
@@ -285,6 +286,20 @@ body {
   .card .card-title .btn-edit-header:hover,
   .form-card .card-title .btn-edit-header:hover {
     background: #f5f5f5 !important;
+  }
+}
+
+/* Botones rojos (eliminar) */
+.btn-danger {
+  color: $danger-color !important;
+  border-color: $danger-color !important;
+
+  .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+      color: white !important;
+  }
+
+  &:hover {
+    background: $danger-color !important;
   }
 }
 

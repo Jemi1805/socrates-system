@@ -30,7 +30,6 @@ interface Estudiante {
   gestion_fin?: string;
   incrip_uni?: boolean;
 }
-
 interface ModalidadGraduacion {
   id: number;
   nombre: string;
@@ -82,6 +81,7 @@ export class PostulantesListComponent implements OnInit {
   resumenVisible: boolean = false;
   // Modo de visualización de inscripción (solo lectura por defecto)
   viewInscripcion: boolean = false;
+  private debeEntrarVer: boolean = false;
   resumenInscripcion: {
     carrera: string | null;
     pensum: string | null;
@@ -113,10 +113,21 @@ export class PostulantesListComponent implements OnInit {
   modalConfirmGuardarVisible: boolean = false;
   showBiographicalData = true;
   showBachilleratoData = true;
+  modalFaltantesVisible: boolean = false;
+  faltantesSecciones: Array<{ titulo: string; items: string[] }> = [];
   // Nuevo registro: habilita selects de carrera y pensum
   esNuevoPostulante = false;
   // Modo de edición para Datos del estudiante (biográficos)
   isEditing = false;
+  // Señales de origen de datos y control de UI
+  datosRecuperadosSga = false;
+  tienePostulanteBD = false;
+  tieneArancelesSga = false;
+  get isBioInputDisabled(): boolean {
+    if (this.viewInscripcion && !this.editBio) return true;
+    if (!this.viewInscripcion && !this.isEditing && (this.tienePostulanteBD || this.datosRecuperadosSga)) return true;
+    return false;
+  }
   // Edición por tarjeta cuando está en modo ver inscripción
   editBio = false;
   editBach = false;
@@ -623,9 +634,7 @@ ngOnInit() {
   this.generarGestiones();
   // Si venimos desde el modal con query ver=1, activar modo Ver inscripción
   const ver = this.route.snapshot.queryParamMap.get('ver');
-  if (ver === '1') {
-    this.entrarVerInscripcion();
-  }
+  this.debeEntrarVer = (ver === '1');
 }
 
 cargarDatosPostulacion() {
@@ -634,10 +643,27 @@ cargarDatosPostulacion() {
     const datos = JSON.parse(datosPostulacion);
     this.estudiante = datos.estudiante;
     this.modalidad = datos.modalidad;
-    this.esNuevoPostulante = false;
+    const est = datos.estudiante;
+    const cod = est?.cod_ceta ?? est?.codCeta;
+    const codStr = (cod !== undefined && cod !== null) ? String(cod).trim() : '';
+    const hasCod = /^\d+$/.test(codStr);
+    // Asumir "nuevo" hasta que backend confirme la existencia de una inscripción
+    this.esNuevoPostulante = true;
+    // Marcar que los datos provienen del SGA cuando hay estudiante con cod_ceta
+    this.datosRecuperadosSga = !!(this.estudiante && hasCod);
+    // Restaurar estado del paso de biográficos si se guardó previamente
+    const biosGuardado = datos?.bio_guardado === true;
+    if (biosGuardado) {
+      this.pasoBiograficosCompletado = true;
+      // Mostrar CTA al final hasta que se registre la inscripción (si no estamos en modo ver)
+      if (!this.viewInscripcion) {
+        this.showRegistrarInscripcion = true;
+        this.resumenVisible = false;
+      }
+    }
     
     // Pre-llenar el formulario con los datos del estudiante
-    if (this.estudiante) {
+    if (this.estudiante && hasCod) {
       // Tomar nro_serie_titulo desde la respuesta directa o desde raw si fuese necesario
       const raw = (this.estudiante as any)?.raw || {};
       const serieDesdeRaw = raw['N° Serie Titulo de Bachiller'] || raw['N° Serie Título de Bachiller'] || raw['Nro Serie Titulo de Bachiller'] || '';
@@ -697,8 +723,7 @@ cargarDatosPostulacion() {
     this.esNuevoPostulante = true;
   }
   // Nota: la carga de pensums se realiza en ngOnInit()
-  // Al iniciar SIEMPRE se requiere guardar biográficos antes de continuar
-  this.pasoBiograficosCompletado = false;
+  // Si no restauramos biosGuardado, el valor por defecto se mantiene en false
 }
 
 // --- Cargar postulante desde BD para usar valores persistidos ---
@@ -709,6 +734,11 @@ private cargarPostulanteDesdeBD() {
   this.postulanteService.getInscripcionByCodCeta(cod).subscribe({
     next: (p) => {
       this.postulanteDesdeBD = p || null;
+      this.tienePostulanteBD = !!p;
+      const srcAny: any = p;
+      // Considerar "no nuevo" SOLO si existe un registro de inscripción real en backend
+      const tieneInscripcion = !!(srcAny && srcAny.inscripcion && srcAny.inscripcion.id);
+      this.esNuevoPostulante = !tieneInscripcion;
       // Fusionar datos persistidos en el formulario actual para mostrar en modo lectura
       if (p && typeof p === 'object') {
         const src: any = p;
@@ -912,6 +942,13 @@ private cargarPostulanteDesdeBD() {
         if (!this.modalidad) {
           this.cargarModalidadActual();
         }
+      }
+      // Si venimos con bios ya guardados (paso completo) y aún no hay inscripción, reactivar CTA y permitir arancel manual
+      if (this.pasoBiograficosCompletado && this.esNuevoPostulante && !this.viewInscripcion) {
+        this.showRegistrarInscripcion = true;
+      }
+      if (this.debeEntrarVer && !this.esNuevoPostulante) {
+        this.entrarVerInscripcion();
       }
       // Si ya existe un resumen o está visible, reconstruirlo para usar datos de BD
       if (this.resumenInscripcion || this.resumenVisible) {
@@ -1924,6 +1961,15 @@ private cargarPostulanteDesdeBD() {
         // Si backend generó cod_ceta, reflejarlo
         if ((res as any)?.cod_ceta) {
           this.postulanteActual.cod_ceta = (res as any).cod_ceta;
+          // Persistir cod_ceta en sessionStorage para rehidratar en recargas
+          try {
+            const raw = sessionStorage.getItem('datos_postulacion') || '{}';
+            const datos = JSON.parse(raw);
+            datos.estudiante = { ...(datos.estudiante || {}), cod_ceta: (res as any).cod_ceta };
+            // Marcar que biográficos ya fueron guardados
+            datos.bio_guardado = true;
+            sessionStorage.setItem('datos_postulacion', JSON.stringify(datos));
+          } catch {}
           // Con el CETA generado, cargar aranceles de material extra
           this.cargarArancelesMaterialExtra();
           // Y sincronizar snapshot desde BD
@@ -1931,26 +1977,26 @@ private cargarPostulanteDesdeBD() {
         }
         if (!this.postulanteActual.nro_serie_titulo && prev.nro_serie_titulo) {
           this.postulanteActual.nro_serie_titulo = prev.nro_serie_titulo;
-        }
-        if (this.postulanteActual.nro_serie_titulo && !this.tipoBachiller) {
-          this.tipoBachiller = 'nacional';
-        }
-        this.isEditing = false;
-        // Importante: conservar esNuevoPostulante = true para mostrar formulario de aranceles manuales
-        this.pasoBiograficosCompletado = true;
-        this.showRegistrarInscripcion = true;
-        // Si aún no hay modalidad establecida (por ejemplo, si no vino desde sessionStorage),
-        // primero intentar recuperar de sessionStorage y luego cargar del backend
+      }
+      if (this.postulanteActual.nro_serie_titulo && !this.tipoBachiller) {
+        this.tipoBachiller = 'nacional';
+      }
+      this.isEditing = false;
+      // Importante: conservar esNuevoPostulante = true para mostrar formulario de aranceles manuales
+      this.pasoBiograficosCompletado = true;
+      this.showRegistrarInscripcion = true;
+      // Si aún no hay modalidad establecida (por ejemplo, si no vino desde sessionStorage),
+      // primero intentar recuperar de sessionStorage y luego cargar del backend
+      if (!this.modalidad) {
+        this.recuperarModalidadDeSession();
         if (!this.modalidad) {
-          this.recuperarModalidadDeSession();
-          if (!this.modalidad) {
-            this.cargarModalidadActual();
-          }
+          this.cargarModalidadActual();
         }
-      },
-      error: (err) => {
-        console.error('Error al guardar datos biográficos:', err);
-        alert('No se pudo guardar los datos biográficos. Verifique e intente nuevamente.');
+      }
+    },
+    error: (err) => {
+      console.error('Error al guardar datos biográficos:', err);
+      alert('No se pudo guardar los datos biográficos. Verifique e intente nuevamente.');
       }
     });
   }
@@ -2242,12 +2288,15 @@ private cargarPostulanteDesdeBD() {
     if (!codCeta) {
       this.aranceles = [];
       this.totalAranceles = 0;
+      this.tieneArancelesSga = false;
       return;
     }
     this.loadingAranceles = true;
     // Limpiar selección previa al recargar
     this.selectedAranceles = [];
     this.totalArancelesSeleccionados = 0;
+    // Por defecto, asumir que no hay aranceles SGA hasta que el endpoint los devuelva
+    this.tieneArancelesSga = false;
     // En modo visualización y para postulante nuevo: evitar SGA y construir tabla directamente desde aranceles_est
     if (this.viewInscripcion && this.esNuevoPostulante && !this.editAranceles) {
       const cod = this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta;
@@ -2258,6 +2307,7 @@ private cargarPostulanteDesdeBD() {
           const aplicar = (arr: any[]) => {
             this._aplicarArancelesEstEnVista(arr || []);
             this.loadingAranceles = false;
+            this.tieneArancelesSga = false;
           };
           if (!est || est.length === 0) {
             // Reintentar con 'seleccionado=1' por compatibilidad
@@ -2277,6 +2327,7 @@ private cargarPostulanteDesdeBD() {
         error: () => {
           this._aplicarArancelesEstEnVista([]);
           this.loadingAranceles = false;
+          this.tieneArancelesSga = false;
         }
       });
       return;
@@ -2288,6 +2339,7 @@ private cargarPostulanteDesdeBD() {
         this.aranceles = res?.data || [];
         this.totalAranceles = res?.total ?? this.aranceles.length;
         this.loadingAranceles = false;
+        this.tieneArancelesSga = Array.isArray(this.aranceles) && this.aranceles.length > 0;
         // En modo Visualización (y mientras no se edita la card), cruzar con aranceles_est seleccionados en backend
         if (this.viewInscripcion && !this.editAranceles) {
           const cod = this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta;
@@ -2361,15 +2413,18 @@ private cargarPostulanteDesdeBD() {
               const est = Array.isArray(resp2?.data) ? resp2.data : (Array.isArray(resp2) ? resp2 : []);
               this._aplicarArancelesEstEnVista(est || []);
               this.loadingAranceles = false;
+              this.tieneArancelesSga = false;
             },
             error: () => {
               this._aplicarArancelesEstEnVista([]);
               this.loadingAranceles = false;
+              this.tieneArancelesSga = false;
             }
           });
         } else {
           this._aplicarArancelesEstEnVista([]);
           this.loadingAranceles = false;
+          this.tieneArancelesSga = false;
         }
       }
     });

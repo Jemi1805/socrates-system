@@ -134,7 +134,7 @@
         <div class="bio-row">
           <div class="bio-item">
             <span class="form-label">Carrera:</span>
-            <select class="form-select" [(ngModel)]="carreraNormalizada" name="carrera" [disabled]="!esNuevoPostulante" (ngModelChange)="onCarreraChange($event)">
+            <select class="form-select" [(ngModel)]="carreraNormalizada" name="carrera" [disabled]="isBioInputDisabled || !esNuevoPostulante" (ngModelChange)="onCarreraChange($event)">
               <option [ngValue]="null">Seleccione carrera</option>
               <option [ngValue]="'mecanica'">Mecánica Automotriz</option>
               <option [ngValue]="'electricidad'">Electricidad y Electrónica Automotriz</option>
@@ -142,7 +142,7 @@
           </div>
           <div class="bio-item">
             <span class="form-label">Pensum:</span>
-            <select class="form-select" [(ngModel)]="postulanteActual.pensum" name="pensum" [disabled]="!esNuevoPostulante">
+            <select class="form-select" [(ngModel)]="postulanteActual.pensum" name="pensum" [disabled]="isBioInputDisabled || !esNuevoPostulante">
               <option [ngValue]="null" disabled>Seleccione pensum</option>
               <option *ngFor="let p of pensums" [ngValue]="p">{{ p }}</option>
             </select>
@@ -157,17 +157,17 @@
         <div class="bio-row">
           <div class="bio-item">
             <span class="form-label">Nombres:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.nombres_est" name="nombres" placeholder="Ingrese Nombres" required [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)"
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.nombres_est" name="nombres" placeholder="Ingrese Nombres" required [disabled]="isBioInputDisabled"
                    (input)="onNombreInput('nombres_est', $event)" />
           </div>
           <div class="bio-item">
             <span class="form-label">Apellido Paterno:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_pat" name="ap_pat" placeholder="Ingrese Apellido Paterno" required [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)"
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_pat" name="ap_pat" placeholder="Ingrese Apellido Paterno" required [disabled]="isBioInputDisabled"
                    (input)="onNombreInput('ap_pat', $event)" />
           </div>
           <div class="bio-item">
             <span class="form-label">Apellido Materno:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_mat" name="ap_mat" placeholder="Ingrese Apellido Materno" required [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)"
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.ap_mat" name="ap_mat" placeholder="Ingrese Apellido Materno" required [disabled]="isBioInputDisabled"
                    (input)="onNombreInput('ap_mat', $event)" />
           </div>
         </div>
@@ -175,11 +175,11 @@
         <div class="row g-1">
           <div class="col-md-2">
             <span class="form-label">Fecha de Nacimiento:</span>
-            <input type="date" class="form-control" [(ngModel)]="postulanteActual.fecha_nacimiento" name="fecha_nacimiento" placeholder="Ingrese Fecha de Nacimiento" required [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)" />
+            <input type="date" class="form-control" [(ngModel)]="postulanteActual.fecha_nacimiento" name="fecha_nacimiento" placeholder="Ingrese Fecha de Nacimiento" required [disabled]="isBioInputDisabled" />
           </div>
           <div class="col-md-3">
             <span class="form-label">Lugar de Nacimiento:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.lugar_nacimiento" name="lugar_nacimiento" placeholder="Ingrese Lugar de Nacimiento" required [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)"
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.lugar_nacimiento" name="lugar_nacimiento" placeholder="Ingrese Lugar de Nacimiento" required [disabled]="isBioInputDisabled"
                    (input)="onLugarNacimientoInput($event)" />
           </div>
           <div class="col-auto">
@@ -190,7 +190,7 @@
                    inputmode="numeric" minlength="8" maxlength="9"
                    pattern="^\\d{8,9}$"
                    (input)="onCiInput($event)"
-                   [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)" />
+                   [disabled]="isBioInputDisabled" />
           </div>
           <!-- Separador visual entre CI y Complemento -->
           <div *ngIf="esNuevoPostulante || isEditing || (viewInscripcion && editBio)" class="col-auto d-flex align-items-end justify-content-center">
@@ -202,11 +202,11 @@
                    placeholder="Ej.: 1A"
                    inputmode="text" maxlength="2" pattern="^[0-9][A-Z]$"
                    (input)="onComplementoInput($event)"
-                   required [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)" />
+                   required [disabled]="isBioInputDisabled" />
           </div>
           <div class="col">
             <span class="form-label">Procedencia:</span>
-            <input type="text" class="form-control" [(ngModel)]="postulanteActual.procedencia" name="procedencia" placeholder="Ej: Cochabamba" required [disabled]="(viewInscripcion && !editBio) || (!viewInscripcion && !isEditing && !esNuevoPostulante)"
+            <input type="text" class="form-control" [(ngModel)]="postulanteActual.procedencia" name="procedencia" placeholder="Ej: Cochabamba" required [disabled]="isBioInputDisabled"
                    (input)="onProcedenciaInput($event)" />
           </div>
         </div>
@@ -352,8 +352,8 @@
                     [disabled]="viewInscripcion && !editBach"
                   />
                 </div>
-                <div class="col-md-2">
-                  <button class="btn btn-outline-danger w-100" (click)="eliminarGradoGestion(i)">
+                <div class="col-md-1">
+                  <button class="btn btn-danger w-100" (click)="eliminarGradoGestion(i)">
                     <i class="bi bi-trash"></i>
                   </button>
                 </div>
@@ -363,7 +363,7 @@
                   <i class="bi bi-info-circle me-1"></i>
                   Agrega las gestiones y grados cursados.
                 </div>
-                <button class="btn btn-outline-primary btn-sm" (click)="agregarGradoGestion()" [disabled]="viewInscripcion && !editBach">
+                <button class="btn btn-primary btn-sm" (click)="agregarGradoGestion()" [disabled]="viewInscripcion && !editBach">
                   <i class="bi bi-plus-lg me-1"></i>
                   Agregar grado/gestión
                 </button>
@@ -405,7 +405,7 @@
               </div>
             </div>
           </div>
-          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearOpcion()" [disabled]="!selectedOpcion" [disabled]="viewInscripcion && !editBach">
+          <button type="button" class="btn btn-sm btn-warning mt-2" (click)="clearOpcion()" [disabled]="!selectedOpcion" [disabled]="viewInscripcion && !editBach">
             Quitar selección
           </button>
         </div>
@@ -514,8 +514,8 @@
                     [disabled]="viewInscripcion && !editBach"
                   />
                 </div>
-                <div class="col-md-2">
-                  <button class="btn btn-outline-danger w-100" (click)="eliminarGradoGestionTraspaso(i)" [disabled]="viewInscripcion && !editBach">
+                <div class="col-md-1">
+                  <button class="btn btn-danger w-100" (click)="eliminarGradoGestionTraspaso(i)" [disabled]="viewInscripcion && !editBach">
                     <i class="bi bi-trash"></i>
                   </button>
                 </div>
@@ -525,7 +525,7 @@
                   <i class="bi bi-info-circle me-1"></i>
                   Agrega las gestiones y grados cursados.
                 </div>
-                <button class="btn btn-outline-primary btn-sm" (click)="agregarGradoGestionTraspaso()" [disabled]="viewInscripcion && !editBach">
+                <button class="btn btn-primary btn-sm" (click)="agregarGradoGestionTraspaso()" [disabled]="viewInscripcion && !editBach">
                   <i class="bi bi-plus-lg me-1"></i>
                   Agregar grado/gestión
                 </button>
@@ -545,8 +545,8 @@
                 [(ngModel)]="homoCambioPlanData.nro_resolucion_rectoral"
                 placeholder="Ej. RES-2025-001"
                 style="text-transform: uppercase"
-                pattern='^[A-Z0-9\-\"°\s]+$'
-                title='Solo MAYÚSCULAS, números, guion -, " y °'
+                pattern='^[A-Z0-9\-\"°\/\s]+$'
+                title='Solo MAYÚSCULAS, números, guion -, " y ° /'
                 (input)="onSerieInput($event, homoCambioPlanData, 'nro_resolucion_rectoral', true)"
                 [disabled]="viewInscripcion && !editBach"
               />
@@ -566,8 +566,8 @@
                 <div class="col-md-3">
                   <input type="text" class="form-control" [(ngModel)]="gg.gestion" placeholder="Gestión (p. ej., 2018)" [disabled]="viewInscripcion && !editBach"/>
                 </div>
-                <div class="col-md-2">
-                  <button class="btn btn-outline-danger w-100" (click)="eliminarGradoGestionCambioPlan(i)" [disabled]="viewInscripcion && !editBach">
+                <div class="col-md-1">
+                  <button class="btn btn-danger w-100" (click)="eliminarGradoGestionCambioPlan(i)" [disabled]="viewInscripcion && !editBach">
                     <i class="bi bi-trash"></i>
                   </button>
                 </div>
@@ -577,7 +577,7 @@
                   <i class="bi bi-info-circle me-1"></i>
                   Agrega las gestiones y grados cursados.
                 </div>
-                <button class="btn btn-outline-primary btn-sm" (click)="agregarGradoGestionCambioPlan()" [disabled]="viewInscripcion && !editBach">
+                <button class="btn btn-primary btn-sm" (click)="agregarGradoGestionCambioPlan()" [disabled]="viewInscripcion && !editBach">
                   <i class="bi bi-plus-lg me-1"></i>
                   Agregar grado/gestión
                 </button>
@@ -736,7 +736,7 @@
       <!-- Registro manual de aranceles
            - En ver-inscripción: mostrar solo en edición y si permiteEdicionArancelesEnVista (nuevo postulante o CETA inicia con 9)
            - Fuera de ver-inscripción: siempre visible -->
-      <div class="manual-arancel my-3 border rounded" *ngIf="esNuevoPostulante && (!viewInscripcion || (viewInscripcion && editAranceles))">
+      <div class="manual-arancel my-3 border rounded" *ngIf="esNuevoPostulante && !tieneArancelesSga && (!viewInscripcion || (viewInscripcion && editAranceles))">
         <div class="row g-2">
           <div class="col-md-2">
             <label class="form-label">Gestión</label>
@@ -894,7 +894,7 @@
       </div>
     </div>
 
-    <!-- Sección de Modalidad y Documentos -->
+    <!-- Sección de Modalidad -->
     <div class="modalidad-docs-container" *ngIf="pasoBiograficosCompletado">
       <!-- Selección de modalidad -->
       <div class="modalidad-card">
