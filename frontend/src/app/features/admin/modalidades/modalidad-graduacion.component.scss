@@ -297,6 +297,10 @@ select.form-select, .form-control {
   }
 }
 
+strong span {
+  font-weight: 500 !important;
+}
+
 // Animaciones
 .spin {
   animation: spin 1s linear infinite;

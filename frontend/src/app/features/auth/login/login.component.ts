@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -11,7 +11,7 @@ import { AuthService } from '../../../core/services/auth.service';
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.scss']
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   credentials = {
     nombre_usuario: '',
     password: ''
@@ -29,6 +29,13 @@ export class LoginComponent {
   ) {
     const ret = this.route.snapshot.queryParamMap.get('returnUrl');
     if (ret) this.returnUrl = ret;
+  }
+
+  ngOnInit() {
+    this.credentials.nombre_usuario = '';
+    this.credentials.password = '';
+    this.error = '';
+    this.passwordVisible = false;
   }
 
   onSubmit() {

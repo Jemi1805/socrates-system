@@ -937,6 +937,9 @@
         <div *ngIf="selectedAranceles.length === 0" class="alert alert-info">
           <i class="bi bi-info-circle me-1"></i>
           Selecciona aranceles en la tabla de arriba para verlos aquí.
+          <div class="text-muted small mt-2">
+            Estado actual: <strong>Sin pagos registrados</strong>
+          </div>
         </div>
 
         <div class="table-responsive" *ngIf="selectedAranceles.length > 0">

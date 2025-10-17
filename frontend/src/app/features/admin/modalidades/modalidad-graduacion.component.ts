@@ -60,9 +60,9 @@ export class ModalidadGraduacionComponent implements OnInit {
   loadingInscripcion = false;
 
   // Inscripción actual (si ya está inscrito en alguna modalidad)
-  inscripcionActual: { modalidad_id: number; nombre: string; estado?: string; fecha_inscripcion?: string } | null = null;
+  inscripcionActual: { modalidad_id: number; nombre: string; estado?: string; fecha_inscripcion?: string; aranceles_completos?: boolean | number | string } | null = null;
   // Proyecto/Tema actual si existe
-  proyectoActual: { id?: number; nombre?: string; estado?: string; tipo?: string; created_at?: string } | null = null;
+  proyectoActual: { id?: number; nombre?: string; estado?: string; objetivo?: string; tipo?: string; created_at?: string } | null = null;
 
   // Validaciones
   private readonly CETA_REGEX = /^\d{9}$/; // exactamente 9 dígitos
@@ -828,6 +828,23 @@ export class ModalidadGraduacionComponent implements OnInit {
           this.inscripcionActual = null;
         }
         return of(void 0);
+      }),
+      switchMap(() => {
+        return this.postulanteService.getInscripModalidadByCodCeta(String(codCeta)).pipe(
+          tap((r: any) => {
+            try {
+              let row: any = null;
+              if (!r) row = null; else if (Array.isArray(r)) row = r[0] || null; else if (r.data) row = Array.isArray(r.data) ? (r.data[0] || null) : r.data; else row = r;
+              const flag = row?.aranceles_completos ?? row?.inscripcion?.aranceles_completos;
+              if (flag !== undefined && flag !== null) {
+                const v = (typeof flag === 'string') ? flag.trim() : flag;
+                const ok = (v === true || v === 1 || v === '1');
+                this.inscripcionActual = this.inscripcionActual ? { ...this.inscripcionActual, aranceles_completos: ok } : { modalidad_id: 0, nombre: '', aranceles_completos: ok } as any;
+              }
+            } catch {}
+          }),
+          catchError(() => of(void 0))
+        );
       }),
       finalize(() => {
         this.loadingInscripcion = false;
