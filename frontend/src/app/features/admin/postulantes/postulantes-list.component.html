@@ -79,7 +79,7 @@
     </div>
   </div>
 
-  <div class="content-wrapper" *ngIf="!resumenVisible || viewInscripcion">
+  <div class="content-wrapper" *ngIf="!resumenVisible">
     
     <!-- Datos biográficos del estudiante -->
     <div class="biographical-card">
@@ -1237,7 +1237,7 @@
   </div>
 
   <!-- Modal de Cambios Guardados (global) -->
-  <div *ngIf="modalCambiosVisible && !esNuevoPostulante">
+  <div *ngIf="modalCambiosVisible">
     <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalCambiosLabel">
       <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
         <div class="modal-content">
@@ -1246,7 +1246,7 @@
               <i class="bi bi-clipboard-check text-success me-2"></i>
               Cambios guardados
             </h5>
-            <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="cerrarModalCambios()"></button>
+            <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="continuarCambios()"></button>
           </div>
           <div class="modal-body">
             <div *ngIf="(cambiosRealizados || []).length === 0" class="alert alert-info py-2">
@@ -1272,12 +1272,11 @@
             </div>
           </div>
           <div class="modal-footer py-2 d-flex justify-content-end gap-2">
-            <button type="button" class="btn btn-success btn-sm" (click)="continuarCambios()">Continuar cambios</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cerrarModalCambios()">Cerrar cambios</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="continuarCambios()">Cerrar cambios</button>
           </div>
         </div>
       </div>
     </div>
-    <div class="modal-backdrop fade show" (click)="cerrarModalCambios()"></div>
+    <div class="modal-backdrop fade show" (click)="continuarCambios()"></div>
   </div>
 </div>

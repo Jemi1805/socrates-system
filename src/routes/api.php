@@ -98,6 +98,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('documentos_requeridos', DocumentosRequeridosController::class);
     Route::apiResource('documentos_adjuntos', DocumentosAdjuntosController::class);
     Route::apiResource('diploma_bachiller', DiplomaBachillerController::class);
+    Route::post('diploma_bachiller/upsert', [DiplomaBachillerController::class, 'upsert']);
     Route::apiResource('ra_homol_ex', RaHomolExController::class);
     Route::apiResource('grado_homol', GradoHomolController::class);
     Route::apiResource('transitabilidad_edu_reg', TransitabilidadEduRegController::class);

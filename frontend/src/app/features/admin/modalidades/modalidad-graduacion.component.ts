@@ -601,7 +601,7 @@ export class ModalidadGraduacionComponent implements OnInit {
 
   // Navegar a Postulantes en modo "Ver inscripción" y pasar el estudiante en sessionStorage
   verInscripcion() {
-    if (!this.estudiante) {
+    if (!this.estudiante || !this.inscripcionActual) {
       // Si no hay estudiante cargado, no tiene sentido entrar a ver
       return;
     }
@@ -836,10 +836,11 @@ export class ModalidadGraduacionComponent implements OnInit {
               let row: any = null;
               if (!r) row = null; else if (Array.isArray(r)) row = r[0] || null; else if (r.data) row = Array.isArray(r.data) ? (r.data[0] || null) : r.data; else row = r;
               const flag = row?.aranceles_completos ?? row?.inscripcion?.aranceles_completos;
-              if (flag !== undefined && flag !== null) {
+              if (flag !== undefined && flag !== null && this.inscripcionActual) {
                 const v = (typeof flag === 'string') ? flag.trim() : flag;
                 const ok = (v === true || v === 1 || v === '1');
-                this.inscripcionActual = this.inscripcionActual ? { ...this.inscripcionActual, aranceles_completos: ok } : { modalidad_id: 0, nombre: '', aranceles_completos: ok } as any;
+                // Solo actualizar el flag si ya existe una inscripción real
+                this.inscripcionActual = { ...this.inscripcionActual, aranceles_completos: ok } as any;
               }
             } catch {}
           }),

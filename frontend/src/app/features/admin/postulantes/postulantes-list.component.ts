@@ -1667,7 +1667,7 @@ private cargarPostulanteDesdeBD() {
               this.editAranceles = false;
               this.hasChangesInView = false;
               const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual());
-              this.mostrarModalCambios(cambios);
+              this.mostrarModalCambios(cambios, true);
             },
             error: (e: any) => {
               console.error('Error en guardados secundarios:', e);
@@ -1684,7 +1684,7 @@ private cargarPostulanteDesdeBD() {
           this.editAranceles = false;
           this.hasChangesInView = false;
           const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual());
-          this.mostrarModalCambios(cambios);
+          this.mostrarModalCambios(cambios, true);
         }
       },
       error: () => {
@@ -1761,9 +1761,12 @@ private cargarPostulanteDesdeBD() {
       }
     }
     const cod = this.postulanteActual.cod_ceta as number | undefined;
-    const req$ = cod
-      ? this.postulanteService.update(cod, this.postulanteActual as Postulante)
-      : this.postulanteService.create(this.postulanteActual as Postulante);
+    // En flujo NUEVO, forzar creación sin cod_ceta para que el backend lo autogenere
+    const req$ = this.esNuevoPostulante
+      ? this.postulanteService.create(({ ...(this.postulanteActual as any), cod_ceta: undefined } as Postulante))
+      : (cod
+        ? this.postulanteService.update(cod, this.postulanteActual as Postulante)
+        : this.postulanteService.create(this.postulanteActual as Postulante));
     req$.subscribe({
       next: () => {
         // Calcular cambios con el estado actual en memoria antes de refrescar
@@ -1937,7 +1940,8 @@ private cargarPostulanteDesdeBD() {
         const afterSuccess = () => {
           // Calcular cambios reales con snapshot previo y actual (incluye campos detallados de diploma)
           const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual()) || [];
-          this.mostrarModalCambios(cambios as any[]);
+          // En Bachillerato queremos mostrar el modal incluso para postulante nuevo
+          this.mostrarModalCambios(cambios as any[], true);
           // Reset y refresco
           this.editBach = false;
           this.hasChangesInView = false;
@@ -1984,7 +1988,7 @@ private cargarPostulanteDesdeBD() {
     this.postulanteService.upsertDatosCarrera(payload).subscribe({
       next: () => {
         const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual());
-        this.mostrarModalCambios(cambios);
+        this.mostrarModalCambios(cambios, true);
         this.editInicio = false;
         this.hasChangesInView = false;
         this.cargarPostulantes();
@@ -2014,7 +2018,7 @@ private cargarPostulanteDesdeBD() {
     this.postulanteService.upsertDatosCarrera(payload).subscribe({
       next: () => {
         const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual());
-        this.mostrarModalCambios(cambios);
+        this.mostrarModalCambios(cambios, true);
         this.editConclusion = false;
         this.hasChangesInView = false;
         this.cargarPostulantes();
@@ -2881,9 +2885,9 @@ private cargarPostulanteDesdeBD() {
     this._snapshotAntes = this.getSnapshotActual();
   }
 
-  private mostrarModalCambios(cambios: Array<{ campo: string; anterior: any; nuevo: any }>) {
-    // Solo mostrar el modal si NO es un postulante nuevo (modo edición)
-    if (this.esNuevoPostulante) {
+  private mostrarModalCambios(cambios: Array<{ campo: string; anterior: any; nuevo: any }>, showInNuevoPost: boolean = false) {
+    // Por defecto, no mostrar para postulante nuevo; salvo que se indique explícitamente
+    if (this.esNuevoPostulante && !showInNuevoPost) {
       return;
     }
     this.loadingService.showModal();
@@ -3318,8 +3322,8 @@ private cargarPostulanteDesdeBD() {
           }
         }
 
-        // Mostrar modal de cambios como en otros cards
-        this.mostrarModalCambios(cambios);
+        // Mostrar modal de cambios como en otros cards (también en postulante nuevo)
+        this.mostrarModalCambios(cambios, true);
 
         // Limpiar formulario y estado de edición
         this.editingArancelIndex = null;

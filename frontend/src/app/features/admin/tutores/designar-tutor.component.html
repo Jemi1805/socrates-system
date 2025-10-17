@@ -13,26 +13,41 @@
       <div class="card-body">
         <h5 class="card-title d-flex align-items-center gap-2">
           <i class="bi bi-person-vcard"></i>
-          Estudiante y Tema
+          Datos del Postulante y Tema Registrado
         </h5>
         <div class="row g-3">
           <div class="col-md-6">
-            <div class="d-flex align-items-start gap-3 border rounded p-2 bg-light">
-              <div class="student-avatar me-1"><i class="bi bi-person-circle fs-2"></i></div>
+            <div class="border rounded p-2 bg-light">
+              <div class="fw-semibold mb-1"><i class="bi bi-person-circle me-1"></i> Información del Postulante</div>
               <div>
-                <div class="fw-semibold mb-1">{{ (estudiante?.ap_pat || '') + ' ' + (estudiante?.ap_mat || '') + ' ' + (estudiante?.nombres || '') }}</div>
-                <div class="text-muted small" *ngIf="codCeta"><i class="bi bi-person-badge me-1"></i> CETA: {{ codCeta }}</div>
-                <div class="text-muted small" *ngIf="estudiante?.carrera"><i class="bi bi-building me-1"></i> {{ estudiante?.carrera }}</div>
-                <div class="text-muted small" *ngIf="estudiante?.pensum"><i class="bi bi-list-check me-1"></i> Pensum: {{ estudiante?.pensum }}</div>
+                <div class="fw-semibold mb-1"></div>
+                <div class="small" *ngIf="codCeta">
+                  <strong class="text-muted">Nombre Completo:</strong> {{ (estudiante?.ap_pat || '') + ' ' + (estudiante?.ap_mat || '') + ' ' + (estudiante?.nombres || '') }}
+                </div>
+                <div class="small" *ngIf="codCeta">
+                  <strong class="text-muted">Código CETA:</strong> {{ codCeta }}
+                </div>
+                <div class="small" *ngIf="estudiante?.carrera"> 
+                  <strong class="text-muted">Carrera:</strong> {{ estudiante?.carrera }}
+                </div>
+                <div class="small" *ngIf="estudiante?.pensum">
+                  <strong class="text-muted">Pensum:</strong> {{ estudiante?.pensum }}
+                </div>
               </div>
             </div>
           </div>
           <div class="col-md-6">
             <div class="border rounded p-2 bg-light">
               <div class="fw-semibold mb-1"><i class="bi bi-journal-text me-1"></i> Tema registrado</div>
-              <div class="small"><span class="text-muted">Nombre:</span> {{ proyecto?.nombre || proyecto?.tema || '-' }}</div>
-              <div class="small" *ngIf="proyecto?.tipo"><span class="text-muted">Modalidad:</span> {{ proyecto?.tipo }}</div>
-              <div class="small" *ngIf="proyecto?.estado"><span class="text-muted">Estado:</span> {{ proyecto?.estado }}</div>
+              <div class="small" *ngIf="proyecto?.tipo">
+                <strong class="text-muted">Modalidad:</strong> {{ proyecto?.tipo }}
+              </div>
+              <div class="small">
+                <strong class="text-muted">Nombre del Tema:</strong> {{ proyecto?.nombre || proyecto?.tema || '-' }}
+              </div>
+              <div class="small" *ngIf="proyecto?.estado">
+                <strong class="text-muted">Estado:</strong> {{ proyecto?.estado }}
+              </div>
             </div>
           </div>
         </div>
