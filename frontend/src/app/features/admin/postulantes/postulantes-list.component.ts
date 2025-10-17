@@ -770,6 +770,10 @@ ngOnInit() {
   // Si venimos desde el modal con query ver=1, activar modo Ver inscripción
   const ver = this.route.snapshot.queryParamMap.get('ver');
   this.debeEntrarVer = (ver === '1');
+  if (this.debeEntrarVer && !this.viewInscripcion) {
+    // Activar modo Ver inmediatamente para que aparezcan los botones "Editar"
+    this.entrarVerInscripcion();
+  }
 }
 
 cargarDatosPostulacion() {
@@ -1082,7 +1086,11 @@ private cargarPostulanteDesdeBD() {
       if (this.pasoBiograficosCompletado && this.esNuevoPostulante && !this.viewInscripcion) {
         this.showRegistrarInscripcion = true;
       }
-      if (this.debeEntrarVer && !this.esNuevoPostulante) {
+      // Si el postulante ya tiene inscripción en BD, entrar en modo ver automáticamente
+      if (!this.esNuevoPostulante && !this.viewInscripcion) {
+        this.entrarVerInscripcion();
+      }
+      if (this.debeEntrarVer) {
         this.entrarVerInscripcion();
       }
       // Si ya existe un resumen o está visible, reconstruirlo para usar datos de BD
@@ -1131,6 +1139,15 @@ private cargarPostulanteDesdeBD() {
           // Importante: no sobreescribir la modalidad si ya vino desde sessionStorage
           if (!this.modalidad) {
             this.cargarModalidadActual();
+          }
+          // Si el postulante tiene datos en BD (no nuevo), activar modo ver automáticamente
+          const tieneInscripcion2 = !!((src as any)?.inscripcion && (src as any).inscripcion.id);
+          if (tieneInscripcion2 && !this.viewInscripcion) {
+            this.entrarVerInscripcion();
+          }
+          // Activar modo Ver si se navegó con ver=1
+          if (this.debeEntrarVer) {
+            this.entrarVerInscripcion();
           }
         },
         error: (err2) => {
@@ -1522,7 +1539,11 @@ private cargarPostulanteDesdeBD() {
 
   // --- Edición de datos biográficos ---
   iniciarEdicionBiograficos() {
-    this.isEditing = true;
+    this.loadingService.showModal();
+    setTimeout(() => {
+      this.isEditing = true;
+      this.loadingService.hideModal();
+    }, 0);
   }
 
   guardarBiograficos() {
@@ -1673,21 +1694,53 @@ private cargarPostulanteDesdeBD() {
   }
 
   // Toggles de edición por tarjeta
-  iniciarEdicionBioCard() { this.prepararSnapshotAntesDeEditar(); this.editBio = true; }
+  iniciarEdicionBioCard() {
+    this.prepararSnapshotAntesDeEditar();
+    this.loadingService.showModal();
+    setTimeout(() => {
+      this.editBio = true;
+      this.loadingService.hideModal();
+    }, 0);
+  }
   finalizarEdicionBioCard() { this.editBio = false; }
-  iniciarEdicionBachCard() { this.prepararSnapshotAntesDeEditar(); this.editBach = true; }
+  iniciarEdicionBachCard() {
+    this.prepararSnapshotAntesDeEditar();
+    this.loadingService.showModal();
+    setTimeout(() => {
+      this.editBach = true;
+      this.loadingService.hideModal();
+    }, 0);
+  }
   finalizarEdicionBachCard() { this.editBach = false; }
-  iniciarEdicionInicioCard() { this.prepararSnapshotAntesDeEditar(); this.editInicio = true; }
+  iniciarEdicionInicioCard() {
+    this.prepararSnapshotAntesDeEditar();
+    this.loadingService.showModal();
+    setTimeout(() => {
+      this.editInicio = true;
+      this.loadingService.hideModal();
+    }, 0);
+  }
   finalizarEdicionInicioCard() { this.editInicio = false; }
-  iniciarEdicionConclusionCard() { this.prepararSnapshotAntesDeEditar(); this.editConclusion = true; }
+  iniciarEdicionConclusionCard() {
+    this.prepararSnapshotAntesDeEditar();
+    this.loadingService.showModal();
+    setTimeout(() => {
+      this.editConclusion = true;
+      this.loadingService.hideModal();
+    }, 0);
+  }
   finalizarEdicionConclusionCard() { this.editConclusion = false; }
   iniciarEdicionArancelesCard() {
     this.prepararSnapshotAntesDeEditar();
-    this.editAranceles = true;
-    // Si estamos visualizando una inscripción, habilitar el formulario de arancel manual temporalmente
-    if (this.viewInscripcion) {
-      this.showManualArancelesEnEdicion = true;
-    }
+    this.loadingService.showModal();
+    setTimeout(() => {
+      this.editAranceles = true;
+      // Si estamos visualizando una inscripción, habilitar el formulario de arancel manual temporalmente
+      if (this.viewInscripcion) {
+        this.showManualArancelesEnEdicion = true;
+      }
+      this.loadingService.hideModal();
+    }, 0);
   }
   finalizarEdicionArancelesCard() { this.editAranceles = false; this.showManualArancelesEnEdicion = false; }
 
@@ -2768,6 +2821,7 @@ private cargarPostulanteDesdeBD() {
   private compararSnapshots(prev: any, curr: any): Array<{ campo: string; anterior: any; nuevo: any }> {
     if (!prev) return [];
     const etiquetas: Record<string, string> = {
+      // Datos del estudiante
       nombres_est: 'Nombres',
       ap_pat: 'Apellido Paterno',
       ap_mat: 'Apellido Materno',
@@ -2777,31 +2831,38 @@ private cargarPostulanteDesdeBD() {
       lugar_nacimiento: 'Lugar de Nacimiento',
       carrera: 'Carrera',
       pensum: 'Pensum',
-      tipo_bachiller: 'Tipo de Bachiller',
-      nro_serie_titulo: 'N° Serie/Resolución',
-      diploma_emision: 'diploma.emision',
-      diploma_fecha_emision: 'diploma.fecha_emision',
-      diploma_gestion_bachillerato: 'diploma.gestion_bachillerato',
-      diploma_observacion: 'diploma.observacion',
-      diploma_nro_resolucion: 'diploma.nro_resolucion',
-      diploma_fecha_resolucion: 'diploma.fecha_resolucion',
-      edu_reg_serie_tm: 'transitabilidad.edu_regular.serie_titulo_tm',
-      edu_reg_numero_tm: 'transitabilidad.edu_regular.numero_titulo_tm',
-      edu_reg_fecha_emision: 'transitabilidad.edu_regular.fecha_emision',
-      tec_med_serie_tm: 'transitabilidad.tecnico_medio.serie_titulo_tm',
-      tec_med_numero_tm: 'transitabilidad.tecnico_medio.numero_titulo_tm',
-      tec_med_fecha_emision: 'transitabilidad.tecnico_medio.fecha_emision',
-      traspaso_instituto_origen: 'traspaso.instituto_origen',
-      traspaso_grados_count: 'traspaso.grados_gestiones_count',
-      homocp_nro_resolucion: 'homologacion_cp.nro_resolucion',
-      homocp_fecha_emision: 'homologacion_cp.fecha_emision',
-      homocp_grados_count: 'homologacion_cp.grados_gestiones_count',
-      reg_ini_c: 'Régimen Inicio',
-      gestion_ini: 'Gestión Inicio',
-      reg_con_c: 'Régimen Conclusión',
-      gestion_fin: 'Gestión Conclusión',
+      // Bachillerato
+      tipo_bachiller: 'Tipo de bachiller',
+      nro_serie_titulo: (this.tipoBachiller === 'extranjero') ? 'Nro. Resolución Administrativa' : 'N° de Serie',
+      diploma_emision: 'Emisión',
+      diploma_fecha_emision: 'Fecha de Emisión',
+      diploma_gestion_bachillerato: 'Gestión de Bachillerato',
+      diploma_observacion: 'Observación',
+      diploma_nro_resolucion: 'Nro. Resolución Administrativa',
+      diploma_fecha_resolucion: 'Fecha de Emisión',
+      // Transitabilidad: Educación Regular
+      edu_reg_serie_tm: 'Serie título Profesional - Técnico Medio',
+      edu_reg_numero_tm: 'N° de Título Profesional - Técnico Medio',
+      edu_reg_fecha_emision: 'Fecha de emisión',
+      // Transitabilidad: Técnico Medio
+      tec_med_serie_tm: 'Serie título Profesional - Técnico Medio',
+      tec_med_numero_tm: 'N° de Título Profesional - Técnico Medio',
+      tec_med_fecha_emision: 'Fecha de emisión',
+      // Traspaso
+      traspaso_instituto_origen: 'Instituto de origen',
+      traspaso_grados_count: 'Grados y gestiones cursadas',
+      // Homologación por cambio de plan
+      homocp_nro_resolucion: 'N° de Resolución Rectoral',
+      homocp_fecha_emision: 'Fecha de emisión',
+      homocp_grados_count: 'Grados y gestiones cursadas',
+      // Inicio / Conclusión de Carrera
+      reg_ini_c: 'Tipo de Regimen (Inicio)',
+      gestion_ini: 'Gestión de Inicio',
+      reg_con_c: 'Tipo de Regimen (Conclusión)',
+      gestion_fin: 'Gestión de Conclusión',
+      // Modalidad y aranceles
       modalidad_id: 'Modalidad (ID)',
-      modalidad_nombre: 'Modalidad',
+      modalidad_nombre: 'Modalidad de Graduación',
       aranceles_count: 'Aranceles seleccionados',
       aranceles_total: 'Total Aranceles',
     };
@@ -2838,6 +2899,8 @@ private cargarPostulanteDesdeBD() {
     // Construir y mostrar el resumen de inscripción en la parte superior
     this.construirResumenInscripcion();
     this.resumenVisible = true;
+    // Activar modo Ver para habilitar botones "Editar" por tarjeta
+    this.viewInscripcion = true;
     try {
       setTimeout(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2900,6 +2963,10 @@ private cargarPostulanteDesdeBD() {
       this.construirResumenInscripcion();
     }
     this.resumenVisible = !!this.resumenInscripcion;
+    // Al mostrar el resumen, activar también el modo Ver
+    if (this.resumenVisible) {
+      this.viewInscripcion = true;
+    }
     // Ocultar CTA de registro y llevar al usuario al inicio para ver el resumen
     this.showRegistrarInscripcion = false;
     try {
