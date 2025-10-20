@@ -790,6 +790,42 @@ input {
   }
 }
 
+// Estilos de grilla para el modal Bootstrap de selección de modalidad (Postulantes)
+.modal {
+  .modal-body {
+    .modalidades-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1.5rem;
+    }
+    .modalidad-card-item {
+      border: 2px solid $border-color;
+      border-radius: $border-radius;
+      padding: 1rem;
+      text-align: center;
+      transition: $transition;
+      cursor: pointer;
+      background: #fff;
+      &:hover {
+        border-color: $primary-color;
+        transform: translateY(-5px);
+        box-shadow: $shadow;
+      }
+      .modalidad-icon {
+        font-size: 2rem;
+        color: $primary-color;
+        margin-bottom: 1rem;
+      }
+      .modalidad-nombre {
+        color: $text-dark-blue;
+        font-weight: 600;
+        font-size: 0.9rem;
+        margin: 0 0 0.5rem 0;
+      }
+    }
+  }
+}
+
 .btn-success {
   color: white !important;
   border-color: $success-color;
