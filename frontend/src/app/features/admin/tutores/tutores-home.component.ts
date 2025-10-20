@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
-import { SgaService, Docente, ApiResponse, Pertinencia, TutorReg } from '../../../shared/services/sga.service';
+import { SgaService, Docente, ApiResponse, Pertinencia, TutorReg, TutorTipo } from '../../../shared/services/sga.service';
 import { forkJoin } from 'rxjs';
 
 @Component({
@@ -45,6 +45,10 @@ export class TutoresHomeComponent implements OnInit {
   successModalVisible: boolean = false;
   successMessage: string = 'Docente guardado correctamente';
   editingSaveError: string | null = null;
+  confirmDisableModalVisible: boolean = false;
+  disableTutorSaving: boolean = false;
+  pendingDisableTutor: TutorReg | null = null;
+  pendingDisableDocente: Docente | null = null;
   // Registro masivo
   bulkSaving: boolean = false;
   bulkError: string | null = null;
@@ -53,6 +57,9 @@ export class TutoresHomeComponent implements OnInit {
   loadingTutores: boolean = false;
   errorTutores: string | null = null;
   tutores: TutorReg[] = [];
+  tutorTipos: TutorTipo[] = [];
+  selectedTipoTutorId: number | null = null;
+  tipoSeleccionado: Record<string, number | null> = {};
   // Set de CIs de tutores ya registrados en gestión actual (para evitar duplicado)
   registradosSet: Set<string> = new Set<string>();
   // Set de nombres normalizados de tutores registrados (fallback si cambió el CI)
@@ -61,20 +68,52 @@ export class TutoresHomeComponent implements OnInit {
   gestionFiltro: string | null = this.gestionActual;
   // Filtro de carrera (MEA/EEA) para el panel de "Tutores registrados"
   carreraFiltroCode: string | null = null;
+  skipFirstPertFocus = false;
 
   constructor(private sga: SgaService, private router: Router) {}
 
   ngOnInit(): void {
     this.loadPertinencias();
+    this.loadTutorTipos();
   }
 
   // -------- Multiselect Pertinencias (UI) --------
   togglePertDropdown() {
+    this.skipFirstPertFocus = false;
     this.pertDropdownOpen = !this.pertDropdownOpen;
   }
 
   openPertDropdown() {
+    this.skipFirstPertFocus = false;
     this.pertDropdownOpen = true;
+  }
+
+  closePertDropdown() {
+    this.pertDropdownOpen = false;
+  }
+
+  onPertInputClick(ev: MouseEvent) {
+    ev.stopPropagation();
+    this.openPertDropdown();
+  }
+
+  onPertInputFocus() {
+    if (this.skipFirstPertFocus) {
+      this.skipFirstPertFocus = false;
+      return;
+    }
+    this.openPertDropdown();
+  }
+
+  onPertInputKeydown(ev: KeyboardEvent) {
+    if (ev.key === 'Tab' || ev.key === 'Shift') return;
+    ev.stopPropagation();
+    this.openPertDropdown();
+  }
+
+  onPertInputInput(ev: Event) {
+    ev.stopPropagation();
+    this.openPertDropdown();
   }
 
   @HostListener('document:click', ['$event'])
@@ -214,6 +253,35 @@ export class TutoresHomeComponent implements OnInit {
     this.selectedPertIds = [];
   }
 
+  private normalizeCi(val: any): string {
+    const s = (val == null ? '' : String(val)).trim().toUpperCase();
+    const digits = s.replace(/[^0-9]/g, '');
+    return digits || s;
+  }
+
+  private getTipoSeleccionado(ci: any): number | null {
+    const key = this.normalizeCi(ci);
+    return this.tipoSeleccionado[key] ?? null;
+  }
+
+  private setTipoSeleccionado(ci: any, tipoId: number | null) {
+    const key = this.normalizeCi(ci);
+    this.tipoSeleccionado[key] = tipoId ?? null;
+  }
+
+  getTipoTutorNombre(doc: Docente): string | null {
+    const tipoId = this.getTipoSeleccionado(doc.ci) ?? (doc as any).tipo_tutor_id ?? null;
+    if (tipoId == null) {
+      return null;
+    }
+    const found = this.tutorTipos.find(tt => tt.id === tipoId);
+    if (found) {
+      return found.nombre || null;
+    }
+    const fallback = (doc as any).tipo_tutor;
+    return fallback ? String(fallback) : null;
+  }
+
   get pertPlaceholder(): string {
     return this.pertMax ? `Seleccione hasta ${this.pertMax} pertinencias` : 'Seleccione una o más pertinencias';
   }
@@ -243,6 +311,7 @@ export class TutoresHomeComponent implements OnInit {
       .filter(p => this.selectedPertIds.includes(p.id))
       .map(p => p.nombre_pert)
       .join(', ');
+    const tipoTutorId = this.selectedTipoTutorId ?? null;
     const item = {
       ci,
       nombre,
@@ -250,24 +319,28 @@ export class TutoresHomeComponent implements OnInit {
       apellido_m: this.editingDocente.apellido_m || undefined,
       celular,
       profesion: this.editingDocente.profesion || undefined,
+      titulo: this.editingDocente.profesion || undefined,
       cod_carrera: codCarr,
       pertinencia_acad_id: primaryPertId,
       pertinencia_acad_ids: this.selectedPertIds,
       pertinencia: pertNom || undefined,
+      tipo_tutor_id: tipoTutorId ?? undefined,
+      activo: true,
     } as any;
     this.savingDocente = true;
     this.sga.registerTutoresBulk([item]).subscribe({
       next: (resp) => {
         this.savingDocente = false;
         if (resp?.success) {
-          const gestion = (resp as any)?.gestion ?? this.gestionActual;
-          this.successMessage = `Tutor registrado y activado. Gestión: ${gestion}`;
+          this.successMessage = `Tutor registrado y activado.`;
           this.successModalVisible = true;
           // Marcar en set de registrados
-          this.registradosSet.add(ci);
+          this.registradosSet.add(this.normalizeCi(ci));
+          this.setTipoSeleccionado(ci, tipoTutorId);
           this.modalEditarDocenteVisible = false;
           // Si panel de registrados está visible, refrescar
           if (this.showRegistrados) this.loadTutores();
+          this.buscarDocentes();
         } else {
           this.editingSaveError = resp?.message || 'No se pudo registrar el tutor';
         }
@@ -277,6 +350,28 @@ export class TutoresHomeComponent implements OnInit {
         this.editingSaveError = err?.message || 'Error al registrar tutor';
       }
     });
+  }
+
+  onSubmitTutorModal() {
+    this.registrarYActivarTutor();
+  }
+
+  onTipoSeleccionadoChange(doc: Docente, value: any) {
+    let tipoId: number | null;
+    if (value === null || value === undefined || value === '') {
+      tipoId = null;
+    } else {
+      const parsed = Number(value);
+      tipoId = Number.isFinite(parsed) ? parsed : null;
+    }
+    this.setTipoSeleccionado(doc.ci, tipoId);
+    (doc as any).tipo_tutor_id = tipoId;
+    const found = tipoId != null ? this.tutorTipos.find(tt => tt.id === tipoId) : undefined;
+    (doc as any).tipo_tutor = found ? found.nombre : null;
+
+    if (this.editingDocente && this.normalizeCi(this.editingDocente.ci) === this.normalizeCi(doc.ci)) {
+      this.selectedTipoTutorId = tipoId;
+    }
   }
 
   // Si el docente ya figura como tutor en la gestión actual, actualizar su snapshot en 'tutores'
@@ -321,12 +416,14 @@ export class TutoresHomeComponent implements OnInit {
     const celular = (this.editingDocente?.celular || '').toString().trim();
     const titulo = (this.editingDocente?.profesion || '').toString().trim();
     const hasAnyPert = (this.selectedPertIds?.length || 0) > 0;
+    const tipoTutor = this.selectedTipoTutorId;
     if (!(cod === 'MEA' || cod === 'EEA')) miss.push('Carrera');
     if (!nombre) miss.push('Nombres');
     if (!apPat) miss.push('Apellido paterno');
     if (!ci) miss.push('CI');
     if (!celular) miss.push('Celular');
     if (!titulo) miss.push('Título(s)');
+    if (!tipoTutor) miss.push('Tipo de Tutor');
     if (!hasAnyPert) miss.push('Pertinencia académica');
     // Validaciones de formato
     if (!this.isValidNombre(nombre, true)) miss.push('Nombres (formato)');
@@ -431,6 +528,8 @@ export class TutoresHomeComponent implements OnInit {
               celular: (d as any).celular || '',
               pertinencia: (d as any).pertinencia || '',
               pertinencia_acad_id: (d as any).pertinencia_acad_id ?? null,
+              tipo_tutor_id: (d as any).tipo_tutor_id ?? null,
+              tipo_tutor: (d as any).tipo_tutor || null,
             } as Docente;
             map.set(key, item);
             sgaNameIndex.set(fullNameKey(item), key);
@@ -493,6 +592,8 @@ export class TutoresHomeComponent implements OnInit {
               pertinencia_acad_id: (ld as any).pertinencia_acad_id != null ? (ld as any).pertinencia_acad_id : prev.pertinencia_acad_id,
               // Si hicimos merge por nombre (prev venía de SGA con CI malo), sobreescribir el CI mostrado con el local
               ci: pickCi,
+              tipo_tutor_id: (ld as any).tipo_tutor_id ?? (prev as any).tipo_tutor_id ?? null,
+              tipo_tutor: (ld as any).tipo_tutor ?? (prev as any).tipo_tutor ?? null,
             } as Docente;
             // Guardar de regreso en el mismo slot del map que se esté usando (por CI local o por CI SGA si hicimos merge por nombre)
             if (map.has(key)) {
@@ -529,6 +630,8 @@ export class TutoresHomeComponent implements OnInit {
 
           // Mapa CI -> listas de pertinencias (nombres e ids) provenientes del snapshot de tutores
           const pertMap = new Map<string, { ids: number[]; noms: string[] }>();
+          const tutorInfoByCi = new Map<string, TutorReg>();
+          const tutorInfoByName = new Map<string, TutorReg>();
           for (const t of regArr) {
             const ciKey = normCi((t as any).ci);
             if (!ciKey) continue;
@@ -540,6 +643,9 @@ export class TutoresHomeComponent implements OnInit {
               const newNoms = Array.from(new Set([...prev.noms, ...noms]));
               pertMap.set(ciKey, { ids: newIds, noms: newNoms });
             }
+            tutorInfoByCi.set(ciKey, t as TutorReg);
+            const nameKey = fullNameKey(t);
+            if (nameKey) tutorInfoByName.set(nameKey, t as TutorReg);
           }
 
           // Enriquecer docentes con todas las pertinencias registradas en tutores
@@ -552,6 +658,23 @@ export class TutoresHomeComponent implements OnInit {
                 (docVal as any).pertinencia = entry.noms.join(', ');
               }
             }
+            const tutorInfo = tutorInfoByCi.get(ciKey) || tutorInfoByName.get(fullNameKey(docVal));
+            if (tutorInfo) {
+              (docVal as any).tutor_reg_id = tutorInfo.id;
+              (docVal as any).tutor_activo = (tutorInfo.activo ?? true) ? true : false;
+              if ((docVal as any).tipo_tutor_id == null && tutorInfo.tipo_tutor_id != null) {
+                (docVal as any).tipo_tutor_id = tutorInfo.tipo_tutor_id;
+              }
+              if (!(docVal as any).tipo_tutor && tutorInfo.tipo_tutor) {
+                (docVal as any).tipo_tutor = tutorInfo.tipo_tutor;
+              }
+              if (!docVal.profesion && (tutorInfo as any).titulo) {
+                docVal.profesion = (tutorInfo as any).titulo;
+              }
+            } else {
+              (docVal as any).tutor_reg_id = undefined;
+              (docVal as any).tutor_activo = false;
+            }
           }
         } else {
           this.registradosSet = new Set<string>();
@@ -559,6 +682,10 @@ export class TutoresHomeComponent implements OnInit {
         }
 
         this.docentes = Array.from(map.values());
+        this.tipoSeleccionado = {};
+        for (const d of this.docentes) {
+          this.setTipoSeleccionado(d.ci, (d as any).tipo_tutor_id ?? null);
+        }
       },
       error: (err) => {
         this.loadingDocentes = false;
@@ -593,7 +720,10 @@ export class TutoresHomeComponent implements OnInit {
     const initPert = (doc as any).pertinencia_acad_id;
     this.selectedPertIds = (initPert != null) ? [Number(initPert)] : [];
     this.pertSearch = '';
-    this.pertDropdownOpen = true;
+    this.pertDropdownOpen = false;
+    this.skipFirstPertFocus = true;
+    const tipo = this.getTipoSeleccionado(doc.ci) ?? ((doc as any).tipo_tutor_id ?? null);
+    this.selectedTipoTutorId = tipo;
     this.modalEditarDocenteVisible = true;
   }
 
@@ -615,7 +745,9 @@ export class TutoresHomeComponent implements OnInit {
     this.modalGestion = this.gestionActual;
     this.selectedPertIds = [];
     this.pertSearch = '';
-    this.pertDropdownOpen = true;
+    this.pertDropdownOpen = false;
+    this.skipFirstPertFocus = true;
+    this.selectedTipoTutorId = null;
     this.modalEditarDocenteVisible = true;
   }
 
@@ -631,76 +763,58 @@ export class TutoresHomeComponent implements OnInit {
     this.editingDocente = null;
   }
 
+  cerrarModalExito() {
+    this.successModalVisible = false;
+  }
+
   guardarDocenteEditado() {
     if (!this.editingDocente) return;
     this.editingSaveError = null;
     this.savingDocente = true;
-    // Normalizar entradas también en edición
-    this.editingDocente.nombre = this.toTitleCase(this.sanitizeNameChars(((this.editingDocente.nombre || '') as string).replace(/\s+/g, ' ').trim())) as any;
-    this.editingDocente.apellido_p = this.toTitleCase(this.sanitizeNameChars(((this.editingDocente.apellido_p || '') as string).replace(/\s+/g, ' ').trim())) as any;
-    this.editingDocente.apellido_m = this.toTitleCase(this.sanitizeNameChars(((this.editingDocente.apellido_m || '') as string).replace(/\s+/g, ' ').trim())) as any;
-    this.editingDocente.celular = ((this.editingDocente.celular || '') as string).replace(/\D/g, '').slice(0, 8) as any;
+
+    // Normalizar entradas
+    this.editingDocente.nombre = this.toTitleCase(
+      this.sanitizeNameChars(((this.editingDocente.nombre || '') as string).replace(/\s+/g, ' ').trim())
+    ) as any;
+    this.editingDocente.apellido_p = this.toTitleCase(
+      this.sanitizeNameChars(((this.editingDocente.apellido_p || '') as string).replace(/\s+/g, ' ').trim())
+    ) as any;
+    this.editingDocente.apellido_m = this.toTitleCase(
+      this.sanitizeNameChars(((this.editingDocente.apellido_m || '') as string).replace(/\s+/g, ' ').trim())
+    ) as any;
+    this.editingDocente.celular = ((this.editingDocente.celular || '') as string)
+      .replace(/\D/g, '')
+      .slice(0, 8) as any;
+
     const ciKey = (this.editingDocente.ci || '').toString().trim();
-    // Determinar nombre(s) de pertinencia desde los ids seleccionados (multi)
     const selectedP = (this.pertinencias || []).filter(p => this.selectedPertIds.includes(p.id));
     const pertNombre = selectedP.map(p => p.nombre_pert).join(', ');
     const primaryPertId = this.selectedPertIds?.[0] ?? null;
-    const codCarr = (this.modalCarreraCode === 'MEA' || this.modalCarreraCode === 'EEA')
-      ? this.modalCarreraCode
-      : ((this.carreraSeleccionada && this.carreraSeleccionadaCodigo !== '—') ? this.carreraSeleccionadaCodigo : null);
-    const payload = {
-      id: this.isCreateMode ? undefined : (this.editingDocente as any).id,
-      ci: ciKey,
-      nombre: this.editingDocente.nombre || '',
-      apellido_p: this.editingDocente.apellido_p || '',
-      apellido_m: this.editingDocente.apellido_m || '',
-      profesion: this.editingDocente.profesion || '',
-      celular: this.editingDocente.celular || '',
-      pertinencia_acad_id: primaryPertId,
-      cod_carrera: codCarr,
-      ci_original: this.isCreateMode ? null : (this.editingCiOriginal || null),
-      activo: true,
-    };
-    this.sga.saveDocenteByCi(payload).subscribe({
-      next: (resp) => {
-        this.savingDocente = false;
-        if (resp?.success && resp.data) {
-          const saved = resp.data as any;
-          const updated: Docente = {
-            id: (saved as any)?.id ?? (this.editingDocente as any)?.id,
-            nombre: saved.nombre || this.editingDocente!.nombre || '',
-            apellido_p: saved.apellido_p || this.editingDocente!.apellido_p || '',
-            apellido_m: saved.apellido_m || this.editingDocente!.apellido_m || '',
-            ci: saved.ci || ciKey,
-            profesion: saved.profesion || this.editingDocente!.profesion || '',
-            celular: saved.celular || this.editingDocente!.celular || '',
-            pertinencia: (saved.pertinenciaAcad?.nombre_pert) || pertNombre,
-            pertinencia_acad_id: saved.pertinencia_acad_id ?? primaryPertId,
-          } as Docente;
-          // localizar por CI previo y actualizar en lista
-          const prevKey = (this.editingCiOriginal || ciKey) as string;
-          const idx = this.docentes.findIndex(d => (d.ci || '').toString().trim() === prevKey);
-          if (idx >= 0) this.docentes[idx] = updated; else this.docentes.push(updated);
-          // actualizar CI original para futuras ediciones
-          this.editingCiOriginal = (updated.ci || '').toString().trim();
-          // Si este docente ya es tutor en gestión actual, refrescar snapshot automáticamente
-          this.refreshTutorSnapshotIfExists(updated);
-          this.cerrarModalEditarDocente();
-          this.successMessage = 'Datos del docente guardados correctamente';
-          this.successModalVisible = true;
-        } else {
-          this.editingSaveError = resp?.message || 'No se pudo guardar el docente';
-        }
-      },
-      error: (err) => {
-        this.savingDocente = false;
-        this.editingSaveError = err?.message || 'Error al guardar docente';
-      }
-    });
-  }
 
-  cerrarModalExito() {
-    this.successModalVisible = false;
+    const updated: Docente = {
+      ...this.editingDocente,
+      ci: ciKey,
+      profesion: this.editingDocente.profesion || '',
+      pertinencia: pertNombre,
+      pertinencia_acad_id: primaryPertId as any,
+      pertinencia_ids: [...this.selectedPertIds],
+      pertinencias: selectedP.map(p => p.nombre_pert),
+    } as Docente;
+
+    const prevKey = (this.editingCiOriginal || ciKey) as string;
+    const idx = this.docentes.findIndex(d => (d.ci || '').toString().trim() === prevKey);
+    if (idx >= 0) {
+      this.docentes[idx] = updated;
+    } else {
+      this.docentes.push(updated);
+    }
+    this.editingCiOriginal = (updated.ci || '').toString().trim();
+    this.setTipoSeleccionado(this.editingCiOriginal, this.selectedTipoTutorId ?? null);
+
+    this.savingDocente = false;
+    this.cerrarModalEditarDocente();
+    this.successMessage = 'Datos actualizados (pendientes de registro como tutor)';
+    this.successModalVisible = true;
   }
 
   // Helpers de selección
@@ -728,7 +842,9 @@ export class TutoresHomeComponent implements OnInit {
     const hasCelular = !!(doc.celular && String(doc.celular).trim());
     const hasPert = (doc as any).pertinencia_acad_id != null || !!(doc.pertinencia && String(doc.pertinencia).trim());
     const notRegistrado = !this.isRegistradoGestionActual(doc);
-    return hasCi && hasTitulo && hasCelular && hasPert && notRegistrado;
+    const tipoId = this.getTipoSeleccionado(doc.ci) ?? (doc as any).tipo_tutor_id ?? null;
+    const hasTipo = !!tipoId;
+    return hasCi && hasTitulo && hasCelular && hasPert && hasTipo && notRegistrado;
   }
 
   isRegistradoGestionActual(doc: Docente): boolean {
@@ -751,6 +867,11 @@ export class TutoresHomeComponent implements OnInit {
     const seleccionados = this.docentes.filter(d => this.selectedCis.has(d.ci));
     if (!seleccionados.length) return;
     this.bulkError = null;
+    const faltanTipo = seleccionados.filter(d => !this.getTipoSeleccionado(d.ci) && !(d as any).tipo_tutor_id);
+    if (faltanTipo.length) {
+      this.bulkError = 'Seleccione el Tipo de Tutor para todos los docentes marcados.';
+      return;
+    }
     this.bulkSaving = true;
     const codCarr = (this.carreraSeleccionada && this.carreraSeleccionadaCodigo !== '—') ? this.carreraSeleccionadaCodigo : undefined;
     const items = seleccionados.map(d => ({
@@ -760,12 +881,14 @@ export class TutoresHomeComponent implements OnInit {
       apellido_m: d.apellido_m || '',
       celular: d.celular || '',
       profesion: d.profesion || '',
+      titulo: d.profesion || '',
       cod_carrera: codCarr,
       pertinencia_acad_id: (d as any).pertinencia_acad_id ?? null,
       pertinencia_acad_ids: (d as any).pertinencia_ids,
       pertinencia: (Array.isArray((d as any).pertinencias) && (d as any).pertinencias.length)
         ? (d as any).pertinencias.join(', ')
         : (d.pertinencia || undefined),
+      tipo_tutor_id: this.getTipoSeleccionado(d.ci) ?? (d as any).tipo_tutor_id ?? undefined,
     }));
     this.sga.registerTutoresBulk(items as any).subscribe({
       next: (resp) => {
@@ -773,8 +896,7 @@ export class TutoresHomeComponent implements OnInit {
         if (resp?.success) {
           const created = (resp as any)?.counts?.created ?? 0;
           const updated = (resp as any)?.counts?.updated ?? 0;
-          const gestion = (resp as any)?.gestion ?? '';
-          this.successMessage = `Tutores registrados correctamente. Nuevos: ${created}, Actualizados: ${updated}. Gestión: ${gestion}`;
+          this.successMessage = `Tutores registrados correctamente. Nuevos: ${created}, Actualizados: ${updated}.`;
           this.successModalVisible = true;
           // Limpiar selección
           this.selectedCis.clear();
@@ -783,7 +905,9 @@ export class TutoresHomeComponent implements OnInit {
             const ci = (d.ci || '').toString().trim();
             if (!ci) continue;
             this.registradosSet.add(ci);
+            d.tutor_activo = true;
           }
+          this.buscarDocentes();
         } else {
           this.bulkError = resp?.message || 'No se pudo registrar tutores';
         }
@@ -808,6 +932,7 @@ export class TutoresHomeComponent implements OnInit {
         const codSel = this.carreraSeleccionadaCodigo;
         this.carreraFiltroCode = (codSel === 'MEA' || codSel === 'EEA') ? codSel : 'MEA';
       }
+      if (!this.tutorTipos.length) this.loadTutorTipos();
       this.loadTutores();
     }
   }
@@ -819,12 +944,30 @@ export class TutoresHomeComponent implements OnInit {
     const params: any = {};
     const codigo = this.carreraFiltroCode || (this.carreraSeleccionadaCodigo !== '—' ? this.carreraSeleccionadaCodigo : undefined);
     if (codigo) params.carrera = codigo;
-    if (this.gestionFiltro) params.gestion = this.gestionFiltro;
     this.sga.getTutores(params).subscribe({
       next: (resp) => {
         this.loadingTutores = false;
         if (resp?.success && Array.isArray(resp.data)) {
-          this.tutores = resp.data as TutorReg[];
+          const incoming = resp.data as TutorReg[];
+          if (this.tutores.length) {
+            const byId = new Map<number, TutorReg>();
+            for (const existing of this.tutores) {
+              if (existing?.id != null) byId.set(existing.id, existing);
+            }
+            const merged: TutorReg[] = [];
+            for (const item of incoming) {
+              if (item?.id != null && byId.has(item.id)) {
+                const target = byId.get(item.id)!;
+                Object.assign(target, item, { activo: !!item.activo });
+                merged.push(target);
+              } else {
+                merged.push({ ...item, activo: !!item.activo });
+              }
+            }
+            this.tutores = merged;
+          } else {
+            this.tutores = incoming.map(t => ({ ...t, activo: !!t.activo }));
+          }
         } else {
           this.tutores = [];
         }
@@ -832,6 +975,234 @@ export class TutoresHomeComponent implements OnInit {
       error: (err) => {
         this.loadingTutores = false;
         this.errorTutores = err?.message || 'Error al cargar tutores';
+      }
+    });
+  }
+
+  private loadTutorTipos() {
+    this.sga.getTutorTipos().subscribe({
+      next: (resp) => { this.tutorTipos = resp?.data || []; },
+      error: () => { this.tutorTipos = []; }
+    });
+  }
+
+  getPertListFromString(value?: string | null): string[] {
+    if (!value) return [];
+    return value.split(',').map(p => p.trim()).filter(p => !!p);
+  }
+
+  canEnableTutor(t: TutorReg): boolean {
+    const hasTipo = !!t.tipo_tutor_id;
+    const hasPert = (t.pertinencia_acad_id != null) || ((t.pertinencia_ids || []).length > 0) || !!(t.pertinencia && String(t.pertinencia).trim());
+    return hasTipo && hasPert;
+  }
+
+  onToggleActivo(t: TutorReg, checked: boolean) {
+    this.pendingDisableDocente = null;
+    if (checked) {
+      // Si se intenta habilitar sin datos completos, revertir
+      if (!this.canEnableTutor(t)) {
+        this.errorTutores = 'No se puede habilitar: requiere Tipo de Tutor y Pertinencia académica';
+        // Revertir visualmente en el próximo ciclo de cambio de detección
+        setTimeout(() => { t.activo = false; }, 0);
+        return;
+      }
+      this.sga.toggleTutor(t.id, true).subscribe({
+        next: (resp) => {
+          if (resp?.success && resp.data) {
+            t.activo = !!resp.data.activo;
+          }
+        },
+        error: (err) => {
+          this.errorTutores = err?.message || 'No se pudo cambiar el estado del tutor';
+        }
+      });
+      return;
+    }
+
+    // Confirmar antes de deshabilitar
+    this.errorTutores = null;
+    this.pendingDisableTutor = t;
+    this.pendingDisableDocente = null;
+    this.confirmDisableModalVisible = true;
+    // Mantener switch activado hasta confirmar
+    setTimeout(() => { t.activo = true; }, 0);
+  }
+
+  onToggleDocenteActivo(event: Event, doc: Docente) {
+    const input = event.target as HTMLInputElement | null;
+    const checked = input?.checked ?? false;
+
+    if (!doc.tutor_reg_id) {
+      this.errorDocentes = 'No se pudo determinar el tutor registrado para este docente.';
+      if (input) input.checked = !!doc.tutor_activo;
+      return;
+    }
+
+    if (checked) {
+      this.sga.toggleTutor(doc.tutor_reg_id, true).subscribe({
+        next: (resp) => {
+          if (resp?.success && resp.data) {
+            doc.tutor_activo = !!resp.data.activo;
+            if (input) input.checked = doc.tutor_activo;
+          } else {
+            doc.tutor_activo = false;
+            if (input) input.checked = false;
+            this.errorDocentes = 'No se pudo habilitar al tutor';
+          }
+        },
+        error: (err) => {
+          doc.tutor_activo = false;
+          if (input) input.checked = false;
+          this.errorDocentes = err?.message || 'Error al habilitar tutor';
+        }
+      });
+      return;
+    }
+
+    // Intento de deshabilitar: revertir visualmente hasta confirmar
+    if (input) input.checked = true;
+    doc.tutor_activo = true;
+    this.errorDocentes = null;
+    this.pendingDisableDocente = doc;
+    this.pendingDisableTutor = null;
+    this.confirmDisableModalVisible = true;
+  }
+
+  confirmarDeshabilitarTutor() {
+    if (this.pendingDisableDocente) {
+      const doc = this.pendingDisableDocente;
+      this.disableTutorSaving = true;
+      this.sga.toggleTutor(doc.tutor_reg_id!, false).subscribe({
+        next: (resp) => {
+          this.disableTutorSaving = false;
+          this.confirmDisableModalVisible = false;
+          this.pendingDisableDocente = null;
+          if (resp?.success && resp.data) {
+            doc.tutor_activo = !!resp.data.activo;
+            if (!doc.tutor_activo) {
+              this.successMessage = 'Tutor deshabilitado.';
+              this.successModalVisible = true;
+            } else {
+              doc.tutor_activo = true;
+            }
+          } else {
+            doc.tutor_activo = true;
+            this.errorDocentes = 'No se pudo deshabilitar al tutor';
+          }
+        },
+        error: (err) => {
+          this.disableTutorSaving = false;
+          this.confirmDisableModalVisible = false;
+          doc.tutor_activo = true;
+          this.errorDocentes = err?.message || 'Error al deshabilitar tutor';
+          this.pendingDisableDocente = null;
+        }
+      });
+      this.pendingDisableTutor = null;
+      return;
+    }
+
+    if (!this.pendingDisableTutor) {
+      this.cancelarDeshabilitarTutor();
+      return;
+    }
+    const tutor = this.pendingDisableTutor;
+    this.disableTutorSaving = true;
+    this.sga.toggleTutor(tutor.id, false).subscribe({
+      next: (resp) => {
+        this.disableTutorSaving = false;
+        this.confirmDisableModalVisible = false;
+        this.pendingDisableTutor = null;
+        if (resp?.success && resp.data) {
+          tutor.activo = !!resp.data.activo;
+          this.successMessage = 'Tutor deshabilitado.';
+          this.successModalVisible = true;
+        } else {
+          tutor.activo = true;
+          this.errorTutores = 'No se pudo deshabilitar al tutor';
+        }
+      },
+      error: (err) => {
+        this.disableTutorSaving = false;
+        this.confirmDisableModalVisible = false;
+        this.errorTutores = err?.message || 'Error al deshabilitar tutor';
+        if (this.pendingDisableTutor) {
+          this.pendingDisableTutor.activo = true;
+        }
+        this.pendingDisableTutor = null;
+      }
+    });
+  }
+
+  cancelarDeshabilitarTutor() {
+    if (this.pendingDisableTutor) {
+      this.pendingDisableTutor.activo = true;
+    }
+    if (this.pendingDisableDocente) {
+      this.pendingDisableDocente.tutor_activo = true;
+    }
+    this.pendingDisableTutor = null;
+    this.pendingDisableDocente = null;
+    this.confirmDisableModalVisible = false;
+    this.disableTutorSaving = false;
+  }
+
+  tipoTutorNombre(t: TutorReg): string | null {
+    if (!t) return null;
+    if (t.tipo_tutor && typeof t.tipo_tutor === 'string') {
+      return t.tipo_tutor;
+    }
+    if ((t as any)?.tipo_tutor?.nombre) {
+      return String((t as any).tipo_tutor.nombre);
+    }
+    if (t.tipo_tutor_id != null) {
+      const found = this.tutorTipos.find(tt => tt.id === t.tipo_tutor_id);
+      if (found?.nombre) return found.nombre;
+    }
+    return null;
+  }
+
+  onEnableDocenteClick(doc: Docente) {
+    if (!doc.tutor_reg_id) return;
+    this.disableTutorSaving = true;
+    this.sga.toggleTutor(doc.tutor_reg_id, true).subscribe({
+      next: (resp) => {
+        this.disableTutorSaving = false;
+        if (resp?.success && resp.data) {
+          doc.tutor_activo = !!resp.data.activo;
+        } else {
+          doc.tutor_activo = false;
+          this.errorDocentes = 'No se pudo habilitar al tutor';
+        }
+      },
+      error: (err) => {
+        this.disableTutorSaving = false;
+        doc.tutor_activo = false;
+        this.errorDocentes = err?.message || 'Error al habilitar tutor';
+      }
+    });
+  }
+
+  onDisableDocenteClick(doc: Docente) {
+    if (!doc.tutor_reg_id) return;
+    this.errorDocentes = null;
+    this.pendingDisableDocente = doc;
+    this.pendingDisableTutor = null;
+    this.confirmDisableModalVisible = true;
+  }
+
+  onTipoTutorChange(t: TutorReg, tipoId: number) {
+    this.sga.updateTutor(t.id, { tipo_tutor_id: tipoId }).subscribe({
+      next: (resp) => {
+        if (resp?.success && resp.data) {
+          t.tipo_tutor_id = tipoId;
+          const found = this.tutorTipos.find(x => x.id === tipoId);
+          t.tipo_tutor = found ? found.nombre : undefined;
+        }
+      },
+      error: (err) => {
+        this.errorTutores = err?.message || 'No se pudo actualizar el tipo de tutor';
       }
     });
   }

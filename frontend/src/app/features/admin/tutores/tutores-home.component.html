@@ -116,6 +116,14 @@
               <div class="invalid-feedback">Ingrese título o profesión</div>
             </div>
             <div class="col-md-6">
+              <label class="form-label">Tipo de Tutor <span class="text-danger">*</span></label>
+              <select class="form-select" [(ngModel)]="selectedTipoTutorId" [ngClass]="{'is-invalid': showFieldErrors && !selectedTipoTutorId}">
+                <option [ngValue]="null" disabled>Seleccione tipo</option>
+                <option *ngFor="let tt of tutorTipos" [ngValue]="tt.id">{{ tt.nombre }}</option>
+              </select>
+              <div class="invalid-feedback">Seleccione el tipo de tutor</div>
+            </div>
+            <div class="col-md-6">
               <label class="form-label">Pertinencia Académica(s) <span class="text-danger">*</span></label>
               <div #msRoot class="ms-control" [class.open]="pertDropdownOpen">
                 <div class="ms-chips" (click)="togglePertDropdown()" [class.has-chips]="(selectedPertIds?.length || 0) > 0">
@@ -123,10 +131,10 @@
                     {{ p.nombre_pert }} <i class="bi bi-x ms-1"></i>
                   </span>
                   <input class="ms-input" type="text" [placeholder]="pertPlaceholder" [(ngModel)]="pertSearch"
-                         (click)="$event.stopPropagation(); openPertDropdown()"
-                         (focus)="openPertDropdown()"
-                         (keydown)="openPertDropdown()"
-                         (input)="openPertDropdown(); $event.stopPropagation()">
+                         (click)="onPertInputClick($event)"
+                         (focus)="onPertInputFocus()"
+                         (keydown)="onPertInputKeydown($event)"
+                         (input)="onPertInputInput($event)">
                 </div>
                 <button class="ms-clear btn btn-link p-0" *ngIf="(selectedPertIds?.length || 0) > 0" (click)="clearPert(); $event.stopPropagation()" type="button">
                   <i class="bi bi-x"></i>
@@ -148,13 +156,8 @@
           <div class="me-auto" *ngIf="editingSaveError">
             <span class="text-danger small">{{ editingSaveError }}</span>
           </div>
-          <button *ngIf="isCreateMode" type="button" class="btn btn-success btn-sm" (click)="registrarYActivarTutor()" [disabled]="savingDocente">
-            <i class="bi" [ngClass]="savingDocente ? 'bi-hourglass-split' : 'bi-person-badge'" class="me-1"></i>
-            {{ savingDocente ? 'Procesando...' : 'Registrar y activar como Tutor' }}
-          </button>
-          <button *ngIf="!isCreateMode" type="button" class="btn btn-success btn-sm" (click)="guardarDocenteEditado()" [disabled]="savingDocente">
-            <i class="bi" [ngClass]="savingDocente ? 'bi-hourglass-split' : (isCreateMode ? 'bi-person-plus' : 'bi-check2')" class="me-1"></i>
-            {{ savingDocente ? 'Guardando...' : (isCreateMode ? 'Registrar' : 'Guardar') }}
+          <button type="button" class="btn btn-success btn-sm" (click)="onSubmitTutorModal()" [disabled]="savingDocente">
+            {{ savingDocente ? 'Procesando...' : 'Guardar y registrar tutor' }}
           </button>
           <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cerrarModalEditarDocente()">
             Cerrar
@@ -184,17 +187,6 @@
                   <option [ngValue]="'EEA'">EEA</option>
                 </select>
               </div>
-              <div class="d-none d-sm-block vr"></div>
-              <div class="d-flex align-items-center gap-2">
-                <span class="text-muted small">Gestión</span>
-                <div class="input-group input-group-sm gestion-group w-auto">
-                  <span class="input-group-text"><i class="bi bi-calendar2"></i></span>
-                  <select class="form-select" [(ngModel)]="gestionFiltro" (ngModelChange)="onGestionFiltroChange($event)">
-                    <option [ngValue]="gestionActual">{{ gestionActual }}</option>
-                    <option [ngValue]="gestionAlternaActual">{{ gestionAlternaActual }}</option>
-                  </select>
-                </div>
-              </div>
             </div>
             <div class="d-flex align-items-center gap-3">
               <small class="text-muted">Total: <strong>{{ tutores?.length || 0 }}</strong></small>
@@ -217,9 +209,11 @@
                   <th>Apellido Materno</th>
                   <th>CI</th>
                   <th>Celular</th>
+                  <th>Título(s)</th>
                   <th>Carrera</th>
                   <th>Pertinencia</th>
-                  <th>Gestión</th>
+                  <th>Tipo de Tutor</th>
+                  <th>Activo</th>
                 </tr>
               </thead>
               <tbody>
@@ -229,9 +223,28 @@
                   <td>{{ t.apellido_m || '-' }}</td>
                   <td>{{ t.ci }}</td>
                   <td>{{ t.celular || '-' }}</td>
+                  <td>{{ t.titulo || '-' }}</td>
                   <td>{{ t.cod_carrera }}</td>
-                  <td>{{ t.pertinencia || '-' }}</td>
-                  <td>{{ t.gestion_registro || '-' }}</td>
+                  <td>
+                    <ul class="mb-0 ps-3" *ngIf="t.pertinencias && t.pertinencias.length; else pertTextoReg">
+                      <li *ngFor="let p of t.pertinencias">{{ p }}</li>
+                    </ul>
+                    <ng-template #pertTextoReg>
+                      <ul class="mb-0 ps-3" *ngIf="t.pertinencia; else sinPertReg">
+                        <li *ngFor="let p of getPertListFromString(t.pertinencia)">{{ p }}</li>
+                      </ul>
+                      <ng-template #sinPertReg>-</ng-template>
+                    </ng-template>
+                  </td>
+                  <td>{{ tipoTutorNombre(t) || '-' }}</td>
+                  <td>
+                    <div class="form-check form-switch m-0">
+                      <input class="form-check-input" type="checkbox"
+                             [checked]="!!t.activo"
+                             [disabled]="!canEnableTutor(t) && !t.activo"
+                             (change)="onToggleActivo(t, $event.target.checked)" />
+                    </div>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -269,6 +282,36 @@
   <div class="modal-backdrop fade show" (click)="cerrarModalExito()"></div>
 </div>
 
+<!-- Modal: Confirmar deshabilitación de tutor -->
+<div *ngIf="confirmDisableModalVisible">
+  <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalConfirmDisableLabel">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header py-2">
+          <h5 class="modal-title" id="modalConfirmDisableLabel">
+            <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>
+            Deshabilitar tutor
+          </h5>
+          <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="cancelarDeshabilitarTutor()"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">¿Confirmas deshabilitar al tutor seleccionado?</p>
+          <p class="mb-0 text-muted small" *ngIf="pendingDisableTutor">
+            {{ pendingDisableTutor.nombre }} {{ pendingDisableTutor.apellido_p || '' }} {{ pendingDisableTutor.apellido_m || '' }}
+          </p>
+        </div>
+        <div class="modal-footer py-2 d-flex justify-content-end gap-2">
+          <button type="button" class="btn btn-secondary btn-sm" (click)="cancelarDeshabilitarTutor()" [disabled]="disableTutorSaving">Cancelar</button>
+          <button type="button" class="btn btn-danger btn-sm" (click)="confirmarDeshabilitarTutor()" [disabled]="disableTutorSaving">
+            {{ disableTutorSaving ? 'Deshabilitando...' : 'Deshabilitar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop fade show" (click)="cancelarDeshabilitarTutor()"></div>
+</div>
+
     <!-- Fila separada para la card de Importar Docentes (no afecta la otra columna) -->
     <div class="row g-3 align-items-start" *ngIf="showImport">
       <div class="col-12">
@@ -298,12 +341,6 @@
                   {{ loadingDocentes ? 'Buscando...' : 'Buscar' }}
                 </button>
               </div>
-              <div class="col-12 col-sm-auto">
-                <button class="btn btn-success" (click)="registrarTutores()" [disabled]="!hasSeleccion || bulkSaving">
-                  <i class="bi" [ngClass]="bulkSaving ? 'bi-hourglass-split' : 'bi-person-plus'"></i>
-                  {{ bulkSaving ? 'Registrando...' : 'Registrar tutores' }}
-                </button>
-              </div>
             </div>
 
             <div *ngIf="bulkError" class="alert alert-danger py-2">{{ bulkError }}</div>
@@ -322,6 +359,7 @@
                     <th>Celular</th>
                     <th>Título(s)</th>
                     <th>Pertinencia Académica</th>
+                    <th>Tipo de Tutor</th>
                     <th>Estado</th>
                     <th class="text-end">Acciones</th>
                   </tr>
@@ -334,7 +372,21 @@
                     <td>{{ d.ci }}</td>
                     <td>{{ d.celular }}</td>
                     <td>{{ d.profesion || '-' }}</td>
-                    <td>{{ (d.pertinencias && d.pertinencias.length) ? d.pertinencias.join(', ') : (d.pertinencia || '-') }}</td>
+                    <td>
+                      <ul class="mb-0 ps-3" *ngIf="d.pertinencias && d.pertinencias.length; else pertTexto">
+                        <li *ngFor="let p of d.pertinencias">{{ p }}</li>
+                      </ul>
+                      <ng-template #pertTexto>
+                        <ul class="mb-0 ps-3" *ngIf="d.pertinencia; else sinPert">
+                          <li *ngFor="let p of getPertListFromString(d.pertinencia)">{{ p }}</li>
+                        </ul>
+                        <ng-template #sinPert>-</ng-template>
+                      </ng-template>
+                    </td>
+                    <td>
+                      <span *ngIf="getTipoTutorNombre(d); else sinTipo">{{ getTipoTutorNombre(d) }}</span>
+                      <ng-template #sinTipo>-</ng-template>
+                    </td>
                     <td>
                       <span *ngIf="isRegistradoGestionActual(d)" class="badge bg-success">Registrado</span>
                       <span *ngIf="!isRegistradoGestionActual(d)" class="badge bg-secondary">Disponible</span>
@@ -344,12 +396,12 @@
                         <button class="btn btn-sm btn-primary" (click)="editarDocente(d)">
                           <i class="bi bi-pencil-square"></i>
                         </button>
-                        <div class="form-check m-0">
-                          <input class="form-check-input" type="checkbox" #cb
-                               [checked]="isSelected(d)"
-                               [disabled]="!isDocenteSeleccionable(d)"
-                               [attr.title]="!isDocenteSeleccionable(d) ? (isRegistradoGestionActual(d) ? 'Ya registrado en la gestión actual' : 'Complete CI, Título, Celular y Pertinencia para seleccionar') : null"
-                               (change)="toggleSelect(d, cb.checked)" />
+                        <div class="form-check form-switch m-0">
+                          <input class="form-check-input" type="checkbox"
+                                 [checked]="d.tutor_reg_id ? !!d.tutor_activo : isSelected(d)"
+                                 [disabled]="!d.tutor_reg_id && !isDocenteSeleccionable(d)"
+                                 [attr.title]="d.tutor_reg_id ? (d.tutor_activo ? 'Tutor activo. Cambia el estado para deshabilitar.' : 'Tutor deshabilitado. Cambia el estado para habilitar.') : (!isDocenteSeleccionable(d) ? 'Complete CI, Título, Celular, Pertinencia y Tipo para registrar' : null)"
+                                 (change)="d.tutor_reg_id ? onToggleDocenteActivo($event, d) : toggleSelect(d, $event.target.checked)" />
                         </div>
                       </div>
                     </td>

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
 // --- INTERFACES (ajusta según tu backend) ---
@@ -61,6 +61,11 @@ export interface Docente {
   pertinencia_acad_id?: number | null;
   pertinencia_ids?: number[];
   pertinencias?: string[];
+  tipo_tutor_id?: number | null;
+  tipo_tutor?: string;
+  activo?: boolean;
+  tutor_reg_id?: number;
+  tutor_activo?: boolean;
 }
 
 export interface Pertinencia {
@@ -81,6 +86,7 @@ export interface TutorBulkItem {
   pertinencia_acad_id?: number | null;
   pertinencia_acad_ids?: number[]; // soporte multi-pertinencias
   pertinencia?: string; // nombre de pertinencia si viene del SGA
+  activo?: boolean;
 }
 
 export interface TutorReg {
@@ -90,14 +96,22 @@ export interface TutorReg {
   apellido_m?: string;
   ci: string;
   celular?: string;
+  titulo?: string;
   cod_carrera?: string;
   carrera?: string;
   pertinencia?: string;
   pertinencia_acad_id?: number | null;
   pertinencia_ids?: number[];
   pertinencias?: string[];
-  gestion_registro?: string; // 1/YYYY o 2/YYYY
   activo?: boolean;
+  tipo_tutor_id?: number | null;
+  tipo_tutor?: string;
+}
+
+export interface TutorTipo {
+  id: number;
+  nombre: string;
+  is_active?: boolean;
 }
 
 export interface ArancelEst {
@@ -286,12 +300,32 @@ export class SgaService {
 
   // --- DOCENTES (Local BD) ---
   getDocentesLocales(carrera?: string): Observable<ApiResponse<Docente[]>> {
+    // Usar tutores locales como fuente y mapear a forma Docente para el flujo de importación
     let params = new HttpParams();
     if (carrera) {
       params = params.set('carrera', carrera);
     }
-    return this.http.get<ApiResponse<Docente[]>>(`${environment.apiUrl}/docentes`, { params })
-      .pipe(catchError(this.handleError));
+    return this.http.get<ApiResponse<TutorReg[]>>(`${environment.apiUrl}/tutores`, { params }).pipe(
+      map((resp) => {
+        const list = (resp?.data || []).map(t => ({
+          nombre: t.nombre,
+          apellido_p: t.apellido_p || '',
+          apellido_m: t.apellido_m || '',
+          ci: t.ci,
+          profesion: t.titulo || '',
+          celular: t.celular || '',
+          pertinencia: t.pertinencia || '',
+          pertinencia_acad_id: t.pertinencia_acad_id ?? null,
+          pertinencia_ids: t.pertinencia_ids,
+          pertinencias: t.pertinencias,
+          tipo_tutor_id: t.tipo_tutor_id ?? null,
+          tipo_tutor: t.tipo_tutor,
+          activo: t.activo ?? false,
+        }) as Docente);
+        return { success: true, data: list } as ApiResponse<Docente[]>;
+      }),
+      catchError(this.handleError)
+    );
   }
 
   // Guardar/actualizar Docente por CI (fuera de /sga)
@@ -318,6 +352,33 @@ export class SgaService {
     if (params?.carrera) httpParams = httpParams.set('carrera', params.carrera);
     if (params?.gestion) httpParams = httpParams.set('gestion', params.gestion);
     return this.http.get<ApiResponse<TutorReg[]>>(`${environment.apiUrl}/tutores`, { params: httpParams })
+      .pipe(
+        map(resp => {
+          const data = Array.isArray(resp?.data) ? resp.data.map(item => ({
+            ...item,
+            activo: !!(item as any).activo,
+          })) : [];
+          return { ...(resp || {}), data } as ApiResponse<TutorReg[]>;
+        }),
+        catchError(this.handleError)
+      );
+  }
+
+  // --- TUTORES: tipos ---
+  getTutorTipos(): Observable<ApiResponse<TutorTipo[]>> {
+    return this.http.get<ApiResponse<TutorTipo[]>>(`${environment.apiUrl}/tutores/tipos`)
+      .pipe(catchError(this.handleError));
+  }
+
+  // --- TUTORES: actualizar ---
+  updateTutor(id: number, data: Partial<TutorReg>): Observable<ApiResponse<TutorReg>> {
+    return this.http.put<ApiResponse<TutorReg>>(`${environment.apiUrl}/tutores/${id}`, data)
+      .pipe(catchError(this.handleError));
+  }
+
+  // --- TUTORES: toggle activo ---
+  toggleTutor(id: number, activo: boolean): Observable<ApiResponse<{ id: number; activo: boolean }>> {
+    return this.http.patch<ApiResponse<{ id: number; activo: boolean }>>(`${environment.apiUrl}/tutores/${id}/toggle`, { activo })
       .pipe(catchError(this.handleError));
   }
 

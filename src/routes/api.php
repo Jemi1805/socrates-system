@@ -128,12 +128,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Catálogos base
     Route::apiResource('carrera', CarreraController::class);
     Route::apiResource('pensum', PensumController::class);
-    // Docentes: upsert por CI
-    Route::post('docentes/upsert_by_ci', [DocenteController::class, 'upsertByCi']);
-        Route::get('docentes', [DocenteController::class, 'index']);
-        // Docentes: actualizar por ID (y sincroniza tutor)
-        Route::put('docentes/{id}', [DocenteController::class, 'update']);
-        Route::patch('docentes/{id}', [DocenteController::class, 'update']);
+    // (Docentes eliminados) ahora se trabaja únicamente con tutores
 
         // Tutores: registro masivo desde docentes seleccionados
     Route::post('tutores/register_bulk', [TutorController::class, 'registerBulk'])
@@ -141,6 +136,16 @@ Route::middleware('auth:sanctum')->group(function () {
     // Tutores: listado
     Route::get('tutores', [TutorController::class, 'index'])
         ->middleware('permission:tutores.leer');
+    // Tutores: catálogo de tipos
+    Route::get('tutores/tipos', [TutorController::class, 'tipos'])
+        ->middleware('permission:tutores.leer');
+    // Tutores: actualización y toggle de estado
+    Route::put('tutores/{id}', [TutorController::class, 'update'])
+        ->where(['id' => '\\d+'])
+        ->middleware('permission:tutores.actualizar');
+    Route::patch('tutores/{id}/toggle', [TutorController::class, 'toggle'])
+        ->where(['id' => '\\d+'])
+        ->middleware('permission:tutores.activar_desactivar');
     // Tutores: designación
     Route::post('tutores/designar', [TutorController::class, 'designar'])
         ->middleware('permission:tutores.designar');

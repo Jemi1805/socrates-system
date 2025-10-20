@@ -64,6 +64,7 @@ class UsuarioPermisoSeeder extends Seeder
             ['codigo' => 'tutores.crear', 'nombre' => 'Registrar Tutor', 'descripcion' => 'Permite registrar tutores'],
             ['codigo' => 'tutores.leer', 'nombre' => 'Ver Tutor', 'descripcion' => 'Permite ver/listar tutores'],
             ['codigo' => 'tutores.actualizar', 'nombre' => 'Editar Tutor', 'descripcion' => 'Permite editar tutores'],
+            ['codigo' => 'tutores.activar_desactivar', 'nombre' => 'Activar o Desactivar Tutor', 'descripcion' => 'Permite habilitar o deshabilitar tutores'],
             ['codigo' => 'tutores.designar', 'nombre' => 'Designar Tutor', 'descripcion' => 'Permite designar tutor a un estudiante/tema'],
 
             // Usuarios

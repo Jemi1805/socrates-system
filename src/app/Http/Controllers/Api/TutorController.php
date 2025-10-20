@@ -7,23 +7,23 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
-use App\Models\Docente;
 use App\Models\Tutor;
 use App\Models\PertinenciaAcad;
+use App\Models\TipoTutor;
 
 class TutorController extends Controller
 {
     /**
      * Listar tutores registrados.
-     * Filtros opcionales: ?carrera=MEA|EEA|Nombre, ?gestion=1/YYYY|2/YYYY
+     * Filtros opcionales: ?carrera=MEA|EEA|Nombre
      */
     public function index(Request $request)
     {
         $carrera = $request->query('carrera');
-        $gestion = $request->query('gestion');
 
         $query = Tutor::query()
             ->leftJoin('carrera', 'tutores.cod_carrera', '=', 'carrera.cod_carrera')
+            ->leftJoin('tipo_tutor', 'tutores.tipo_tutor_id', '=', 'tipo_tutor.id')
             ->select('tutores.*', 'carrera.nombre_carrera as carrera_nom')
             ->with(['pertinencias:id,nombre_pert']);
 
@@ -45,10 +45,6 @@ class TutorController extends Controller
             }
         }
 
-        if ($gestion) {
-            $query->where('tutores.gestion_registro', $gestion);
-        }
-
         $rows = $query->orderBy('tutores.nombre')->get();
 
         $data = $rows->map(function ($t) {
@@ -60,6 +56,7 @@ class TutorController extends Controller
                 'apellido_p' => $t->apellido_p,
                 'apellido_m' => $t->apellido_m,
                 'celular' => $t->celular,
+                'titulo' => $t->titulo,
                 'ci' => $t->ci,
                 'cod_carrera' => $t->cod_carrera,
                 'carrera' => $t->carrera_nom,
@@ -67,8 +64,9 @@ class TutorController extends Controller
                 'pertinencia' => $t->pertinencia_nom,
                 'pertinencia_ids' => $pertIds,
                 'pertinencias' => $pertNoms,
-                'gestion_registro' => $t->gestion_registro,
                 'activo' => (bool)$t->activo,
+                'tipo_tutor_id' => $t->tipo_tutor_id,
+                'tipo_tutor' => optional(TipoTutor::find($t->tipo_tutor_id))->nombre,
             ];
         });
 
@@ -79,8 +77,8 @@ class TutorController extends Controller
         ]);
     }
     /**
-     * Registrar tutores en lote a partir de docentes seleccionados.
-     * Espera payload: { items: [{ ci, nombre, apellido_p, apellido_m, celular, profesion?, cod_carrera?, pertinencia_acad_id?, pertinencia? }] }
+     * Registrar/actualizar tutores en lote (directamente en tabla tutores).
+     * Espera payload: { items: [{ ci, nombre, apellido_p, apellido_m, celular, cod_carrera?, pertinencia_acad_id?, pertinencia?, pertinencia_acad_ids?: number[], tipo_tutor_id?: number }] }
      */
     public function registerBulk(Request $request)
     {
@@ -92,12 +90,14 @@ class TutorController extends Controller
             'items.*.apellido_p' => 'nullable|string|max:150',
             'items.*.apellido_m' => 'nullable|string|max:150',
             'items.*.celular' => 'required|string|max:50',
-            'items.*.profesion' => 'nullable|string|max:255',
             'items.*.cod_carrera' => 'nullable|string|max:10',
             'items.*.pertinencia_acad_id' => 'nullable|integer|exists:pertinencia_acad,id',
             'items.*.pertinencia_acad_ids' => 'nullable|array',
             'items.*.pertinencia_acad_ids.*' => 'integer|exists:pertinencia_acad,id',
             'items.*.pertinencia' => 'nullable|string|max:255',
+            'items.*.titulo' => 'nullable|string|max:255',
+            'items.*.tipo_tutor_id' => 'nullable|integer|exists:tipo_tutor,id',
+            'items.*.activo' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -110,9 +110,6 @@ class TutorController extends Controller
 
         $items = $validator->validated()['items'];
 
-        $now = Carbon::now();
-        $gestion = ($now->month >= 7) ? ('2/' . $now->year) : ('1/' . $now->year);
-
         $created = 0; $updated = 0; $skipped = 0;
         $result = [];
 
@@ -123,67 +120,68 @@ class TutorController extends Controller
                 $idsMulti = [];
                 if (isset($i['pertinencia_acad_ids']) && is_array($i['pertinencia_acad_ids'])) {
                     $idsMulti = array_values(array_unique(array_map('intval', $i['pertinencia_acad_ids'])));
-                    $idsMulti = array_filter($idsMulti, fn($v) => $v > 0);
+                    $idsMulti = array_filter($idsMulti, function ($v) { return $v > 0; });
                 }
-                $primaryId = isset($i['pertinencia_acad_id']) ? (int)$i['pertinencia_acad_id'] : ( ($idsMulti[0] ?? null) );
-                // Construir data parcial para Docente
-                $docData = [];
-                if (isset($i['nombre'])) $docData['nombre'] = $i['nombre'];
-                if (isset($i['apellido_p'])) $docData['apellido_p'] = $i['apellido_p'];
-                if (isset($i['apellido_m'])) $docData['apellido_m'] = $i['apellido_m'];
-                if (isset($i['celular'])) $docData['celular'] = $i['celular'];
-                if (isset($i['profesion'])) $docData['profesion'] = $i['profesion'];
-                if (!is_null($primaryId)) $docData['pertinencia_acad_id'] = $primaryId;
-                if (isset($i['cod_carrera'])) $docData['cod_carrera'] = $i['cod_carrera'];
-                $docData['activo'] = true;
-                if ($updateOnly) {
-                    // No crear docentes nuevos en modo actualización únicamente
-                    $doc = Docente::whereRaw('TRIM(UPPER(ci)) = ?', [$ci])->first();
-                    if (!$doc) {
-                        $skipped++;
-                        continue;
-                    }
-                    $doc->fill($docData);
-                    $doc->save();
-                } else {
-                    // Evitar duplicados por espacios/caso: buscar primero por CI normalizado
-                    $doc = Docente::whereRaw('TRIM(UPPER(ci)) = ?', [$ci])->first();
-                    if ($doc) {
-                        $doc->fill($docData);
-                        // Asegurar normalización de CI en registro existente
-                        $doc->ci = $ci;
-                        $doc->save();
+
+                $primaryId = isset($i['pertinencia_acad_id'])
+                    ? (int)$i['pertinencia_acad_id']
+                    : (isset($idsMulti[0]) ? $idsMulti[0] : null);
+
+                // Validar IDs existentes en pertinencia_acad antes de usar
+                $validRows = [];
+                if (count($idsMulti)) {
+                    $validRows = PertinenciaAcad::whereIn('id', $idsMulti)
+                        ->get(['id', 'nombre_pert'])
+                        ->map(function ($row) {
+                            return ['id' => $row->id, 'nombre' => $row->nombre_pert];
+                        })
+                        ->toArray();
+                    $idsMulti = array_column($validRows, 'id');
+                }
+                if (!is_null($primaryId) && !in_array($primaryId, $idsMulti, true)) {
+                    $fallback = PertinenciaAcad::find($primaryId);
+                    if ($fallback) {
+                        $idsMulti[] = $fallback->id;
+                        $validRows[] = ['id' => $fallback->id, 'nombre' => $fallback->nombre_pert];
                     } else {
-                        $doc = Docente::create(array_merge(['ci' => $ci], $docData));
+                        $primaryId = count($idsMulti) ? $idsMulti[0] : null;
                     }
                 }
 
                 // Resolver nombre(s) de pertinencia
                 $pertNom = isset($i['pertinencia']) ? $i['pertinencia'] : null;
                 if (!$pertNom) {
-                    $idsForNames = $idsMulti;
-                    if (!count($idsForNames) && !is_null($primaryId)) $idsForNames = [$primaryId];
-                    if (count($idsForNames)) {
-                        $names = PertinenciaAcad::whereIn('id', $idsForNames)->pluck('nombre_pert')->toArray();
-                        if (count($names)) $pertNom = implode(', ', $names);
+                    if (count($validRows)) {
+                        $pertNom = implode(', ', array_filter(array_column($validRows, 'nombre')));
+                    } elseif (!is_null($primaryId)) {
+                        $single = PertinenciaAcad::find($primaryId);
+                        if ($single && $single->nombre_pert) {
+                            $pertNom = $single->nombre_pert;
+                        }
                     }
                 }
 
-                // Construir snapshot parcial para Tutor (si no existe no se sobreescriben con null)
-                $snapBase = [ 'ci' => $ci, 'activo' => true ];
+                // Construir data para Tutor
+                $snapBase = [ 'ci' => $ci ];
                 if (isset($i['nombre'])) $snapBase['nombre'] = $i['nombre'];
                 if (isset($i['apellido_p'])) $snapBase['apellido_p'] = $i['apellido_p'];
                 if (isset($i['apellido_m'])) $snapBase['apellido_m'] = $i['apellido_m'];
                 if (isset($i['celular'])) $snapBase['celular'] = $i['celular'];
+                if (isset($i['titulo'])) {
+                    $snapBase['titulo'] = $i['titulo'];
+                } elseif (isset($i['profesion'])) {
+                    $snapBase['titulo'] = $i['profesion'];
+                }
                 if (isset($i['cod_carrera'])) $snapBase['cod_carrera'] = $i['cod_carrera'];
                 if (!is_null($primaryId)) $snapBase['pertinencia_acad_id'] = $primaryId;
                 if (!is_null($pertNom)) $snapBase['pertinencia_nom'] = $pertNom;
+                if (isset($i['tipo_tutor_id'])) $snapBase['tipo_tutor_id'] = (int)$i['tipo_tutor_id'];
 
-                $existing = Tutor::where('docente_id', $doc->id)
-                    ->orWhereRaw('TRIM(UPPER(ci)) = ?', [$ci])
-                    ->first();
+                $existing = Tutor::whereRaw('TRIM(UPPER(ci)) = ?', [$ci])->first();
                 if ($existing) {
-                    // No cambiar gestion_registro en actualización
+                    if (array_key_exists('activo', $i)) {
+                        $snapBase['activo'] = (bool)$i['activo'];
+                    }
                     $existing->fill($snapBase);
                     $existing->save();
                     // Sincronizar multi-pertinencias si se envía el arreglo
@@ -198,8 +196,9 @@ class TutorController extends Controller
                         $skipped++;
                         continue;
                     }
-                    // Crear con gestión actual
-                    $tutor = Tutor::create(array_merge(['docente_id' => $doc->id], $snapBase, ['gestion_registro' => $gestion]));
+                    $snapBase['activo'] = array_key_exists('activo', $i) ? (bool)$i['activo'] : true;
+                    // Crear
+                    $tutor = Tutor::create($snapBase);
                     // Registrar multi-pertinencias
                     if (count($idsMulti)) {
                         $tutor->pertinencias()->sync($idsMulti);
@@ -215,10 +214,9 @@ class TutorController extends Controller
             DB::commit();
             return response()->json([
                 'success' => true,
-                'message' => 'Tutores registrados correctamente',
+                'message' => 'Tutores registrados/actualizados correctamente',
                 'data' => $result,
                 'counts' => [ 'created' => $created, 'updated' => $updated, 'skipped' => $skipped ],
-                'gestion' => $gestion,
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -227,6 +225,57 @@ class TutorController extends Controller
                 'message' => 'Error al registrar tutores',
             ], 500);
         }
+    }
+
+    /** Actualizar datos del tutor (incluye tipo_tutor_id obligatorio para activación) */
+    public function update(Request $request, int $id)
+    {
+        $tutor = Tutor::findOrFail($id);
+        $validator = Validator::make($request->all(), [
+            'nombre' => 'sometimes|string|max:150',
+            'apellido_p' => 'sometimes|nullable|string|max:150',
+            'apellido_m' => 'sometimes|nullable|string|max:150',
+            'celular' => 'sometimes|nullable|string|max:50',
+            'cod_carrera' => 'sometimes|nullable|string|max:10',
+            'pertinencia_acad_id' => 'sometimes|nullable|integer|exists:pertinencia_acad,id',
+            'titulo' => 'sometimes|nullable|string|max:255',
+            'tipo_tutor_id' => 'required|integer|exists:tipo_tutor,id',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+        $data = $validator->validated();
+        $tutor->fill($data);
+        $tutor->save();
+        return response()->json(['success' => true, 'data' => $tutor]);
+    }
+
+    /** Alternar estado activo del tutor, validando datos completos */
+    public function toggle(Request $request, int $id)
+    {
+        $tutor = Tutor::with('pertinencias')->findOrFail($id);
+        $activo = (bool)$request->boolean('activo', !$tutor->activo);
+        if ($activo) {
+            // Validaciones para habilitar: tipo y pertinencia presentes
+            $hasTipo = !is_null($tutor->tipo_tutor_id);
+            $hasPert = $tutor->pertinencia_acad_id != null || ($tutor->pertinencias && $tutor->pertinencias->count() > 0);
+            if (!$hasTipo || !$hasPert) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se puede habilitar: requiere Tipo de Tutor y Pertinencia académica',
+                ], 422);
+            }
+        }
+        $tutor->activo = $activo;
+        $tutor->save();
+        return response()->json(['success' => true, 'data' => ['id' => $tutor->id, 'activo' => (bool)$tutor->activo]]);
+    }
+
+    /** Catálogo de tipos de tutor */
+    public function tipos()
+    {
+        $tipos = TipoTutor::where('is_active', true)->orderBy('nombre')->get(['id','nombre','is_active']);
+        return response()->json(['success' => true, 'data' => $tipos]);
     }
 
     /**
@@ -279,7 +328,7 @@ class TutorController extends Controller
                     'cod_ceta' => $data['cod_ceta'],
                 ],
                 [
-                    'proyecto_id' => $data['proyecto_id'] ?? null,
+                    'proyecto_id' => (isset($data['proyecto_id']) ? $data['proyecto_id'] : null),
                     'fecha_designacion' => $now->toDateString(),
                     'tutor_nombre' => $tutNombre,
                     'estudiante_nombre' => $estNombre,

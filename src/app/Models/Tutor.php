@@ -12,24 +12,23 @@ class Tutor extends Model
     protected $table = 'tutores';
 
     protected $fillable = [
-        'docente_id',
         'activo',
         // Snapshot de datos del docente al momento de registro
         'nombre',
         'apellido_p',
         'apellido_m',
         'celular',
+        'titulo',
         'cod_carrera',
         'ci',
         'pertinencia_acad_id',
         'pertinencia_nom',
-        // Gestión de registro ("1/YYYY" o "2/YYYY")
-        'gestion_registro',
+        'tipo_tutor_id',
     ];
 
-    public function docente()
+    public function tipo()
     {
-        return $this->belongsTo(Docente::class, 'docente_id', 'id');
+        return $this->belongsTo(TipoTutor::class, 'tipo_tutor_id');
     }
 
     public function postulantes()
