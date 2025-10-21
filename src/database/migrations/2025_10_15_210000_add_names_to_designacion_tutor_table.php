@@ -5,9 +5,9 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 
-return new class extends Migration
+class AddNamesToDesignacionTutorTable extends Migration
 {
-    public function up(): void
+    public function up()
     {
         if (Schema::hasTable('designacion_tutor')) {
             Schema::table('designacion_tutor', function (Blueprint $table) {
@@ -59,7 +59,7 @@ return new class extends Migration
         }
     }
 
-    public function down(): void
+    public function down()
     {
         if (Schema::hasTable('designacion_tutor')) {
             // Eliminar triggers
@@ -76,4 +76,4 @@ return new class extends Migration
             });
         }
     }
-};
+}

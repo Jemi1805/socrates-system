@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\PensumController;
 use App\Http\Controllers\Api\DocenteController;
 use App\Http\Controllers\Api\TutorController;
 use App\Http\Controllers\Api\PertinenciaController;
+use App\Http\Controllers\Api\ConvocatoriaController;
 
 // 🔐 RUTAS DE AUTENTICACIÓN (Sin middleware)
 Route::prefix('auth')->group(function () {
@@ -95,6 +96,24 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:temas.actualizar');
     Route::apiResource('inscrip_modalidad', InscripModalidadController::class)
         ->middleware('permission:inscrip_modalidad.actualizar');
+
+    Route::get('convocatorias/activas', [ConvocatoriaController::class, 'activas'])
+        ->middleware('permission:convocatorias.leer');
+    Route::patch('convocatorias/{id}/toggle', [ConvocatoriaController::class, 'toggleActivo'])
+        ->where(['id' => '\\d+'])
+        ->middleware('permission:convocatorias.activar_desactivar');
+    Route::apiResource('convocatorias', ConvocatoriaController::class)
+        ->only(['index', 'show'])
+        ->middleware('permission:convocatorias.leer');
+    Route::apiResource('convocatorias', ConvocatoriaController::class)
+        ->only(['store'])
+        ->middleware('permission:convocatorias.crear');
+    Route::apiResource('convocatorias', ConvocatoriaController::class)
+        ->only(['update'])
+        ->middleware('permission:convocatorias.actualizar');
+    Route::apiResource('convocatorias', ConvocatoriaController::class)
+        ->only(['destroy'])
+        ->middleware('permission:convocatorias.eliminar');
     Route::apiResource('documentos_requeridos', DocumentosRequeridosController::class);
     Route::apiResource('documentos_adjuntos', DocumentosAdjuntosController::class);
     Route::apiResource('diploma_bachiller', DiplomaBachillerController::class);

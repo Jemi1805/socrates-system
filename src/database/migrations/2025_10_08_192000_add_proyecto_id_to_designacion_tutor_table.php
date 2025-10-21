@@ -4,9 +4,9 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
+class AddProyectoIdToDesignacionTutorTable extends Migration
 {
-    public function up(): void
+    public function up()
     {
         if (Schema::hasTable('designacion_tutor')) {
             // Agregar columna proyecto_id si no existe
@@ -50,7 +50,7 @@ return new class extends Migration
         }
     }
 
-    public function down(): void
+    public function down()
     {
         if (Schema::hasTable('designacion_tutor')) {
             Schema::table('designacion_tutor', function (Blueprint $table) {
@@ -62,4 +62,4 @@ return new class extends Migration
             });
         }
     }
-};
+}

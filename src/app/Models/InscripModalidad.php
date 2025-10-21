@@ -19,10 +19,12 @@ class InscripModalidad extends Model
         'aranceles_id',
         'fecha_inscripcion',
         'estado',
+        'convocatoria_id',
     ];
 
     protected $casts = [
         'fecha_inscripcion' => 'date',
+        'convocatoria_id' => 'integer',
     ];
 
     /**
@@ -70,5 +72,10 @@ class InscripModalidad extends Model
     public function postulante()
     {
         return $this->belongsTo(Postulante::class, 'cod_ceta_est', 'cod_ceta');
+    }
+
+    public function convocatoria()
+    {
+        return $this->belongsTo(Convocatoria::class, 'convocatoria_id');
     }
 }

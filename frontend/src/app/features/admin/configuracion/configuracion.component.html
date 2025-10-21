@@ -20,7 +20,7 @@
                   <div class="cfg-icon me-3"><i class="bi bi-people"></i></div>
                   <div class="flex-fill">
                     <div class="cfg-title">Usuarios</div>
-                    <div class="cfg-desc text-muted">Gestione usuarios del sistema y sus datos.</div>
+                    <div class="cfg-desc text-white">Gestione usuarios del sistema y sus datos.</div>
                   </div>
                 </div>
               </div>
@@ -29,7 +29,16 @@
                   <div class="cfg-icon me-3"><i class="bi bi-list-check"></i></div>
                   <div class="flex-fill">
                     <div class="cfg-title">Pertinencias</div>
-                    <div class="cfg-desc text-muted">Gestione las pertinencias académicas.</div>
+                    <div class="cfg-desc text-white">Gestione las pertinencias académicas.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-12 col-md-4">
+                <div class="cfg-item d-flex align-items-center p-3" role="button" (click)="toggleConvocatorias()">
+                  <div class="cfg-icon me-3"><i class="bi bi-calendar-event"></i></div>
+                  <div class="flex-fill">
+                    <div class="cfg-title">Convocatorias</div>
+                    <div class="cfg-desc text-white">Gestione periodos de convocatoria.</div>
                   </div>
                 </div>
               </div>
@@ -82,7 +91,12 @@
                     <td>{{ u.nombre_usuario }}</td>
                     <td>{{ u.rol?.nombre || '-' }}</td>
                     <td>
-                      <span class="badge" [class.bg-success]="u.activo" [class.bg-secondary]="!u.activo">{{ u.activo ? 'Sí' : 'No' }}</span>
+                      <div class="form-check form-switch d-flex align-items-center justify-content-center">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                          [checked]="u.activo"
+                          [disabled]="togglingUsuarioId === u.id"
+                          (change)="onUsuarioToggleChange(u, $event)" />
+                      </div>
                     </td>
                     <td>
                       <button class="btn btn-outline-secondary btn-sm" (click)="startEdit(u)">
@@ -154,9 +168,102 @@
             <div *ngIf="!loadingPertinencias && !pertinencias?.length && !errorPertinencias" class="text-muted small">Sin pertinencias registradas.</div>
           </div>
         </div>
+
+        <!-- Card expandible: Convocatorias -->
+        <div *ngIf="convocatoriasOpen" class="config-card mt-3">
+          <div class="card-body">
+            <h3 class="card-title d-flex align-items-center gap-2">
+              <i class="bi bi-calendar-event"></i>
+              Convocatorias
+            </h3>
+
+            <div class="d-flex gap-2 mb-2 flex-wrap align-items-center">
+              <button class="btn btn-outline-secondary btn-sm" (click)="loadConvocatorias()" [disabled]="loadingConvocatorias">
+                <i class="bi" [ngClass]="loadingConvocatorias ? 'bi-hourglass-split' : 'bi-arrow-clockwise'"></i>
+                {{ loadingConvocatorias ? 'Actualizando...' : 'Actualizar' }}
+              </button>
+              <button class="btn btn-primary btn-sm" (click)="openNewConv()">
+                <i class="bi bi-plus-circle"></i>
+                Nueva convocatoria
+              </button>
+            </div>
+
+            <div *ngIf="errorConvocatorias" class="alert alert-danger py-2">{{ errorConvocatorias }}</div>
+            <div *ngIf="loadingConvocatorias" class="text-muted small">Cargando convocatorias...</div>
+            <div class="table-responsive" *ngIf="!loadingConvocatorias && convocatorias?.length">
+              <table class="table table-sm table-striped align-middle">
+                <thead class="table-dark">
+                  <tr>
+                    <th>Año</th>
+                    <th>N°</th>
+                    <th>Nombre</th>
+                    <th>Inicio</th>
+                    <th>Fin</th>
+                    <th>Inscripciones</th>
+                    <th>Designaciones</th>
+                    <th>Activo</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let c of convocatorias">
+                    <td>{{ c.anio }}</td>
+                    <td>{{ c.numero_convocatoria }}</td>
+                    <td>{{ c.nombre }}</td>
+                    <td>{{ c.fecha_inicio | date:'yyyy-MM-dd' }}</td>
+                    <td>{{ c.fecha_fin | date:'yyyy-MM-dd' }}</td>
+                    <td>{{ c.inscripciones_count ?? '-' }}</td>
+                    <td>{{ c.designaciones_tutor_count ?? '-' }}</td>
+                    <td>
+                      <div class="form-check form-switch d-flex align-items-center justify-content-center">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                          [checked]="c.es_activo"
+                          [disabled]="togglingConvocatoriaId === c.id"
+                          (change)="onConvocatoriaToggleChange(c, $event)" />
+                      </div>
+                    </td>
+                    <td>
+                      <button class="btn btn-outline-secondary btn-sm" (click)="startEditConv(c)">
+                        <i class="bi bi-pencil-square"></i>
+                        Editar
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div *ngIf="!loadingConvocatorias && !convocatorias?.length && !errorConvocatorias" class="text-muted small">Sin convocatorias registradas.</div>
       </div>
     </div>
   </div>
+
+<!-- Modal confirmación genérico -->
+<div *ngIf="confirmModalVisible">
+  <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="confirmModalLabel">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header py-2">
+          <h5 class="modal-title" id="confirmModalLabel">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            {{ confirmModalTitle }}
+          </h5>
+          <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="confirmModalCancel()"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">{{ confirmModalMessage }}</p>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-danger btn-sm" (click)="confirmModalConfirm()">
+            {{ confirmModalConfirmText }}
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="confirmModalCancel()">
+            {{ confirmModalCancelText }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop fade show"></div>
 </div>
 
 <!-- Modal Crear/Editar Usuario (fuera de las cards para evitar clipping) -->
@@ -381,4 +488,137 @@
     </div>
   </div>
   <div class="modal-backdrop fade show" (click)="cancelNewPert()"></div>
+</div>
+
+<!-- Modal Nueva Convocatoria -->
+<div *ngIf="newConvVisible">
+  <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="newConvModalLabel">
+    <div class="modal-dialog modal-md modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header py-2">
+          <h5 class="modal-title" id="newConvModalLabel">
+            <i class="bi bi-calendar-event me-2"></i>
+            Nueva convocatoria
+          </h5>
+          <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="cancelNewConv()"></button>
+        </div>
+        <div class="modal-body">
+          <div *ngIf="convFormError" class="alert alert-warning py-2">{{ convFormError }}</div>
+          <form [formGroup]="newConvForm" (ngSubmit)="submitNewConv()" novalidate>
+            <div class="row g-3">
+              <div class="col-12 col-md-6">
+                <label class="form-label">Año</label>
+                <input type="number" class="form-control" formControlName="anio" [readonly]="true" />
+                <div class="form-text">Se calcula automáticamente según el año en curso.</div>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Número</label>
+                <input type="number" class="form-control" formControlName="numero_convocatoria" [readonly]="true" />
+                <div class="form-text">Incremental por año.</div>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Nombre <span class="text-danger">*</span></label>
+                <input class="form-control" formControlName="nombre" [placeholder]="formatNumeroConvocatoria(siguienteNumeroConvocatoria)" />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Fecha de inicio <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" formControlName="fecha_inicio" [attr.min]="anioFechaMin" [attr.max]="anioFechaMax" />
+                <div class="form-text">Solo fechas del {{ anioActual }}.</div>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Fecha de fin <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" formControlName="fecha_fin" [attr.min]="anioFechaMin" [attr.max]="anioFechaMax" />
+              </div>
+              <div class="col-12">
+                <label class="form-label">Descripción</label>
+                <textarea class="form-control" formControlName="descripcion" rows="2" placeholder="Detalle adicional"></textarea>
+              </div>
+              <div class="col-12 d-flex align-items-end">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" formControlName="es_activo" id="chkActivoNewConv" />
+                  <label class="form-check-label" for="chkActivoNewConv">Activa</label>
+                </div>
+              </div>
+            </div>
+            <div class="mt-3 d-flex justify-content-end gap-2">
+              <button class="btn btn-success btn-sm d-flex align-items-center gap-2" type="submit" [disabled]="newConvForm.invalid || convModalSaving">
+                <span *ngIf="convModalSaving" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                <i *ngIf="!convModalSaving" class="bi bi-save"></i>
+                {{ convModalSaving ? 'Guardando...' : 'Guardar' }}
+              </button>
+              <button class="btn btn-outline-secondary btn-sm" type="button" (click)="cancelNewConv()" [disabled]="convModalSaving">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop fade show" (click)="cancelNewConv()"></div>
+</div>
+
+<!-- Modal Editar Convocatoria -->
+<div *ngIf="editConvVisible">
+  <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="editConvModalLabel">
+    <div class="modal-dialog modal-md modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header py-2">
+          <h5 class="modal-title" id="editConvModalLabel">
+            <i class="bi bi-calendar-event me-2"></i>
+            Editar convocatoria
+          </h5>
+          <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="cancelEditConv()"></button>
+        </div>
+        <div class="modal-body">
+          <div *ngIf="convFormError" class="alert alert-warning py-2">{{ convFormError }}</div>
+          <form [formGroup]="editConvForm" (ngSubmit)="submitEditConv()" novalidate>
+            <div class="row g-3">
+              <div class="col-12 col-md-6">
+                <label class="form-label">Año</label>
+                <input type="number" class="form-control" formControlName="anio" [readonly]="true" />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Número</label>
+                <input type="number" class="form-control" formControlName="numero_convocatoria" [readonly]="true" />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Nombre <span class="text-danger">*</span></label>
+                <input class="form-control" formControlName="nombre" />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Fecha de inicio <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" formControlName="fecha_inicio" [attr.min]="anioFechaMin" [attr.max]="anioFechaMax" />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Fecha de fin <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" formControlName="fecha_fin" [attr.min]="anioFechaMin" [attr.max]="anioFechaMax" />
+              </div>
+              <div class="col-12">
+                <label class="form-label">Descripción</label>
+                <textarea class="form-control" formControlName="descripcion" rows="2"></textarea>
+              </div>
+              <div class="col-12 d-flex align-items-end">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" formControlName="es_activo" id="chkActivoEditConv" />
+                  <label class="form-check-label" for="chkActivoEditConv">Activa</label>
+                </div>
+              </div>
+            </div>
+            <div class="mt-3 d-flex justify-content-end gap-2">
+              <button class="btn btn-success btn-sm d-flex align-items-center gap-2" type="submit" [disabled]="editConvForm.invalid || convModalSaving">
+                <span *ngIf="convModalSaving" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                <i *ngIf="!convModalSaving" class="bi bi-save"></i>
+                {{ convModalSaving ? 'Guardando...' : 'Guardar cambios' }}
+              </button>
+              <button class="btn btn-outline-secondary btn-sm" type="button" (click)="cancelEditConv()" [disabled]="convModalSaving">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop fade show" (click)="cancelEditConv()"></div>
 </div>

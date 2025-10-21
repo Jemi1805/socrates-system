@@ -67,6 +67,13 @@ class UsuarioPermisoSeeder extends Seeder
             ['codigo' => 'tutores.activar_desactivar', 'nombre' => 'Activar o Desactivar Tutor', 'descripcion' => 'Permite habilitar o deshabilitar tutores'],
             ['codigo' => 'tutores.designar', 'nombre' => 'Designar Tutor', 'descripcion' => 'Permite designar tutor a un estudiante/tema'],
 
+            // Convocatorias
+            ['codigo' => 'convocatorias.crear', 'nombre' => 'Crear Convocatoria', 'descripcion' => 'Permite registrar convocatorias'],
+            ['codigo' => 'convocatorias.leer', 'nombre' => 'Ver Convocatoria', 'descripcion' => 'Permite ver/listar convocatorias'],
+            ['codigo' => 'convocatorias.actualizar', 'nombre' => 'Editar Convocatoria', 'descripcion' => 'Permite editar convocatorias'],
+            ['codigo' => 'convocatorias.eliminar', 'nombre' => 'Eliminar Convocatoria', 'descripcion' => 'Permite eliminar convocatorias'],
+            ['codigo' => 'convocatorias.activar_desactivar', 'nombre' => 'Activar o Desactivar Convocatoria', 'descripcion' => 'Permite activar o desactivar convocatorias'],
+
             // Usuarios
             ['codigo' => 'usuarios.crear', 'nombre' => 'Crear Usuario', 'descripcion' => 'Permite crear usuarios'],
             ['codigo' => 'usuarios.actualizar', 'nombre' => 'Editar Usuario', 'descripcion' => 'Permite editar usuarios y permisos'],

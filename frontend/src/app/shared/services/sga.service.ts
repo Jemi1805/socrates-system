@@ -129,6 +129,22 @@ export interface Modalidad {
   descripcion: string;
 }
 
+export interface Convocatoria {
+  id: number;
+  anio: number;
+  numero_convocatoria: number;
+  nombre: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  descripcion?: string;
+  es_activo: boolean;
+  creado_por?: number | null;
+  created_at?: string;
+  updated_at?: string;
+  inscripciones_count?: number;
+  designaciones_tutor_count?: number;
+}
+
 export interface Proyecto {
   id: number;
   modalidad_nom: number;
@@ -209,6 +225,11 @@ export class SgaService {
 
   updateUsuario(id: number, data: Partial<Usuario>): Observable<ApiResponse<Usuario>> {
     return this.http.put<ApiResponse<Usuario>>(`${environment.apiUrl}/users/${id}`, data)
+      .pipe(catchError(this.handleError));
+  }
+
+  toggleUsuario(id: number): Observable<ApiResponse<Usuario>> {
+    return this.http.patch<ApiResponse<Usuario>>(`${environment.apiUrl}/users/${id}/toggle-status`, {})
       .pipe(catchError(this.handleError));
   }
 
@@ -443,6 +464,73 @@ export class SgaService {
 
   deleteProyecto(id: number): Observable<ApiResponse<any>> {
     return this.http.delete<ApiResponse<any>>(`${this.baseUrl}/proyectos/${id}`)
+      .pipe(catchError(this.handleError));
+  }
+
+  // --- CONVOCATORIAS ---
+  getConvocatorias(params?: Record<string, any>): Observable<any> {
+    let httpParams = new HttpParams();
+    if (params) {
+      Object.keys(params).forEach((key) => {
+        if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+          httpParams = httpParams.set(key, params[key]);
+        }
+      });
+    }
+    return this.http
+      .get<any>(`${environment.apiUrl}/convocatorias`, { params: httpParams })
+      .pipe(catchError(this.handleError));
+  }
+
+  getConvocatoriaById(id: number, params?: Record<string, any>): Observable<Convocatoria> {
+    let httpParams = new HttpParams();
+    if (params) {
+      Object.keys(params).forEach((key) => {
+        if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+          httpParams = httpParams.set(key, params[key]);
+        }
+      });
+    }
+    return this.http
+      .get<Convocatoria>(`${environment.apiUrl}/convocatorias/${id}`, { params: httpParams })
+      .pipe(catchError(this.handleError));
+  }
+
+  createConvocatoria(data: Partial<Convocatoria>): Observable<Convocatoria> {
+    return this.http
+      .post<Convocatoria>(`${environment.apiUrl}/convocatorias`, data)
+      .pipe(catchError(this.handleError));
+  }
+
+  updateConvocatoria(id: number, data: Partial<Convocatoria>): Observable<Convocatoria> {
+    return this.http
+      .put<Convocatoria>(`${environment.apiUrl}/convocatorias/${id}`, data)
+      .pipe(catchError(this.handleError));
+  }
+
+  deleteConvocatoria(id: number): Observable<any> {
+    return this.http
+      .delete<any>(`${environment.apiUrl}/convocatorias/${id}`)
+      .pipe(catchError(this.handleError));
+  }
+
+  toggleConvocatoria(id: number): Observable<{ message: string; es_activo: boolean }> {
+    return this.http
+      .patch<{ message: string; es_activo: boolean }>(`${environment.apiUrl}/convocatorias/${id}/toggle`, {})
+      .pipe(catchError(this.handleError));
+  }
+
+  getConvocatoriasActivas(params?: Record<string, any>): Observable<Convocatoria[]> {
+    let httpParams = new HttpParams();
+    if (params) {
+      Object.keys(params).forEach((key) => {
+        if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+          httpParams = httpParams.set(key, params[key]);
+        }
+      });
+    }
+    return this.http
+      .get<Convocatoria[]>(`${environment.apiUrl}/convocatorias/activas`, { params: httpParams })
       .pipe(catchError(this.handleError));
   }
 

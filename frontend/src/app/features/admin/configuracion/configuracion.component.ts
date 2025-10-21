@@ -2,8 +2,15 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
-import { SgaService, Usuario, Pertinencia, Rol, Carrera } from '../../../shared/services/sga.service';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { SgaService, Usuario, Pertinencia, Rol, Carrera, Convocatoria, ApiResponse } from '../../../shared/services/sga.service';
+import { LoadingService } from '../../../core/services/loading.service';
+import { finalize } from 'rxjs/operators';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
+
+interface ConvocatoriaToggleResponse {
+  message?: string;
+  es_activo?: boolean;
+}
 
 @Component({
   selector: 'app-configuracion',
@@ -36,6 +43,25 @@ export class ConfiguracionComponent implements OnInit {
   loadingCarreras = false;
   errorCarreras: string | null = null;
 
+  convocatoriasOpen = false;
+  convocatorias: Convocatoria[] = [];
+  loadingConvocatorias = false;
+  errorConvocatorias: string | null = null;
+  newConvVisible = false;
+  newConvForm!: FormGroup;
+  editConvVisible = false;
+  editConvForm!: FormGroup;
+  editingConv: Convocatoria | null = null;
+  convModalSaving = false;
+  togglingConvocatoriaId: number | null = null;
+  deletingConvocatoriaId: number | null = null;
+  anioActual = new Date().getFullYear();
+  anioFechaMin = `${new Date().getFullYear()}-01-01`;
+  anioFechaMax = `${new Date().getFullYear()}-12-31`;
+  ultimaFechaInicio: string | null = null;
+  siguienteNumeroConvocatoria = 1;
+  convFormError: string | null = null;
+
   // Roles
   roles: Rol[] = [];
   loadingRoles = false;
@@ -55,6 +81,14 @@ export class ConfiguracionComponent implements OnInit {
   isCreateUserMode = true;
   modalSaving = false;
   modalError: string | null = null;
+  togglingUsuarioId: number | null = null;
+
+  confirmModalVisible = false;
+  confirmModalTitle = '';
+  confirmModalMessage = '';
+  confirmModalConfirmText = 'Confirmar';
+  confirmModalCancelText = 'Cancelar';
+  private confirmModalOnConfirm: (() => void) | null = null;
 
   // Permisos (modal)
   permsModalVisible = false;
@@ -64,11 +98,53 @@ export class ConfiguracionComponent implements OnInit {
   permsOptions: Array<{ id: number; codigo: string; nombre: string; assigned: boolean }> = [];
   savingPerms = false;
 
-  constructor(private sga: SgaService, private fb: FormBuilder) {}
+  constructor(private sga: SgaService, private fb: FormBuilder, private loading: LoadingService) {}
 
   ngOnInit(): void {
     this.buildNewUserForm();
     this.loadRoles();
+    this.buildNewConvForm();
+  }
+
+  private actualizarMetadatosConvocatorias() {
+    if (!this.convocatorias.length) {
+      this.ultimaFechaInicio = null;
+      this.siguienteNumeroConvocatoria = 1;
+      return;
+    }
+
+    const fechas = this.convocatorias
+      .map((c) => (c.fecha_inicio ? c.fecha_inicio.substring(0, 10) : null))
+      .filter((f): f is string => !!f)
+      .sort();
+
+    this.ultimaFechaInicio = fechas.length ? fechas[fechas.length - 1] : null;
+
+    const actuales = this.convocatorias.filter((c) => c.anio === this.anioActual);
+    if (actuales.length) {
+      const maxNumero = Math.max(...actuales.map((c) => Number(c.numero_convocatoria) || 0));
+      this.siguienteNumeroConvocatoria = maxNumero + 1;
+    } else {
+      this.siguienteNumeroConvocatoria = 1;
+    }
+  }
+
+  private obtenerFechaMinimaPermitidaParaEdicion(convId: number): string | null {
+    if (!this.convocatorias.length) {
+      return null;
+    }
+
+    const restantes = this.convocatorias
+      .filter((c) => c.id !== convId)
+      .map((c) => (c.fecha_inicio ? c.fecha_inicio.substring(0, 10) : null))
+      .filter((f): f is string => !!f)
+      .sort();
+
+    if (restantes.length === 0) {
+      return null;
+    }
+
+    return restantes[restantes.length - 1];
   }
 
   private buildNewUserForm() {
@@ -164,6 +240,34 @@ export class ConfiguracionComponent implements OnInit {
         this.errorPertinencias = err?.message || 'Error al crear la pertinencia';
       }
     });
+  }
+
+  formatNumeroConvocatoria(numero: number): string {
+    const n = Number(numero) || 0;
+    if (!n) {
+      return 'Convocatoria';
+    }
+
+    const ordinales = [
+      '',
+      'Primera', 'Segunda', 'Tercera', 'Cuarta', 'Quinta', 'Sexta', 'Séptima', 'Octava', 'Novena', 'Décima',
+      'Undécima', 'Duodécima', 'Decimotercera', 'Decimocuarta', 'Decimoquinta', 'Decimosexta', 'Decimoséptima', 'Decimoctava', 'Decimonovena', 'Vigésima',
+    ];
+
+    const ordinal = ordinales[n];
+    return ordinal ? `${ordinal} Convocatoria` : `Convocatoria ${n}`;
+  }
+
+  private buildNewConvForm() {
+    this.newConvForm = this.fb.group({
+      anio: [{ value: this.anioActual, disabled: true }, [Validators.required]],
+      numero_convocatoria: [{ value: this.siguienteNumeroConvocatoria, disabled: true }, [Validators.required, Validators.min(1)]],
+      nombre: ['', [Validators.required, Validators.maxLength(30)]],
+      fecha_inicio: ['', [Validators.required, this.validarFechaEnAnioActual()]],
+      fecha_fin: ['', [Validators.required, this.validarFechaEnAnioActual()]],
+      descripcion: ['', [Validators.maxLength(100)]],
+      es_activo: [true],
+    }, { validators: this.validarRangoFechas() });
   }
 
   // --- Roles ---
@@ -391,6 +495,35 @@ export class ConfiguracionComponent implements OnInit {
     }
   }
 
+  private openConfirmModal(title: string, message: string, confirmText: string, onConfirm: () => void, cancelText = 'Cancelar') {
+    this.confirmModalTitle = title;
+    this.confirmModalMessage = message;
+    this.confirmModalConfirmText = confirmText;
+    this.confirmModalCancelText = cancelText;
+    this.confirmModalOnConfirm = onConfirm;
+    this.confirmModalVisible = true;
+    this.setBodyModalOpen(true);
+  }
+
+  private closeConfirmModal() {
+    this.confirmModalVisible = false;
+    this.confirmModalOnConfirm = null;
+    const otherModalOpen = this.newPertVisible || this.editPertVisible || this.newConvVisible || this.editConvVisible || this.userModalVisible || this.permsModalVisible;
+    this.setBodyModalOpen(otherModalOpen);
+  }
+
+  confirmModalConfirm() {
+    const callback = this.confirmModalOnConfirm;
+    this.closeConfirmModal();
+    if (callback) {
+      callback();
+    }
+  }
+
+  confirmModalCancel() {
+    this.closeConfirmModal();
+  }
+
   // --- Permisos por Usuario ---
   openPerms(u: Usuario) {
     this.permsTargetUser = u;
@@ -531,6 +664,341 @@ export class ConfiguracionComponent implements OnInit {
       },
       error: (err) => {
         this.errorPertinencias = err?.message || 'Error al actualizar la pertinencia';
+      }
+    });
+  }
+
+  private ensureEditConvForm() {
+    if (!this.editConvForm) {
+      this.editConvForm = this.fb.group({
+        anio: [{ value: this.anioActual, disabled: true }, [Validators.required]],
+        numero_convocatoria: [{ value: 1, disabled: true }, [Validators.required, Validators.min(1)]],
+        nombre: ['', [Validators.required, Validators.maxLength(30)]],
+        fecha_inicio: ['', [Validators.required, this.validarFechaEnAnioActual()]],
+        fecha_fin: ['', [Validators.required, this.validarFechaEnAnioActual()]],
+        descripcion: ['', [Validators.maxLength(100)]],
+        es_activo: [true],
+      }, { validators: this.validarRangoFechas() });
+    }
+  }
+
+  private validarFechaEnAnioActual(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = control.value ? control.value.toString().slice(0, 10) : '';
+      if (!value) return null;
+      if (value < this.anioFechaMin || value > this.anioFechaMax) {
+        return { fueraDeRango: true };
+      }
+      return null;
+    };
+  }
+
+  private validarRangoFechas(): ValidatorFn {
+    return (group: AbstractControl): ValidationErrors | null => {
+      const inicio = group.get('fecha_inicio')?.value;
+      const fin = group.get('fecha_fin')?.value;
+      if (inicio && fin && fin < inicio) {
+        return { finAntesQueInicio: true };
+      }
+      return null;
+    };
+  }
+
+  toggleConvocatorias() {
+    this.convocatoriasOpen = !this.convocatoriasOpen;
+    if (this.convocatoriasOpen && this.convocatorias.length === 0) {
+      this.loadConvocatorias();
+    }
+  }
+
+  loadConvocatorias() {
+    this.loadingConvocatorias = true;
+    this.errorConvocatorias = null;
+    this.sga.getConvocatorias({ with_counts: true, per_page: 100, order_by: 'fecha_inicio', order_dir: 'desc' }).subscribe({
+      next: (resp) => {
+        this.loadingConvocatorias = false;
+        let items: any[] = [];
+        if (Array.isArray(resp)) {
+          items = resp;
+        } else if (Array.isArray(resp?.data)) {
+          items = resp.data;
+        } else if (Array.isArray(resp?.items)) {
+          items = resp.items;
+        }
+        this.convocatorias = (items || []).map((c: any) => ({
+          ...c,
+          anio: Number(c.anio ?? c.anio_convocatoria ?? this.anioActual),
+          numero_convocatoria: Number(c.numero_convocatoria ?? c.numero ?? 1),
+          es_activo: !!c.es_activo,
+        }));
+        this.actualizarMetadatosConvocatorias();
+      },
+      error: (err) => {
+        this.loadingConvocatorias = false;
+        this.convocatorias = [];
+        this.errorConvocatorias = err?.message || 'Error al cargar convocatorias';
+      }
+    });
+  }
+
+  openNewConv() {
+    if (!this.newConvForm) {
+      this.buildNewConvForm();
+    }
+    this.convFormError = null;
+    this.actualizarMetadatosConvocatorias();
+    const numero = this.siguienteNumeroConvocatoria > 0 ? this.siguienteNumeroConvocatoria : 1;
+    const anioCtrl = this.newConvForm.get('anio');
+    const numeroCtrl = this.newConvForm.get('numero_convocatoria');
+    anioCtrl?.enable({ emitEvent: false });
+    numeroCtrl?.enable({ emitEvent: false });
+    this.newConvForm.reset({
+      anio: this.anioActual,
+      numero_convocatoria: numero,
+      nombre: '',
+      fecha_inicio: '',
+      fecha_fin: '',
+      descripcion: '',
+      es_activo: true,
+    });
+    anioCtrl?.disable({ emitEvent: false });
+    numeroCtrl?.disable({ emitEvent: false });
+    this.convModalSaving = false;
+    this.newConvVisible = true;
+    this.setBodyModalOpen(true);
+  }
+
+  cancelNewConv() {
+    this.newConvVisible = false;
+    this.setBodyModalOpen(false);
+  }
+
+  submitNewConv() {
+    if (this.newConvForm.invalid) {
+      this.newConvForm.markAllAsTouched();
+      return;
+    }
+    const val = this.newConvForm.getRawValue();
+    this.convFormError = null;
+    if (this.ultimaFechaInicio && val.fecha_inicio && val.fecha_inicio < this.ultimaFechaInicio) {
+      this.convFormError = `La fecha de inicio debe ser posterior o igual a ${this.ultimaFechaInicio}.`;
+      return;
+    }
+    const payload: Partial<Convocatoria> = {
+      anio: Number(val.anio) || this.anioActual,
+      numero_convocatoria: Number(val.numero_convocatoria) || this.siguienteNumeroConvocatoria,
+      nombre: val.nombre,
+      fecha_inicio: val.fecha_inicio,
+      fecha_fin: val.fecha_fin,
+      descripcion: val.descripcion || '',
+      es_activo: !!val.es_activo,
+    };
+    this.convModalSaving = true;
+    this.loading.showModal();
+    this.sga.createConvocatoria(payload)
+      .pipe(finalize(() => {
+        this.loading.hideModal();
+        this.convModalSaving = false;
+      }))
+      .subscribe({
+        next: () => {
+          this.cancelNewConv();
+          this.loadConvocatorias();
+        },
+        error: (err) => {
+          this.errorConvocatorias = err?.message || 'Error al crear la convocatoria';
+        }
+      });
+  }
+
+  startEditConv(conv: Convocatoria) {
+    this.editingConv = conv;
+    this.ensureEditConvForm();
+    const inicio = conv.fecha_inicio ? conv.fecha_inicio.substring(0, 10) : '';
+    const fin = conv.fecha_fin ? conv.fecha_fin.substring(0, 10) : '';
+    this.convFormError = null;
+    this.editConvForm.reset({
+      anio: conv.anio || this.anioActual,
+      numero_convocatoria: conv.numero_convocatoria || 1,
+      nombre: conv.nombre || '',
+      fecha_inicio: inicio,
+      fecha_fin: fin,
+      descripcion: conv.descripcion || '',
+      es_activo: conv.es_activo,
+    });
+    this.editConvForm.get('anio')?.disable();
+    this.editConvForm.get('numero_convocatoria')?.disable();
+    this.convModalSaving = false;
+    this.editConvVisible = true;
+    this.setBodyModalOpen(true);
+  }
+
+  cancelEditConv() {
+    this.editConvVisible = false;
+    this.editingConv = null;
+    this.setBodyModalOpen(false);
+  }
+
+  submitEditConv() {
+    if (!this.editingConv) {
+      return;
+    }
+    if (this.editConvForm.invalid) {
+      this.editConvForm.markAllAsTouched();
+      return;
+    }
+    const val = this.editConvForm.getRawValue();
+    this.convFormError = null;
+    if (this.ultimaFechaInicio) {
+      // Permitir mantener la misma fecha o aumentar, pero no reducir por debajo del mínimo global.
+      const fechaMinima = this.obtenerFechaMinimaPermitidaParaEdicion(this.editingConv.id);
+      if (fechaMinima && val.fecha_inicio && val.fecha_inicio < fechaMinima) {
+        this.convFormError = `La fecha de inicio no puede ser menor a ${fechaMinima}.`;
+        return;
+      }
+    }
+    const payload: Partial<Convocatoria> = {
+      anio: Number(val.anio) || this.editingConv.anio || this.anioActual,
+      numero_convocatoria: Number(val.numero_convocatoria) || this.editingConv.numero_convocatoria || 1,
+      nombre: val.nombre,
+      fecha_inicio: val.fecha_inicio,
+      fecha_fin: val.fecha_fin,
+      descripcion: val.descripcion || '',
+      es_activo: !!val.es_activo,
+    };
+    this.convModalSaving = true;
+    this.loading.showModal();
+    this.sga.updateConvocatoria(this.editingConv.id, payload)
+      .pipe(finalize(() => {
+        this.loading.hideModal();
+        this.convModalSaving = false;
+      }))
+      .subscribe({
+        next: () => {
+          this.cancelEditConv();
+          this.loadConvocatorias();
+        },
+        error: (err) => {
+          this.errorConvocatorias = err?.message || 'Error al actualizar la convocatoria';
+        }
+      });
+  }
+
+  onConvocatoriaToggleChange(conv: Convocatoria, ev: Event) {
+    if (this.togglingConvocatoriaId === conv.id) {
+      return;
+    }
+    const input = ev.target as HTMLInputElement;
+    const desiredActive = !!input?.checked;
+    const previousState = conv.es_activo;
+
+    if (!desiredActive) {
+      if (input) {
+        input.checked = previousState;
+      }
+      this.openConfirmModal(
+        'Desactivar convocatoria',
+        `¿Seguro que deseas desactivar "${conv.nombre}"?`,
+        'Desactivar',
+        () => this.executeConvocatoriaToggle(conv, previousState)
+      );
+      return;
+    }
+
+    if (desiredActive !== previousState) {
+      conv.es_activo = desiredActive;
+      this.executeConvocatoriaToggle(conv, previousState);
+    }
+  }
+
+  private executeConvocatoriaToggle(conv: Convocatoria, previousState: boolean) {
+    this.togglingConvocatoriaId = conv.id;
+    this.sga.toggleConvocatoria(conv.id)
+      .pipe(finalize(() => {
+        this.togglingConvocatoriaId = null;
+      }))
+      .subscribe({
+        next: (resp: ConvocatoriaToggleResponse) => {
+          if (resp && typeof resp.es_activo === 'boolean') {
+            conv.es_activo = resp.es_activo;
+          } else {
+            conv.es_activo = !previousState;
+          }
+        },
+        error: (err: any) => {
+          conv.es_activo = previousState;
+          this.errorConvocatorias = err?.message || 'Error al actualizar el estado de la convocatoria';
+        }
+      });
+  }
+
+  onUsuarioToggleChange(user: Usuario, ev: Event) {
+    if (this.togglingUsuarioId === user.id) {
+      return;
+    }
+    const input = ev.target as HTMLInputElement;
+    const desiredActive = !!input?.checked;
+    const previousState = user.activo;
+
+    if (!desiredActive) {
+      if (input) {
+        input.checked = previousState;
+      }
+      this.openConfirmModal(
+        'Desactivar usuario',
+        `¿Seguro que deseas desactivar al usuario "${user.nombre_usuario}"?`,
+        'Desactivar',
+        () => this.executeUsuarioToggle(user, previousState)
+      );
+      return;
+    }
+
+    if (desiredActive !== previousState) {
+      user.activo = desiredActive;
+      this.executeUsuarioToggle(user, previousState);
+    }
+  }
+
+  private executeUsuarioToggle(user: Usuario, previousState: boolean) {
+    this.togglingUsuarioId = user.id;
+    this.sga.toggleUsuario(user.id)
+      .pipe(finalize(() => {
+        this.togglingUsuarioId = null;
+      }))
+      .subscribe({
+        next: (resp: ApiResponse<Usuario>) => {
+          if (resp?.success && resp.data) {
+            user.activo = !!resp.data.activo;
+          } else if ((resp as unknown as Usuario)?.activo !== undefined) {
+            user.activo = !!(resp as unknown as Usuario).activo;
+          } else {
+            user.activo = !previousState;
+          }
+        },
+        error: (err: any) => {
+          user.activo = previousState;
+          this.errorUsuarios = err?.message || 'Error al actualizar el estado del usuario';
+        }
+      });
+  }
+
+  deleteConvocatoria(conv: Convocatoria) {
+    if (this.deletingConvocatoriaId === conv.id) {
+      return;
+    }
+    const confirmed = typeof window !== 'undefined' ? window.confirm('¿Eliminar esta convocatoria?') : true;
+    if (!confirmed) {
+      return;
+    }
+    this.deletingConvocatoriaId = conv.id;
+    this.sga.deleteConvocatoria(conv.id).subscribe({
+      next: () => {
+        this.convocatorias = this.convocatorias.filter(c => c.id !== conv.id);
+        this.deletingConvocatoriaId = null;
+      },
+      error: (err) => {
+        this.errorConvocatorias = err?.message || 'Error al eliminar la convocatoria';
+        this.deletingConvocatoriaId = null;
       }
     });
   }
