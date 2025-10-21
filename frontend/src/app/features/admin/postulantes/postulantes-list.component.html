@@ -897,11 +897,11 @@
       <div class="modalidad-card">
         <h3 class="card-title">
           <i class="bi bi-mortarboard me-2"></i>
-          Modalidad de Graduación
+          Modalidad de Graduación y Convocatoria
         </h3>
         
         <div class="modalidad-content">
-          <p class="form-label">Modalidad actual:</p>
+          <strong class="form-label">Modalidad actual:</strong>
           <div class="modalidad-selected">
             <span *ngIf="!modalidad" class="no-selected">Ninguna modalidad seleccionada</span>
             <div *ngIf="modalidad" class="selected-info">
@@ -918,14 +918,55 @@
               </div>
             </div>
           </div>
-          
-          <button class="btn btn-primary btn-sm mt-3" (click)="mostrarModal()">
+          <button class="btn btn-primary btn-sm align-self-start" (click)="mostrarModal()">
             <i class="bi bi-pencil-square me-1"></i>
             {{ modalidad ? 'Cambiar Modalidad' : 'Seleccionar Modalidad' }}
           </button>
+
+          <div class="convocatoria-section">
+            <div class="convocatoria-header">
+              <i class="bi bi-megaphone"></i>
+              <div>
+                <h4>Convocatoria</h4>
+                <span>Selecciona o actualiza la convocatoria vigente para este registro.</span>
+              </div>
+            </div>
+            <div class="convocatoria-body">
+              <div class="convocatoria-select">
+                <select
+                  id="convocatoriaSelect"
+                  class="form-select"
+                  [ngModel]="convocatoriaSeleccionada?.id"
+                  (ngModelChange)="onConvocatoriaChange($event)"
+                  [disabled]="viewInscripcion && !editAranceles"
+                >
+                  <option [ngValue]="null">Seleccione una convocatoria</option>
+                  <option *ngFor="let conv of convocatorias" [ngValue]="conv.id">
+                    {{ conv.numero_convocatoria }} - {{ conv.nombre }}
+                    <ng-container *ngIf="conv.fecha_inicio && conv.fecha_fin">
+                      ({{ conv.fecha_inicio | date:'dd/MM/yyyy' }} - {{ conv.fecha_fin | date:'dd/MM/yyyy' }})
+                    </ng-container>
+                  </option>
+                </select>
+              </div>
+              <div class="convocatoria-summary" *ngIf="convocatoriaSeleccionada; else convocatoriaPlaceholder">
+                <span class="summary-title">Convocatoria seleccionada</span>
+                <span class="summary-name">{{ convocatoriaSeleccionada.numero_convocatoria }} - {{ convocatoriaSeleccionada.nombre }}</span>
+                <span class="summary-dates" *ngIf="convocatoriaSeleccionada.fecha_inicio && convocatoriaSeleccionada.fecha_fin">
+                  {{ convocatoriaSeleccionada.fecha_inicio | date:'dd/MM/yyyy' }} · {{ convocatoriaSeleccionada.fecha_fin | date:'dd/MM/yyyy' }}
+                </span>
+              </div>
+              <ng-template #convocatoriaPlaceholder>
+                <div class="convocatoria-placeholder">
+                  <i class="bi bi-info-circle me-2"></i>
+                  Selecciona una convocatoria para continuar.
+                </div>
+              </ng-template>
+            </div>
+          </div>
         </div>
       </div>
-      
+
       <!-- Aranceles seleccionados y total -->
       <div class="docs-card">
         <h3 class="card-title">
@@ -938,7 +979,7 @@
           <i class="bi bi-info-circle me-1"></i>
           Selecciona aranceles en la tabla de arriba para verlos aquí.
           <div class="text-muted small mt-2">
-            Estado actual: <strong>Sin pagos registrados</strong>
+            <strong>Estado actual: </strong> <span class="text-bg-warning">Sin pagos registrados</span>
           </div>
         </div>
 
@@ -1029,7 +1070,7 @@
   <div class="mt-3" *ngIf="showRegistrarInscripcion">
     <div class="alert alert-warning py-2" role="alert">
       <i class="bi bi-exclamation-triangle me-1"></i>
-      Verifique los datos (biográficos, bachillerato, modalidad y aranceles seleccionados) antes de registrar la inscripción.
+      NOTA: Verifique los datos (biográficos, bachillerato, modalidad y aranceles seleccionados) antes de registrar la inscripción.
     </div>
     <div *ngIf="inscripcionError" class="alert alert-danger py-2" role="alert">
       <i class="bi bi-exclamation-octagon me-1"></i>
@@ -1129,6 +1170,9 @@
                 </tbody>
               </table>
             </div>
+          </div>
+          <div class="col-12" *ngIf="r.convocatoria">
+            <strong>Convocatoria:</strong> {{ r.convocatoria }}
           </div>
         </div>
     </div>

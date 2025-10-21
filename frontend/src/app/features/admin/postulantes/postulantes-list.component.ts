@@ -9,7 +9,7 @@ import { HttpEventType, HttpResponse } from '@angular/common/http';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { SgaService } from '../../../shared/services/sga.service';
+import { SgaService, Convocatoria } from '../../../shared/services/sga.service';
 import { LoadingService } from '../../../core/services/loading.service';
 
 interface Estudiante {
@@ -72,6 +72,10 @@ export class PostulantesListComponent implements OnInit {
   postulanteDesdeBD: Partial<Postulante> | null = null;
   modalidad: ModalidadGraduacion | null = null;
   modalidades: ModalidadGraduacion[] = [];
+  convocatorias: Convocatoria[] = [];
+  convocatoriaSeleccionada: Convocatoria | null = null;
+  private convocatoriaIdPendiente: number | null = null;
+  private convocatoriaLabelPersistida: string | null = null;
   inscripciones: InscripcionModalidad[] = [];
   // Control de visibilidad del botón final de registro
   showRegistrarInscripcion: boolean = false;
@@ -95,6 +99,7 @@ export class PostulantesListComponent implements OnInit {
     es_tecnico_medio: boolean;
     es_traspaso: boolean;
     es_cambio_plan: boolean;
+    convocatoria?: string | null;
   } | null = null;
   // Estado y error de inscripción
   inscripcionLoading: boolean = false;
@@ -127,6 +132,59 @@ export class PostulantesListComponent implements OnInit {
     if (this.viewInscripcion && !this.editBio) return true;
     if (!this.viewInscripcion && !this.isEditing && (this.tienePostulanteBD || this.datosRecuperadosSga)) return true;
     return false;
+  }
+
+  private cargarConvocatoriasActivas() {
+    this.sgaService.getConvocatoriasActivas({ with_counts: true }).subscribe({
+      next: (convocatorias) => {
+        this.convocatorias = Array.isArray(convocatorias)
+          ? convocatorias.filter(c => c?.es_activo)
+          : [];
+        if (this.convocatoriaSeleccionada) {
+          this.convocatoriaSeleccionada = this.convocatorias.find(c => Number(c.id) === Number(this.convocatoriaSeleccionada?.id)) || null;
+        }
+        this.syncConvocatoriaSeleccionadaDesdeId(this.convocatoriaIdPendiente);
+      },
+      error: () => {
+        this.convocatorias = [];
+      }
+    });
+  }
+
+  onConvocatoriaChange(id: string | number | null) {
+    const convId = id ? Number(id) : null;
+    this.convocatoriaSeleccionada = convId
+      ? (this.convocatorias.find(c => Number(c.id) === convId) || null)
+      : null;
+    this.convocatoriaIdPendiente = convId || null;
+    this.convocatoriaLabelPersistida = this.convocatoriaSeleccionada ? this.formatConvocatoriaLabel(this.convocatoriaSeleccionada) : null;
+    this.markChangedInView();
+    if (this.resumenVisible) {
+      this.construirResumenInscripcion();
+    }
+  }
+
+  private syncConvocatoriaSeleccionadaDesdeId(convId: number | null) {
+    if (!convId) return;
+    if (!Array.isArray(this.convocatorias) || this.convocatorias.length === 0) return;
+    const encontrada = this.convocatorias.find(c => Number(c.id) === Number(convId));
+    if (encontrada) {
+      this.convocatoriaSeleccionada = encontrada;
+      this.convocatoriaLabelPersistida = this.formatConvocatoriaLabel(encontrada);
+      this.convocatoriaIdPendiente = null;
+      if (this.resumenVisible) {
+        this.construirResumenInscripcion();
+      }
+    }
+  }
+
+  private formatConvocatoriaLabel(conv: any): string {
+    if (!conv) return '';
+    const numero = conv.numero_convocatoria ?? conv.numero ?? conv.numeroConvocatoria ?? conv.convocatoria_numero;
+    const nombre = (conv.nombre ?? conv.convocatoria_nom ?? conv.titulo ?? '').toString();
+    if (numero && nombre) return `${numero} - ${nombre}`;
+    if (numero) return `Convocatoria ${numero}`;
+    return nombre || '';
   }
   // Edición por tarjeta cuando está en modo ver inscripción
   editBio = false;
@@ -746,6 +804,7 @@ constructor(private postulanteService: PostulanteService, private sgaService: Sg
 private formatTipoBachiller(v: string | null | undefined): string | null {
   if (!v) return null;
   const s = v.toString().trim().toLowerCase();
+  // ... (rest of the code remains the same)
   if (s.startsWith('nac')) return 'Nacional';
   if (s.startsWith('ext')) return 'Extranjero';
   // Otros valores: capitalizar primera letra por defecto
@@ -756,6 +815,7 @@ ngOnInit() {
   this.cargarDatosPostulacion();
   // Intentar traer el postulante desde BD para usar sus valores persistidos
   this.cargarPostulanteDesdeBD();
+  this.cargarConvocatoriasActivas();
   // Asegurar carga de pensums aún si no hay datos en sessionStorage
   this.cargarPensums();
   // Cargar modalidades desde el backend
@@ -878,6 +938,21 @@ private cargarPostulanteDesdeBD() {
       // Considerar "no nuevo" SOLO si existe un registro de inscripción real en backend
       const tieneInscripcion = !!(srcAny && srcAny.inscripcion && srcAny.inscripcion.id);
       this.esNuevoPostulante = !tieneInscripcion;
+      const convDesdeBd = (srcAny?.inscripcion?.convocatoria) || srcAny?.convocatoria || null;
+      const convIdDesdeBd = convDesdeBd
+        ? (convDesdeBd.id ?? convDesdeBd.convocatoria_id ?? convDesdeBd.convocatoriaId)
+        : (srcAny?.inscripcion?.convocatoria_id ?? srcAny?.convocatoria_id ?? null);
+      const convLabelBd = convDesdeBd
+        ? this.formatConvocatoriaLabel(convDesdeBd)
+        : (srcAny?.inscripcion?.convocatoria_nom ?? srcAny?.convocatoria_nom ?? null);
+      if (convLabelBd) {
+        this.convocatoriaLabelPersistida = convLabelBd.toString();
+      }
+      if (convIdDesdeBd) {
+        const idNum = Number(convIdDesdeBd);
+        this.convocatoriaIdPendiente = isNaN(idNum) ? null : idNum;
+        this.syncConvocatoriaSeleccionadaDesdeId(this.convocatoriaIdPendiente);
+      }
       // Fusionar datos persistidos en el formulario actual para mostrar en modo lectura
       if (p && typeof p === 'object') {
         const src: any = p;
@@ -2944,6 +3019,26 @@ private cargarPostulanteDesdeBD() {
       num_factura: a.num_factura || undefined,
       num_comprobante: a.num_comprobante || undefined,
     }));
+    if (!this.resumenInscripcion) {
+      this.resumenInscripcion = {
+        carrera: null,
+        pensum: null,
+        cod_ceta: null,
+        nombre_completo: '',
+        modalidad: null,
+        tipo_bachiller: null,
+        pago_estado: 'Con deuda',
+        aranceles: [],
+        es_edu_regular: false,
+        es_tecnico_medio: false,
+        es_traspaso: false,
+        es_cambio_plan: false,
+        convocatoria: null,
+      };
+    }
+    const convLabel = this.convocatoriaSeleccionada
+      ? this.formatConvocatoriaLabel(this.convocatoriaSeleccionada)
+      : (this.convocatoriaLabelPersistida ? this.convocatoriaLabelPersistida.toString() : null);
     this.resumenInscripcion = {
       carrera: carreraNombre,
       pensum,
@@ -2957,6 +3052,7 @@ private cargarPostulanteDesdeBD() {
       es_tecnico_medio: this.selectedOpcion === 'tecnicoMedio',
       es_traspaso: this.selectedOpcion === 'traspasoInstituto',
       es_cambio_plan: this.selectedOpcion === 'homologacionCambioPlan',
+      convocatoria: convLabel,
     };
   }
 
@@ -3015,6 +3111,7 @@ private cargarPostulanteDesdeBD() {
       apellidos_est: apellidos,
       modalidad_id: this.modalidad?.id,
       modalidad_nom: this.modalidad?.nombre,
+      convocatoria_id: this.convocatoriaSeleccionada?.id || null,
       carrera: this.carreraNormalizada || this.postulanteActual.carrera || null,
       aranceles_completos: !!this.pagoCompletoSeleccionados,
       aranceles: (this.selectedAranceles || []).map((a: any) => ({
