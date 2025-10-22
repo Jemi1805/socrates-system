@@ -930,6 +930,15 @@
                 <h4>Convocatoria</h4>
                 <span>Selecciona o actualiza la convocatoria vigente para este registro.</span>
               </div>
+              <button
+                class="btn btn-outline-secondary btn-sm"
+                type="button"
+                (click)="toggleEditConvocatoria()"
+                *ngIf="viewInscripcion"
+              >
+                <i class="bi" [ngClass]="editConvocatoria ? 'bi-x-lg' : 'bi-pencil-square'"></i>
+                {{ editConvocatoria ? 'Cancelar' : 'Editar' }}
+              </button>
             </div>
             <div class="convocatoria-body">
               <div class="convocatoria-select">
@@ -938,7 +947,7 @@
                   class="form-select"
                   [ngModel]="convocatoriaSeleccionada?.id"
                   (ngModelChange)="onConvocatoriaChange($event)"
-                  [disabled]="viewInscripcion && !editAranceles"
+                  [disabled]="viewInscripcion && !editConvocatoria"
                 >
                   <option [ngValue]="null">Seleccione una convocatoria</option>
                   <option *ngFor="let conv of convocatorias" [ngValue]="conv.id">
@@ -955,6 +964,16 @@
                 <span class="summary-dates" *ngIf="convocatoriaSeleccionada.fecha_inicio && convocatoriaSeleccionada.fecha_fin">
                   {{ convocatoriaSeleccionada.fecha_inicio | date:'dd/MM/yyyy' }} · {{ convocatoriaSeleccionada.fecha_fin | date:'dd/MM/yyyy' }}
                 </span>
+                <button
+                  class="btn btn-success btn-sm align-self-start"
+                  type="button"
+                  (click)="guardarConvocatoriaSeleccionada()"
+                  *ngIf="editConvocatoria"
+                  [disabled]="!convocatoriaSeleccionada || guardandoConvocatoria"
+                >
+                  <i class="bi bi-save"></i>
+                  {{ guardandoConvocatoria ? 'Guardando...' : 'Guardar' }}
+                </button>
               </div>
               <ng-template #convocatoriaPlaceholder>
                 <div class="convocatoria-placeholder">

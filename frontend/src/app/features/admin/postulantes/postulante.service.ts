@@ -275,12 +275,12 @@ export class PostulanteService {
   }
 
   // Actualiza la fila de inscrip_modalidad por ID (por ejemplo, para sincronizar modalidad_nom)
-  updateInscripModalidad(id: number | string, payload: { modalidad_nom?: string; modalidad_id?: number | string; estado?: string | null }): Observable<any> {
+  updateInscripModalidad(id: number | string, payload: { modalidad_nom?: string; modalidad_id?: number | string; estado?: string | null; convocatoria_id?: number | string | null; nom_convocatoria?: string | null }): Observable<any> {
     return this.http.patch<any>(`${this.baseUrl}/inscrip_modalidad/${id}`, payload);
   }
 
   // Fallback robusto: upsert por código CETA (si el backend no soporta PATCH por ID)
-  updateInscripModalidadByCod(codCeta: number | string, payload: { modalidad_nom?: string; modalidad_id?: number | string; estado?: string | null }): Observable<any> {
+  updateInscripModalidadByCod(codCeta: number | string, payload: { modalidad_nom?: string; modalidad_id?: number | string; estado?: string | null; convocatoria_id?: number | string | null; nom_convocatoria?: string | null }): Observable<any> {
     const body = { cod_ceta_est: codCeta, ...payload } as any;
     return this.http.post<any>(`${this.baseUrl}/inscrip_modalidad/upsert_by_cod`, body);
   }

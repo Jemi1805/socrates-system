@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
-import { forkJoin, of } from 'rxjs';
-import { finalize } from 'rxjs/operators';
+import { forkJoin, of, throwError } from 'rxjs';
+import { finalize, switchMap } from 'rxjs/operators';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { PostulanteService, DocumentoPostulante, ModalidadPostulante } from './postulante.service';
@@ -76,6 +76,10 @@ export class PostulantesListComponent implements OnInit {
   convocatoriaSeleccionada: Convocatoria | null = null;
   private convocatoriaIdPendiente: number | null = null;
   private convocatoriaLabelPersistida: string | null = null;
+  private convocatoriaLabelPendiente: string | null = null;
+  editConvocatoria = false;
+  guardandoConvocatoria = false;
+  private convocatoriaSeleccionadaBackupId: number | null = null;
   inscripciones: InscripcionModalidad[] = [];
   // Control de visibilidad del botón final de registro
   showRegistrarInscripcion: boolean = false;
@@ -141,7 +145,10 @@ export class PostulantesListComponent implements OnInit {
           ? convocatorias.filter(c => c?.es_activo)
           : [];
         if (this.convocatoriaSeleccionada) {
-          this.convocatoriaSeleccionada = this.convocatorias.find(c => Number(c.id) === Number(this.convocatoriaSeleccionada?.id)) || null;
+          const reemplazo = this.convocatorias.find(c => Number(c.id) === Number(this.convocatoriaSeleccionada?.id));
+          if (reemplazo) {
+            this.convocatoriaSeleccionada = reemplazo;
+          }
         }
         this.syncConvocatoriaSeleccionadaDesdeId(this.convocatoriaIdPendiente);
       },
@@ -151,13 +158,32 @@ export class PostulantesListComponent implements OnInit {
     });
   }
 
+  toggleEditConvocatoria() {
+    if (this.editConvocatoria) {
+      this.editConvocatoria = false;
+      this.guardandoConvocatoria = false;
+      if (this.convocatoriaSeleccionadaBackupId !== null) {
+        this.syncConvocatoriaSeleccionadaDesdeId(this.convocatoriaSeleccionadaBackupId);
+      } else {
+        this.convocatoriaSeleccionada = null;
+      }
+      this.convocatoriaIdPendiente = null;
+      this.convocatoriaLabelPendiente = null;
+      this.hasChangesInView = false;
+      return;
+    }
+    this.prepararSnapshotAntesDeEditar();
+    this.convocatoriaSeleccionadaBackupId = this.convocatoriaSeleccionada?.id ?? null;
+    this.editConvocatoria = true;
+  }
+
   onConvocatoriaChange(id: string | number | null) {
     const convId = id ? Number(id) : null;
     this.convocatoriaSeleccionada = convId
       ? (this.convocatorias.find(c => Number(c.id) === convId) || null)
       : null;
     this.convocatoriaIdPendiente = convId || null;
-    this.convocatoriaLabelPersistida = this.convocatoriaSeleccionada ? this.formatConvocatoriaLabel(this.convocatoriaSeleccionada) : null;
+    this.convocatoriaLabelPendiente = this.convocatoriaSeleccionada ? this.formatConvocatoriaLabel(this.convocatoriaSeleccionada) : null;
     this.markChangedInView();
     if (this.resumenVisible) {
       this.construirResumenInscripcion();
@@ -165,13 +191,17 @@ export class PostulantesListComponent implements OnInit {
   }
 
   private syncConvocatoriaSeleccionadaDesdeId(convId: number | null) {
-    if (!convId) return;
+    if (!convId) {
+      this.convocatoriaSeleccionada = null;
+      return;
+    }
     if (!Array.isArray(this.convocatorias) || this.convocatorias.length === 0) return;
     const encontrada = this.convocatorias.find(c => Number(c.id) === Number(convId));
     if (encontrada) {
       this.convocatoriaSeleccionada = encontrada;
       this.convocatoriaLabelPersistida = this.formatConvocatoriaLabel(encontrada);
       this.convocatoriaIdPendiente = null;
+      this.convocatoriaLabelPendiente = null;
       if (this.resumenVisible) {
         this.construirResumenInscripcion();
       }
@@ -186,6 +216,83 @@ export class PostulantesListComponent implements OnInit {
     if (numero) return `Convocatoria ${numero}`;
     return nombre || '';
   }
+
+  guardarConvocatoriaSeleccionada() {
+    if (!this.convocatoriaSeleccionada) {
+      return;
+    }
+    const codCeta = this.postulanteActual?.cod_ceta || this.estudiante?.cod_ceta;
+    if (!codCeta) {
+      alert('No hay código CETA asociado al postulante.');
+      return;
+    }
+    const convId = this.convocatoriaSeleccionada.id;
+    this.guardandoConvocatoria = true;
+    this.loadingService.showModal();
+    const nuevoLabel = this.convocatoriaLabelPendiente
+      ?? this.formatConvocatoriaLabel(this.convocatoriaSeleccionada)
+      ?? this.convocatoriaSeleccionada?.nombre
+      ?? null;
+    const payload: any = {
+      convocatoria_id: convId,
+      nom_convocatoria: nuevoLabel,
+    };
+    if (this.modalidad?.id) {
+      payload.modalidad_id = this.modalidad.id;
+    }
+    if (this.modalidad?.nombre) {
+      payload.modalidad_nom = this.modalidad.nombre;
+    }
+
+    const obs = this.postulanteService.updateInscripModalidadByCod(Number(codCeta), payload);
+
+    const resumenAntes = this.getConvocatoriaResumenLabel();
+    const anterior = this.convocatoriaLabelPersistida ?? resumenAntes;
+    const nuevo = nuevoLabel;
+
+    obs.subscribe({
+      next: (resp) => {
+        if (resp && resp.id != null) {
+          this.inscripModalidadIdActual = Number(resp.id);
+        }
+        this.convocatoriaLabelPersistida = nuevo || null;
+        this.convocatoriaLabelPendiente = null;
+        this.convocatoriaSeleccionadaBackupId = convId;
+        this.editConvocatoria = false;
+        this.guardandoConvocatoria = false;
+        this.loadingService.hideModal();
+        this.hasChangesInView = false;
+        this.convocatoriaIdPendiente = null;
+        const cambiosModal = (anterior !== nuevo)
+          ? [
+              {
+                campo: 'Convocatoria',
+                anterior,
+                nuevo
+              }
+            ]
+          : [
+              {
+                campo: 'Convocatoria',
+                anterior: anterior ?? '',
+                nuevo: nuevo ?? ''
+              }
+            ];
+        this.mostrarModalCambios(cambiosModal, true);
+      },
+      error: (err) => {
+        console.error('Error al actualizar la convocatoria en la inscripción:', err);
+        this.guardandoConvocatoria = false;
+        this.loadingService.hideModal();
+        if (err instanceof Error && err.message === 'SIN_INSCRIPCION') {
+          alert('No existe una inscripción registrada para este postulante. Registre la inscripción antes de asignar una convocatoria.');
+        } else {
+          alert('No se pudo actualizar la convocatoria. Intente nuevamente.');
+        }
+      }
+    });
+  }
+
   // Edición por tarjeta cuando está en modo ver inscripción
   editBio = false;
   editBach = false;
@@ -938,6 +1045,7 @@ private cargarPostulanteDesdeBD() {
       // Considerar "no nuevo" SOLO si existe un registro de inscripción real en backend
       const tieneInscripcion = !!(srcAny && srcAny.inscripcion && srcAny.inscripcion.id);
       this.esNuevoPostulante = !tieneInscripcion;
+      this.inscripModalidadIdActual = srcAny?.inscripcion?.id ?? null;
       const convDesdeBd = (srcAny?.inscripcion?.convocatoria) || srcAny?.convocatoria || null;
       const convIdDesdeBd = convDesdeBd
         ? (convDesdeBd.id ?? convDesdeBd.convocatoria_id ?? convDesdeBd.convocatoriaId)
@@ -952,6 +1060,11 @@ private cargarPostulanteDesdeBD() {
         const idNum = Number(convIdDesdeBd);
         this.convocatoriaIdPendiente = isNaN(idNum) ? null : idNum;
         this.syncConvocatoriaSeleccionadaDesdeId(this.convocatoriaIdPendiente);
+        this.convocatoriaSeleccionadaBackupId = this.convocatoriaIdPendiente;
+      } else if (convDesdeBd) {
+        this.convocatoriaSeleccionada = convDesdeBd;
+        this.convocatoriaLabelPendiente = null;
+        this.convocatoriaIdPendiente = null;
       }
       // Fusionar datos persistidos en el formulario actual para mostrar en modo lectura
       if (p && typeof p === 'object') {
@@ -1677,7 +1790,7 @@ private cargarPostulanteDesdeBD() {
     const cod = this.postulanteActual.cod_ceta as number | undefined;
     const guardarBio$ = cod
       ? this.postulanteService.update(cod, this.postulanteActual as Postulante)
-      : this.postulanteService.create(this.postulanteActual as Postulante);
+      : this.postulanteService.create(({ ...(this.postulanteActual as any), cod_ceta: undefined } as Postulante));
 
     // Preparar payload de datos_carrera si el usuario ha seleccionado valores
     guardarBio$.subscribe({
@@ -2628,7 +2741,7 @@ private cargarPostulanteDesdeBD() {
                   this.postulanteService.getArancelesEstByCodCeta(cod as number, false).subscribe({
                     next: (resp2) => {
                       est = Array.isArray(resp2?.data) ? resp2.data : (Array.isArray(resp2) ? resp2 : []);
-                      this._aplicarArancelesEstEnVista(est);
+                      this._aplicarArancelesEstEnVista(est || []);
                     },
                     error: () => {
                       this._aplicarArancelesEstEnVista([]);
@@ -2652,6 +2765,7 @@ private cargarPostulanteDesdeBD() {
                   const v = (typeof flag === 'string') ? flag.trim() : flag;
                   this.pagoCompletoSeleccionados = v === true || v === 1 || v === '1';
                 }
+                this.inscripModalidadIdActual = (p as any)?.inscripcion?.id ?? this.inscripModalidadIdActual;
               },
               error: () => {
                 // Fallback: consultar directamente inscrip_modalidad por cod_ceta_est
@@ -2661,6 +2775,9 @@ private cargarPostulanteDesdeBD() {
                     if (rows && rows.length) {
                       const r = rows[0];
                       const flag2 = (r as any)?.aranceles_completos;
+                      if (r && r.id != null) {
+                        this.inscripModalidadIdActual = Number(r.id);
+                      }
                       if (flag2 !== undefined && flag2 !== null) {
                         const v2 = (typeof flag2 === 'string') ? flag2.trim() : flag2;
                         this.pagoCompletoSeleccionados = v2 === true || v2 === 1 || v2 === '1';
@@ -2889,7 +3006,20 @@ private cargarPostulanteDesdeBD() {
       modalidad_nombre: this.modalidad?.nombre ?? null,
       aranceles_count: (this.selectedAranceles || []).length,
       aranceles_total: this.totalArancelesSeleccionados ?? 0,
+      // Convocatoria
+      convocatoria_id: this.convocatoriaSeleccionada?.id ?? this.convocatoriaSeleccionadaBackupId ?? null,
+      convocatoria_nombre: this.getConvocatoriaResumenLabel() ?? null,
     };
+  }
+
+  private getConvocatoriaResumenLabel(): string | null {
+    if (this.convocatoriaSeleccionada) {
+      return this.formatConvocatoriaLabel(this.convocatoriaSeleccionada);
+    }
+    if (typeof this.convocatoriaLabelPersistida === 'string' && this.convocatoriaLabelPersistida.trim() !== '') {
+      return this.convocatoriaLabelPersistida;
+    }
+    return null;
   }
 
   private normalizarValor(v: any): string {
@@ -3036,9 +3166,7 @@ private cargarPostulanteDesdeBD() {
         convocatoria: null,
       };
     }
-    const convLabel = this.convocatoriaSeleccionada
-      ? this.formatConvocatoriaLabel(this.convocatoriaSeleccionada)
-      : (this.convocatoriaLabelPersistida ? this.convocatoriaLabelPersistida.toString() : null);
+    const convLabel = this.getConvocatoriaResumenLabel();
     this.resumenInscripcion = {
       carrera: carreraNombre,
       pensum,
@@ -3260,6 +3388,10 @@ private cargarPostulanteDesdeBD() {
         }
         // Construir resumen (se mostrará al cerrar el modal)
         this.construirResumenInscripcion();
+        const inscId = res?.data?.inscripcion?.id ?? res?.inscripcion?.id;
+        if (inscId != null) {
+          this.inscripModalidadIdActual = Number(inscId);
+        }
         this.resumenVisible = false;
         // Spinner antes del modal de éxito
         this.loadingService.showModal();

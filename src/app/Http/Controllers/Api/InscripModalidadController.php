@@ -22,6 +22,11 @@ use App\Models\GradosTrasp;
 class InscripModalidadController extends CrudController
 {
     protected $modelClass = InscripModalidad::class;
+
+    public function index()
+    {
+        return parent::index();
+    }
     /**
      * Sanitiza números de serie/resoluciones: permite solo A-Z, 0-9, guion -, comillas dobles " y símbolo °, y devuelve en MAYÚSCULAS.
      */
@@ -87,7 +92,55 @@ class InscripModalidadController extends CrudController
             // columnas legacy removidas
             'fecha_inscripcion' => 'nullable|date',
             'estado' => 'nullable|string|max:255',
+            'convocatoria_id' => 'nullable|exists:convocatorias,id',
+            'nom_convocatoria' => 'nullable|string|max:150',
         ];
+    }
+
+    public function upsertByCod(Request $request)
+    {
+        $data = $request->validate([
+            'cod_ceta_est' => 'required|integer',
+            'modalidad_id' => 'nullable|exists:modalidad,id',
+            'modalidad_nom' => 'nullable|string|max:120',
+            'estado' => 'nullable|string|max:255',
+            'fecha_inscripcion' => 'nullable|date',
+            'convocatoria_id' => 'nullable|exists:convocatorias,id',
+            'nom_convocatoria' => 'nullable|string|max:150',
+            'aranceles_completos' => 'nullable|boolean',
+        ]);
+
+        $payload = [
+            'cod_ceta_est' => $data['cod_ceta_est'],
+        ];
+
+        foreach ([
+            'modalidad_id',
+            'modalidad_nom',
+            'estado',
+            'fecha_inscripcion',
+            'convocatoria_id',
+            'nom_convocatoria',
+            'aranceles_completos',
+        ] as $key) {
+            if (array_key_exists($key, $data)) {
+                $payload[$key] = $data[$key];
+            }
+        }
+
+        $record = InscripModalidad::query()
+            ->where('cod_ceta_est', $data['cod_ceta_est'])
+            ->orderByDesc('updated_at')
+            ->first();
+
+        if ($record) {
+            $record->fill($payload);
+            $record->save();
+        } else {
+            $record = InscripModalidad::create($payload);
+        }
+
+        return response()->json($record);
     }
 
     // Registro de inscripción con aranceles seleccionados en una sola operación
@@ -205,6 +258,8 @@ class InscripModalidadController extends CrudController
             if (isset($data['apellidos_est'])) $ins->apellidos_est = $data['apellidos_est'];
             if (isset($data['modalidad_id'])) $ins->modalidad_id = $data['modalidad_id'];
             if (isset($data['modalidad_nom'])) $ins->modalidad_nom = $data['modalidad_nom'];
+            if (isset($data['convocatoria_id'])) $ins->convocatoria_id = $data['convocatoria_id'];
+            if (array_key_exists('nom_convocatoria', $data)) $ins->nom_convocatoria = $data['nom_convocatoria'];
             if (isset($data['aranceles_completos'])) $ins->aranceles_completos = (bool)$data['aranceles_completos'];
             // Usuario registrador
             $ins->user_id = isset($data['user_id']) ? $data['user_id'] : ($user ? $user->id : null);

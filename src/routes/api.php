@@ -96,6 +96,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:temas.actualizar');
     Route::apiResource('inscrip_modalidad', InscripModalidadController::class)
         ->middleware('permission:inscrip_modalidad.actualizar');
+    Route::post('inscrip_modalidad/upsert_by_cod', [InscripModalidadController::class, 'upsertByCod'])
+        ->middleware('permission:inscrip_modalidad.actualizar');
 
     Route::get('convocatorias/activas', [ConvocatoriaController::class, 'activas'])
         ->middleware('permission:convocatorias.leer');

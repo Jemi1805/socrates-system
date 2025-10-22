@@ -152,6 +152,8 @@ class InscripcionController extends Controller
             : null;
         $arancelesCompletos = $insRow && isset($insRow->aranceles_completos) ? (bool)$insRow->aranceles_completos : null;
         $estadoInscripcion = $insRow && isset($insRow->estado) ? $insRow->estado : null;
+        $convocatoriaId = $insRow && isset($insRow->convocatoria_id) ? $insRow->convocatoria_id : null;
+        $convocatoriaNom = $insRow && isset($insRow->nom_convocatoria) ? $insRow->nom_convocatoria : null;
 
         // Armar payload conforme al mapeo del FE
         $payload = [
@@ -223,6 +225,24 @@ class InscripcionController extends Controller
             'aranceles_completos' => $arancelesCompletos,
             'estado' => $estadoInscripcion,
         ];
+
+        if ($insRow) {
+            $payload['inscripcion'] = array_merge([
+                'id' => isset($insRow->id) ? $insRow->id : null,
+                'cod_ceta_est' => isset($insRow->cod_ceta_est) ? $insRow->cod_ceta_est : null,
+                'modalidad_id' => isset($insRow->modalidad_id) ? $insRow->modalidad_id : null,
+                'modalidad_nom' => isset($insRow->modalidad_nom) ? $insRow->modalidad_nom : null,
+                'fecha_inscripcion' => isset($insRow->fecha_inscripcion) ? $insRow->fecha_inscripcion : null,
+                'aranceles_completos' => isset($insRow->aranceles_completos) ? (bool)$insRow->aranceles_completos : null,
+                'estado' => isset($insRow->estado) ? $insRow->estado : null,
+                'convocatoria_id' => $convocatoriaId,
+                'convocatoria_nom' => $convocatoriaNom,
+            ], []);
+        } else {
+            $payload['inscripcion'] = null;
+            $payload['convocatoria_id'] = $convocatoriaId;
+            $payload['convocatoria_nom'] = $convocatoriaNom;
+        }
 
             return response()->json($payload);
         } catch (\Throwable $e) {

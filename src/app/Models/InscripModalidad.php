@@ -20,6 +20,7 @@ class InscripModalidad extends Model
         'fecha_inscripcion',
         'estado',
         'convocatoria_id',
+        'nom_convocatoria',
     ];
 
     protected $casts = [
