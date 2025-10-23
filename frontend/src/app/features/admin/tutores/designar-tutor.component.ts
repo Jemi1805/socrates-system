@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
-import { SgaService, Pertinencia, TutorReg } from '../../../shared/services/sga.service';
+import { SgaService, Pertinencia, TutorReg, Convocatoria } from '../../../shared/services/sga.service';
 import { ProyectoService } from '../proyectos/proyecto.service';
 
 @Component({
@@ -32,8 +32,15 @@ export class DesignarTutorComponent implements OnInit {
   // UI State
   isSaving = false;
   showSuccessModal = false;
+  showConfirmModal = false;
   selectedTutor: TutorReg | null = null;
   lastDesignation: any = null;
+  convocatorias: Convocatoria[] = [];
+  selectedConvocatoriaId: number | null = null;
+  confirmConvocatoriaNombre: string | null = null;
+  confirmArea: string | null = null;
+  tutorPertinenciaIds: number[] = [];
+  selectedPertinenciaId: number | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -69,11 +76,44 @@ export class DesignarTutorComponent implements OnInit {
           this.proyecto = (Array.isArray(res?.data) ? res.data[0] : (res?.data || res)) || null;
         }, error: () => {} });
       }
-
       // Cargar áreas (pertinencias) y tutores
       this.loadAreas();
       this.loadTutores();
+      this.loadConvocatorias();
     });
+  }
+
+  private loadConvocatorias() {
+    this.sga.getConvocatorias({ per_page: 100 }).subscribe({
+      next: (resp) => {
+        const raw = (resp?.data ?? resp?.items ?? resp) as any;
+        const list = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
+        this.convocatorias = list as Convocatoria[];
+        if (!this.selectedConvocatoriaId) {
+          const convId = (this.estudiante as any)?.inscripcion?.convocatoria_id
+            ?? this.inscripcionConvocatoriaIdFromStorage();
+          if (convId) {
+            this.selectedConvocatoriaId = Number(convId);
+          }
+        }
+      },
+      error: () => {
+        this.convocatorias = [];
+      }
+    });
+  }
+
+  private inscripcionConvocatoriaIdFromStorage(): number | null {
+    try {
+      const raw = sessionStorage.getItem('datos_postulacion');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const ins = parsed?.inscripcion;
+      if (ins && ins.convocatoria_id) return Number(ins.convocatoria_id);
+      return null;
+    } catch {
+      return null;
+    }
   }
 
   // Cargar pertinencias por carrera (renombradas como Áreas)
@@ -104,7 +144,7 @@ export class DesignarTutorComponent implements OnInit {
     });
   }
 
-  onAreasChange() {
+  public onAreasChange() {
     this.applyFilter();
   }
 
@@ -138,40 +178,91 @@ export class DesignarTutorComponent implements OnInit {
   }
 
   // Acción de designar (placeholder para futura integración)
-  designarTutor(t: TutorReg) {
+  public designarTutor(t: TutorReg) {
     if (!t || (!this.codCeta && !this.estudiante?.cod_ceta)) {
       console.warn('Falta cod_ceta o tutor');
       return;
     }
+    this.selectedTutor = t;
+    this.confirmArea = this.areasText(t);
+    const convId = this.selectedConvocatoriaId
+      ?? (this.estudiante as any)?.inscripcion?.convocatoria_id
+      ?? this.inscripcionConvocatoriaIdFromStorage();
+    this.selectedConvocatoriaId = convId ? Number(convId) : null;
+    this.confirmConvocatoriaNombre = this.convocatorias.find(c => Number(c.id) === this.selectedConvocatoriaId)?.nombre || null;
+    this.tutorPertinenciaIds = this.extraerPertinenciaIds(t);
+    this.selectedPertinenciaId = this.tutorPertinenciaIds.length ? Number(this.tutorPertinenciaIds[0]) : null;
+    this.showConfirmModal = true;
+  }
+
+  public confirmarDesignacion() {
+    if (!this.selectedTutor || (!this.codCeta && !this.estudiante?.cod_ceta)) {
+      this.showConfirmModal = false;
+      return;
+    }
     const cod = Number(this.codCeta || this.estudiante?.cod_ceta);
     const proyectoId = this.proyecto?.id ? Number(this.proyecto.id) : undefined;
+    const payload: any = { tutor_id: Number(this.selectedTutor.id), cod_ceta: cod, proyecto_id: proyectoId };
+    if (this.selectedConvocatoriaId) {
+      payload.convocatoria_id = Number(this.selectedConvocatoriaId);
+    }
+    if (this.selectedPertinenciaId) {
+      payload.pertinencia_id = Number(this.selectedPertinenciaId);
+    }
     this.isSaving = true;
-    this.sga.designarTutor({ tutor_id: Number(t.id), cod_ceta: cod, proyecto_id: proyectoId }).subscribe({
+    this.sga.designarTutor(payload).subscribe({
       next: (resp) => {
         this.isSaving = false;
+        this.showConfirmModal = false;
         if (resp?.success) {
-          this.selectedTutor = t;
           this.lastDesignation = resp?.data || null;
           this.showSuccessModal = true;
         }
       },
       error: (err) => {
         this.isSaving = false;
+        this.showConfirmModal = false;
         alert('No se pudo designar el tutor. ' + (err?.message || ''));
       }
     });
   }
 
+  public cancelarConfirmacion() {
+    this.showConfirmModal = false;
+    this.selectedTutor = null;
+    this.selectedPertinenciaId = null;
+  }
+
   // Texto de áreas mostrado en la tabla
-  areasText(t: TutorReg): string {
+  public areasText(t: TutorReg): string {
     const arr = (t as any)?.pertinencias;
     if (Array.isArray(arr) && arr.length) return arr.join(', ');
     const single = (t as any)?.pertinencia;
     return single ? String(single) : '-';
   }
 
+  private extraerPertinenciaIds(t: TutorReg | null): number[] {
+    if (!t) return [];
+    const rawIds = (t as any)?.pertinencia_ids;
+    if (Array.isArray(rawIds) && rawIds.length) {
+      return rawIds.map((x: any) => Number(x)).filter(x => !Number.isNaN(x));
+    }
+    const single = (t as any)?.pertinencia_acad_id;
+    if (single !== undefined && single !== null) {
+      const n = Number(single);
+      return Number.isNaN(n) ? [] : [n];
+    }
+    return [];
+  }
+
+  public pertinenciaNombre(id: number | null): string {
+    if (!id) return '-';
+    const found = (this.areas || []).find(a => Number(a.id) === Number(id));
+    return found?.nombre_pert || '-';
+  }
+
   // Toggle de áreas por checkbox
-  onToggleArea(ev: Event, id: number) {
+  public onToggleArea(ev: Event, id: number) {
     const checked = (ev.target as HTMLInputElement).checked;
     const nid = Number(id);
     if (checked) {
@@ -182,13 +273,13 @@ export class DesignarTutorComponent implements OnInit {
     this.applyFilter();
   }
 
-  clearAreas() {
+  public clearAreas() {
     this.selectedAreaIds = [];
     this.applyFilter();
   }
 
   // Helpers de UI
-  estudianteNombre(): string {
+  public estudianteNombre(): string {
     const e = this.estudiante || {} as any;
     const nombres = e.nombres || e.nombres_est || '';
     const apPat = e.ap_pat || e.apellido_p || '';
@@ -197,7 +288,7 @@ export class DesignarTutorComponent implements OnInit {
     return full || String(this.codCeta || '');
   }
 
-  closeSuccessModal() {
+  public closeSuccessModal() {
     this.showSuccessModal = false;
   }
 }

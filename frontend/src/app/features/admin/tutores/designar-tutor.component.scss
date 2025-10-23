@@ -7,7 +7,12 @@ $success-color: #4CAF50;
 $danger-color: #F44336;
 $info-color: #17a2b8;
 $light-gray: #f5f5f5;
+$border-color: #e0e0e0;
+$text-dark-blue: #052544;
 $text-light: #666;
+$shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+$border-radius: 12px;
+$transition: all 0.3s ease;
 
 .tutores-container {
   min-height: 100vh;
@@ -102,35 +107,6 @@ $text-light: #666;
   }
 }
 
-/* Botones */
-.btn {
-  color: #052544;
-  border-color: #4C9DBD;
-  border-radius: 8px;
-  font-weight: 500;
-  padding: 0.25rem 0.75rem;
-  transition: all 0.3s ease;
-}
-.btn:hover {
-  color: #fff !important;
-  background-color: #4C9DBD;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-.btn-success {
-  background: #22B07D;
-  border-color: #22B07D;
-  color: #fff;
-
-  .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
-    color: white;
-  }
-}
-.btn-success:hover {
-  background: #179665;
-  border-color: #179665;
-}
-
 // iconos
 .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
   color: $primary-color;
@@ -143,4 +119,57 @@ $text-light: #666;
 @keyframes spin {
   from { transform: rotate(0); }
   to { transform: rotate(360deg); }
+}
+
+// Modal: estilos consistentes con Tutores
+.modal .modal-header {
+  background: $primary-color;
+  color: white;
+  .modal-title { font-weight: 600; }
+  .btn-close {
+    filter: invert(1) grayscale(100%);
+    opacity: 1;
+    &:hover { opacity: 0.85; }
+  }
+
+  .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+    color: white;
+  }
+}
+
+.modal .modal-content {
+  border-radius: $border-radius;
+  box-shadow: $shadow;
+}
+
+// Ajustar opacidad del backdrop para mejor contraste
+.modal-backdrop.show {
+  opacity: .6;
+  backdrop-filter: blur(2px);
+}
+
+// Asegurar superposición por encima de cualquier card/overlay local
+.modal { z-index: 1065; }
+.modal-backdrop { z-index: 1060; }
+
+// Asegurar contraste de etiquetas en el modal
+.modal .form-label { color: $text-dark-blue; }
+
+// Grid de permisos en dos columnas (responsivo)
+.perms-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .5rem .75rem;
+}
+
+.perms-grid .list-group-item {
+  display: flex;
+  align-items: center;
+  margin: 0; // evitar espacios verticales propios del list-group
+}
+
+@media (max-width: 576px) {
+  .perms-grid {
+    grid-template-columns: 1fr; // una columna en móviles
+  }
 }

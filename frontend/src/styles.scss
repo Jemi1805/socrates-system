@@ -152,6 +152,10 @@ body {
     background-color: rgb(59, 173, 105) !important;
     border-color: rgb(78 201 127) !important;
     color: white !important;
+
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+        color: white !important;
+    }
 }
 
 .btn {
