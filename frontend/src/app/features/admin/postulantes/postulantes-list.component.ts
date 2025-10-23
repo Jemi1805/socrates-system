@@ -1615,7 +1615,7 @@ private cargarPostulanteDesdeBD() {
           descripcion: m.descripcion || '',
           icono: this.getIconForModalidad(m?.nombre ?? m?.id),
           monto_arancel: (m.monto_arancel !== undefined && m.monto_arancel !== null
-            ? String(Number(m.monto_arancel))
+            ? String(m.monto_arancel).trim()
             : undefined),
         }));
         this.loadingModalidades = false;
@@ -1654,8 +1654,8 @@ private cargarPostulanteDesdeBD() {
           const mId = Number(mod.id);
           const fromCatalog = (this.modalidades || []).find(m => Number(m.id) === mId) || null;
           const monto = (mod.monto_arancel !== undefined && mod.monto_arancel !== null)
-            ? String(Number(mod.monto_arancel))
-            : (fromCatalog?.monto_arancel !== undefined ? String(fromCatalog.monto_arancel as any) : undefined);
+            ? String(mod.monto_arancel).trim()
+            : (fromCatalog?.monto_arancel !== undefined ? String(fromCatalog.monto_arancel ?? '').trim() : undefined);
           const desc = (mod.descripcion && String(mod.descripcion).trim() !== '')
             ? String(mod.descripcion)
             : (fromCatalog?.descripcion || '');
@@ -1675,7 +1675,9 @@ private cargarPostulanteDesdeBD() {
               nombre: found.nombre,
               descripcion: found.descripcion || '',
               icono: this.getIconForModalidad(found?.nombre ?? found?.id),
-              monto_arancel: (found.monto_arancel !== undefined && found.monto_arancel !== null) ? String(found.monto_arancel as any) : undefined,
+              monto_arancel: (found.monto_arancel !== undefined && found.monto_arancel !== null)
+                ? String(found.monto_arancel ?? '').trim()
+                : undefined,
             } : null;
           } else {
             this.modalidad = null;

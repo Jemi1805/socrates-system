@@ -23,9 +23,28 @@ class InscripModalidadController extends CrudController
 {
     protected $modelClass = InscripModalidad::class;
 
-    public function index()
+    public function index(Request $request)
     {
-        return parent::index();
+        $query = InscripModalidad::query();
+
+        if ($request->filled('cod_ceta_est')) {
+            $query->where('cod_ceta_est', (int) $request->query('cod_ceta_est'));
+        }
+
+        if ($request->filled('modalidad_id')) {
+            $query->where('modalidad_id', (int) $request->query('modalidad_id'));
+        }
+
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->query('estado'));
+        }
+
+        $perPage = (int) $request->query('per_page', 15);
+        if ($perPage <= 0) {
+            $perPage = 15;
+        }
+
+        return $query->paginate($perPage);
     }
     /**
      * Sanitiza números de serie/resoluciones: permite solo A-Z, 0-9, guion -, comillas dobles " y símbolo °, y devuelve en MAYÚSCULAS.
