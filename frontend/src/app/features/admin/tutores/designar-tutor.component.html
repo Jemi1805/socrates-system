@@ -8,6 +8,12 @@
   </app-header>
 
   <div class="content-wrapper">
+    <div class="d-flex justify-content-start mb-3" *ngIf="lastDesignation">
+      <button type="button" class="btn btn-success btn-sm d-flex align-items-center gap-2" (click)="volverAModalidadGraduacion()">
+        <i class="bi bi-arrow-left"></i>
+        Volver
+      </button>
+    </div>
     <!-- Resumen de estudiante y tema -->
     <div class="modalidad-card mb-3">
       <div class="card-body">
@@ -50,13 +56,6 @@
               </div>
             </div>
           </div>
-        </div>
-        <!-- Controles de designación -->
-        <div class="d-flex justify-content-end mt-3 gap-2" *ngIf="lastDesignation">
-          <button type="button" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2" (click)="volverAModalidadGraduacion()">
-            <i class="bi bi-arrow-left"></i>
-            Volver
-          </button>
         </div>
       </div>
     </div>
