@@ -16,8 +16,10 @@ class DesignacionTutor extends Model
         'cod_ceta',
         'proyecto_id',
         'user_id',
+        'user_name',
         'fecha_designacion',
         'convocatoria_id',
+        'convocatoria_nom',
         'estudiante_nombre',
         'tutor_nombre',
     ];

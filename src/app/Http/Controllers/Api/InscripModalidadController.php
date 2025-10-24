@@ -23,8 +23,9 @@ class InscripModalidadController extends CrudController
 {
     protected $modelClass = InscripModalidad::class;
 
-    public function index(Request $request)
+    public function index()
     {
+        $request = request();
         $query = InscripModalidad::query();
 
         if ($request->filled('cod_ceta_est')) {

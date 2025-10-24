@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use App\Models\Tutor;
 use App\Models\PertinenciaAcad;
@@ -288,6 +289,10 @@ class TutorController extends Controller
             'tutor_id' => 'required|integer|exists:tutores,id',
             'cod_ceta' => 'required|integer|exists:postulantes,cod_ceta',
             'proyecto_id' => 'nullable|integer|exists:proyecto,id',
+            'convocatoria_id' => 'nullable|integer|exists:convocatorias,id',
+            'convocatoria_nom' => 'nullable|string|max:150',
+            'user_id' => 'nullable|integer',
+            'user_name' => 'nullable|string|max:150',
         ]);
 
         if ($validator->fails()) {
@@ -299,6 +304,34 @@ class TutorController extends Controller
         }
 
         $data = $validator->validated();
+
+        $userIdFromPayload = isset($data['user_id']) ? (int) $data['user_id'] : null;
+        unset($data['user_id']);
+
+        $authUser = $request->user();
+        $authUserId = $userIdFromPayload ?? ($authUser ? (int) $authUser->id : null);
+        if ($authUserId !== null) {
+            $existsUser = DB::table('users')->where('id', $authUserId)->exists();
+            if (!$existsUser) {
+                $authUserId = null;
+            }
+        }
+        $authUserName = null;
+        if ($authUser) {
+            $authUserName = $authUser->nombre_usuario ?? $authUser->name ?? ($authUser->email ?? null);
+            if (!$authUserName) {
+                $resolvedName = DB::table('usuario')
+                    ->where('id', $authUser->id)
+                    ->value(DB::raw("TRIM(CONCAT(IFNULL(nombre,''),' ',IFNULL(apellido_p,''),' ',IFNULL(apellido_m,'')))"));
+                if ($resolvedName) {
+                    $authUserName = trim($resolvedName);
+                }
+            }
+        }
+
+        if (!empty($data['user_name'])) {
+            $authUserName = $data['user_name'];
+        }
 
         DB::beginTransaction();
         try {
@@ -322,19 +355,32 @@ class TutorController extends Controller
             $estNombre = $p ? trim(implode(' ', array_filter([$p->nombres_est, $p->ap_pat, $p->ap_mat]))) : null;
             $tutNombre = $t ? trim(implode(' ', array_filter([$t->nombre, $t->apellido_p, $t->apellido_m]))) : null;
 
+            $updateData = [
+                'proyecto_id' => (isset($data['proyecto_id']) ? $data['proyecto_id'] : null),
+                'fecha_designacion' => $now->toDateString(),
+                'convocatoria_id' => isset($data['convocatoria_id']) ? $data['convocatoria_id'] : null,
+                'convocatoria_nom' => isset($data['convocatoria_nom']) ? $data['convocatoria_nom'] : null,
+                'tutor_nombre' => $tutNombre,
+                'estudiante_nombre' => $estNombre,
+                'updated_at' => $now,
+                'created_at' => $now,
+            ];
+
+            if ($authUserId !== null) {
+                $updateData['user_id'] = $authUserId;
+            } else {
+                $updateData['user_id'] = null;
+            }
+            if ($authUserName !== null) {
+                $updateData['user_name'] = $authUserName;
+            }
+
             DB::table('designacion_tutor')->updateOrInsert(
                 [
                     'tutor_id' => $data['tutor_id'],
                     'cod_ceta' => $data['cod_ceta'],
                 ],
-                [
-                    'proyecto_id' => (isset($data['proyecto_id']) ? $data['proyecto_id'] : null),
-                    'fecha_designacion' => $now->toDateString(),
-                    'tutor_nombre' => $tutNombre,
-                    'estudiante_nombre' => $estNombre,
-                    'updated_at' => $now,
-                    'created_at' => $now,
-                ]
+                $updateData
             );
 
             $row = DB::table('designacion_tutor')
@@ -350,6 +396,10 @@ class TutorController extends Controller
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
+            Log::error('Error al designar tutor', [
+                'payload' => $request->all(),
+                'exception' => $e->getMessage(),
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Error al designar tutor',

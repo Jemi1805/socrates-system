@@ -404,7 +404,7 @@ export class SgaService {
   }
 
   // --- TUTORES: designación ---
-  designarTutor(data: { tutor_id: number; cod_ceta: number; proyecto_id?: number }): Observable<ApiResponse<any>> {
+  designarTutor(data: { tutor_id: number; cod_ceta: number; proyecto_id?: number; convocatoria_id?: number; convocatoria_nom?: string }): Observable<ApiResponse<any>> {
     return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/tutores/designar`, data)
       .pipe(catchError(this.handleError));
   }

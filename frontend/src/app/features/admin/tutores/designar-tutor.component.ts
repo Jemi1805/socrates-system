@@ -3,8 +3,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
-import { SgaService, Pertinencia, TutorReg, Convocatoria } from '../../../shared/services/sga.service';
+import { SgaService, Pertinencia, TutorReg, Convocatoria, InscripModalidad, ApiResponse } from '../../../shared/services/sga.service';
 import { ProyectoService } from '../proyectos/proyecto.service';
+import { LoadingService } from '../../../core/services/loading.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-designar-tutor',
@@ -19,6 +21,8 @@ export class DesignarTutorComponent implements OnInit {
   proyecto: any = null;
   codCeta: string | null = null;
   carreraKey: 'mecanica' | 'electricidad' | null = null;
+  inscripcion: InscripModalidad | null = null;
+  private inscripcionFetchCod: number | null = null;
 
   // Áreas (pertinencias)
   areas: Pertinencia[] = [];
@@ -35,6 +39,8 @@ export class DesignarTutorComponent implements OnInit {
   showConfirmModal = false;
   selectedTutor: TutorReg | null = null;
   lastDesignation: any = null;
+  showResumenDesignacion = true;
+  showSeleccionTutores = true;
   convocatorias: Convocatoria[] = [];
   selectedConvocatoriaId: number | null = null;
   confirmConvocatoriaNombre: string | null = null;
@@ -47,15 +53,37 @@ export class DesignarTutorComponent implements OnInit {
     private router: Router,
     private sga: SgaService,
     private proyectoService: ProyectoService,
+    private loadingService: LoadingService,
+    private auth: AuthService,
   ) {}
 
   ngOnInit(): void {
+    this.auth.me().subscribe({
+      error: () => {}
+    });
     // Recuperar contexto de sessionStorage si existe
     try {
       const dp = sessionStorage.getItem('datos_postulacion');
       if (dp) {
         const parsed = JSON.parse(dp);
         this.estudiante = parsed?.estudiante || null;
+        this.inscripcion = (parsed?.inscripcion as InscripModalidad) || null;
+        this.lastDesignation = parsed?.last_designation
+          || parsed?.designacion
+          || parsed?.lastDesignation
+          || null;
+        if (!this.inscripcion) {
+          const ins = (this.estudiante as any)?.inscripcion
+            || parsed?.inscripcion_modalidad
+            || parsed?.inscripcionModalidad
+            || parsed?.inscripcionModalidadActual;
+          if (ins) {
+            this.inscripcion = ins as InscripModalidad;
+          }
+        }
+        if (this.estudiante && this.inscripcion) {
+          this.estudiante = { ...this.estudiante, inscripcion: this.inscripcion };
+        }
       }
       const pc = sessionStorage.getItem('proyecto_cache');
       if (pc) {
@@ -63,12 +91,22 @@ export class DesignarTutorComponent implements OnInit {
       }
     } catch {}
 
+    if (this.lastDesignation) {
+      this.showResumenDesignacion = true;
+      this.showSeleccionTutores = false;
+    } else {
+      this.showResumenDesignacion = false;
+    }
+
     // Tomar query params (cod_ceta, carrera)
     this.route.queryParamMap.subscribe(params => {
       const cod = params.get('cod_ceta');
       const carr = params.get('carrera');
       this.codCeta = cod;
       this.carreraKey = this.normalizeCarreraKey(carr || (this.estudiante?.carrera || this.estudiante?.carrera_nombre)) || 'mecanica';
+
+      const codNumeric = cod ? Number(cod) : this.estudiante?.cod_ceta ? Number(this.estudiante.cod_ceta) : null;
+      this.fetchInscripcionForCod(codNumeric);
 
       // Si no hay proyecto cache, intentar traerlo por código
       if (!this.proyecto && cod) {
@@ -86,16 +124,10 @@ export class DesignarTutorComponent implements OnInit {
   private loadConvocatorias() {
     this.sga.getConvocatorias({ per_page: 100 }).subscribe({
       next: (resp) => {
-        const raw = (resp?.data ?? resp?.items ?? resp) as any;
+        const raw = (resp?.data ?? resp) as any;
         const list = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
         this.convocatorias = list as Convocatoria[];
-        if (!this.selectedConvocatoriaId) {
-          const convId = (this.estudiante as any)?.inscripcion?.convocatoria_id
-            ?? this.inscripcionConvocatoriaIdFromStorage();
-          if (convId) {
-            this.selectedConvocatoriaId = Number(convId);
-          }
-        }
+        this.syncSelectedConvocatoriaWithConvocatorias();
       },
       error: () => {
         this.convocatorias = [];
@@ -108,8 +140,15 @@ export class DesignarTutorComponent implements OnInit {
       const raw = sessionStorage.getItem('datos_postulacion');
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      const ins = parsed?.inscripcion;
+      const ins = parsed?.inscripcion
+        || parsed?.inscripcion_modalidad
+        || parsed?.inscripcionModalidad
+        || parsed?.inscripcionModalidadActual
+        || (parsed?.estudiante && parsed.estudiante.inscripcion);
       if (ins && ins.convocatoria_id) return Number(ins.convocatoria_id);
+      const conv = parsed?.convocatoria_id ?? parsed?.convocatoriaId
+        ?? parsed?.convocatoria?.id ?? parsed?.convocatoria?.convocatoria_id;
+      if (conv) return Number(conv);
       return null;
     } catch {
       return null;
@@ -177,6 +216,79 @@ export class DesignarTutorComponent implements OnInit {
     return undefined;
   }
 
+  private fetchInscripcionForCod(cod: number | null) {
+    if (!cod) {
+      this.syncSelectedConvocatoriaWithConvocatorias();
+      return;
+    }
+    if (this.inscripcionFetchCod === cod && this.inscripcion) {
+      this.syncSelectedConvocatoriaWithConvocatorias();
+      return;
+    }
+    this.inscripcionFetchCod = cod;
+    this.sga.getInscripModalidadByPostulante(cod).subscribe({
+      next: (resp: ApiResponse<InscripModalidad[]>) => {
+        const base = resp?.data ?? resp;
+        const list = Array.isArray(base) ? base : Array.isArray((base as any)?.data) ? (base as any).data : [];
+        if (Array.isArray(list) && list.length) {
+          const active = list.find((item: any) => String(item?.estado || '').toLowerCase() === 'inscrito')
+            || list.find((item: any) => item?.es_activo)
+            || list[0];
+          if (active) {
+            this.inscripcion = active as InscripModalidad;
+            const convId = (active as any)?.convocatoria_id ?? (active as any)?.convocatoriaId;
+            if (convId) {
+              this.selectedConvocatoriaId = Number(convId);
+            }
+            if (this.estudiante) {
+              const currentIns = (this.estudiante as any).inscripcion || {};
+              this.estudiante = { ...this.estudiante, inscripcion: { ...currentIns, ...active } };
+            }
+          }
+        }
+        this.syncSelectedConvocatoriaWithConvocatorias();
+      },
+      error: () => {
+        this.syncSelectedConvocatoriaWithConvocatorias();
+      }
+    });
+  }
+
+  private syncSelectedConvocatoriaWithConvocatorias() {
+    const candidate = this.selectedConvocatoriaId
+      ?? (this.inscripcion as any)?.convocatoria_id
+      ?? (this.estudiante as any)?.inscripcion?.convocatoria_id
+      ?? this.inscripcionConvocatoriaIdFromStorage();
+
+    if (candidate) {
+      const matched = this.convocatorias.find(c => Number(c.id) === Number(candidate));
+      if (matched) {
+        this.selectedConvocatoriaId = Number(matched.id);
+      } else {
+        this.selectedConvocatoriaId = Number(candidate);
+      }
+    }
+
+    if (!this.selectedConvocatoriaId && this.convocatorias.length) {
+      const fallback = this.convocatorias.find(c => c.es_activo) || this.convocatorias[0];
+      if (fallback?.id != null) {
+        this.selectedConvocatoriaId = Number(fallback.id);
+      }
+    }
+  }
+
+  private formatConvocatoriaLabel(conv: any): string {
+    if (!conv) return '';
+    const numero = conv?.numero_convocatoria ?? conv?.numero ?? conv?.numeroConvocatoria ?? conv?.convocatoria_numero;
+    const nombreRaw = conv?.nombre ?? conv?.convocatoria_nom ?? conv?.titulo ?? '';
+    const nombre = typeof nombreRaw === 'string' ? nombreRaw.trim() : nombreRaw;
+    if (numero && nombre) return `${numero} - ${nombre}`;
+    if (numero) return `Convocatoria ${numero}`;
+    if (nombre) return String(nombre);
+    const anio = conv?.anio ?? conv?.gestion;
+    return anio ? `Convocatoria ${anio}` : '';
+  }
+
   // Acción de designar (placeholder para futura integración)
   public designarTutor(t: TutorReg) {
     if (!t || (!this.codCeta && !this.estudiante?.cod_ceta)) {
@@ -185,13 +297,22 @@ export class DesignarTutorComponent implements OnInit {
     }
     this.selectedTutor = t;
     this.confirmArea = this.areasText(t);
-    const convId = this.selectedConvocatoriaId
-      ?? (this.estudiante as any)?.inscripcion?.convocatoria_id
-      ?? this.inscripcionConvocatoriaIdFromStorage();
-    this.selectedConvocatoriaId = convId ? Number(convId) : null;
-    this.confirmConvocatoriaNombre = this.convocatorias.find(c => Number(c.id) === this.selectedConvocatoriaId)?.nombre || null;
+    this.syncSelectedConvocatoriaWithConvocatorias();
+    const convRow = this.convocatorias.find(c => Number(c.id) === this.selectedConvocatoriaId) || null;
+    if (convRow) {
+      this.confirmConvocatoriaNombre = this.formatConvocatoriaLabel(convRow);
+    } else {
+      const storedLabel = (this.inscripcion as any)?.convocatoria_nom || (this.inscripcion as any)?.nom_convocatoria;
+      this.confirmConvocatoriaNombre = storedLabel ? String(storedLabel) : null;
+    }
     this.tutorPertinenciaIds = this.extraerPertinenciaIds(t);
-    this.selectedPertinenciaId = this.tutorPertinenciaIds.length ? Number(this.tutorPertinenciaIds[0]) : null;
+    const selectedSet = new Set((this.selectedAreaIds || []).map(id => Number(id)));
+    const preferred = this.tutorPertinenciaIds.find(id => selectedSet.has(Number(id)));
+    if (preferred !== undefined) {
+      this.selectedPertinenciaId = Number(preferred);
+    } else {
+      this.selectedPertinenciaId = this.tutorPertinenciaIds.length ? Number(this.tutorPertinenciaIds[0]) : null;
+    }
     this.showConfirmModal = true;
   }
 
@@ -205,23 +326,69 @@ export class DesignarTutorComponent implements OnInit {
     const payload: any = { tutor_id: Number(this.selectedTutor.id), cod_ceta: cod, proyecto_id: proyectoId };
     if (this.selectedConvocatoriaId) {
       payload.convocatoria_id = Number(this.selectedConvocatoriaId);
+      const convRow = this.convocatorias.find(c => Number(c.id) === Number(this.selectedConvocatoriaId));
+      if (convRow) {
+        payload.convocatoria_nom = this.formatConvocatoriaLabel(convRow);
+      } else if (this.confirmConvocatoriaNombre) {
+        payload.convocatoria_nom = this.confirmConvocatoriaNombre;
+      }
     }
-    if (this.selectedPertinenciaId) {
-      payload.pertinencia_id = Number(this.selectedPertinenciaId);
+    const user = this.auth.getUser();
+    const resolvedName = user?.nombre_usuario
+      || [user?.nombre, user?.apellido_p, user?.apellido_m].filter(Boolean).join(' ').trim()
+      || user?.email
+      || null;
+    if (resolvedName) {
+      payload.user_name = resolvedName;
+    }
+    const resolvedUserId = this.resolveUserId(user);
+    if (resolvedUserId !== null) {
+      payload.user_id = resolvedUserId;
     }
     this.isSaving = true;
+    this.loadingService.showModal();
     this.sga.designarTutor(payload).subscribe({
       next: (resp) => {
         this.isSaving = false;
         this.showConfirmModal = false;
+        this.loadingService.hideModal();
         if (resp?.success) {
           this.lastDesignation = resp?.data || null;
+          if (this.lastDesignation) {
+            const areaLabel = this.confirmArea || (this.selectedTutor ? this.areasText(this.selectedTutor) : null);
+            if (areaLabel) {
+              (this.lastDesignation as any).area = areaLabel;
+            }
+            if (!this.lastDesignation.convocatoria_nom && payload.convocatoria_nom) {
+              this.lastDesignation.convocatoria_nom = payload.convocatoria_nom;
+            }
+            if (!this.lastDesignation.tutor_nombre && this.selectedTutor) {
+              this.lastDesignation.tutor_nombre = [
+                this.selectedTutor.nombre,
+                this.selectedTutor.apellido_p,
+                this.selectedTutor.apellido_m,
+              ].filter(Boolean).join(' ').trim();
+            }
+            if (!this.lastDesignation.cod_ceta && cod) {
+              this.lastDesignation.cod_ceta = cod;
+            }
+            if (!this.lastDesignation.user_name && resolvedName) {
+              this.lastDesignation.user_name = resolvedName;
+            }
+            if (!this.lastDesignation.user_id && resolvedUserId !== null) {
+              this.lastDesignation.user_id = resolvedUserId;
+            }
+          }
+          this.persistLastDesignation(this.lastDesignation);
           this.showSuccessModal = true;
+          this.showResumenDesignacion = true;
+          this.showSeleccionTutores = false;
         }
       },
       error: (err) => {
         this.isSaving = false;
         this.showConfirmModal = false;
+        this.loadingService.hideModal();
         alert('No se pudo designar el tutor. ' + (err?.message || ''));
       }
     });
@@ -231,6 +398,10 @@ export class DesignarTutorComponent implements OnInit {
     this.showConfirmModal = false;
     this.selectedTutor = null;
     this.selectedPertinenciaId = null;
+  }
+
+  public volverAModalidadGraduacion() {
+    this.router.navigate(['/modalidad-graduacion']);
   }
 
   // Texto de áreas mostrado en la tabla
@@ -290,5 +461,47 @@ export class DesignarTutorComponent implements OnInit {
 
   public closeSuccessModal() {
     this.showSuccessModal = false;
+  }
+
+  public clearSavedDesignation() {
+    this.lastDesignation = null;
+    this.persistLastDesignation(null);
+    this.showResumenDesignacion = false;
+    this.showSeleccionTutores = true;
+  }
+
+  public reopenDesignacion() {
+    this.selectedTutor = null;
+    this.showConfirmModal = false;
+    this.confirmArea = null;
+    this.confirmConvocatoriaNombre = null;
+    this.showResumenDesignacion = false;
+    this.showSeleccionTutores = true;
+  }
+
+  private resolveUserId(user: any): number | null {
+    if (!user) return null;
+    const candidates = [user.id, user.user_id, user.usuario_id];
+    for (const value of candidates) {
+      if (value === null || value === undefined) continue;
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  }
+
+  private persistLastDesignation(designation: any | null) {
+    try {
+      const raw = sessionStorage.getItem('datos_postulacion');
+      const parsed = raw ? JSON.parse(raw) : {};
+      if (designation) {
+        parsed.last_designation = designation;
+      } else {
+        delete parsed.last_designation;
+        delete parsed.lastDesignation;
+        delete parsed.designacion;
+      }
+      sessionStorage.setItem('datos_postulacion', JSON.stringify(parsed));
+    } catch {}
   }
 }

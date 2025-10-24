@@ -51,77 +51,118 @@
             </div>
           </div>
         </div>
+        <!-- Controles de designación -->
+        <div class="d-flex justify-content-end mt-3 gap-2" *ngIf="lastDesignation">
+          <button type="button" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2" (click)="volverAModalidadGraduacion()">
+            <i class="bi bi-arrow-left"></i>
+            Volver
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- Filtro por Áreas (Pertinencias) -->
-    <div class="modalidad-card mb-3">
+    <div class="modalidad-card mb-3" *ngIf="lastDesignation && showResumenDesignacion">
       <div class="card-body">
         <h5 class="card-title d-flex align-items-center gap-2">
-          <i class="bi bi-diagram-3"></i>
-          Filtrar por Áreas
+          <i class="bi bi-person-check-fill text-success"></i>
+          Designación actual
         </h5>
-        <div class="row g-2 align-items-center">
-          <div class="col-12">
-            <div class="d-flex flex-wrap gap-3">
-              <label class="form-check" *ngFor="let a of areas">
-                <input class="form-check-input me-1" type="checkbox" [checked]="selectedAreaIds.includes(a.id)" (change)="onToggleArea($event, a.id)" />
-                <span class="form-check-label">{{ a.nombre_pert }}</span>
-              </label>
+        <div class="row g-3">
+          <div class="col-12 col-md-4">
+            <strong>Tutor</strong>
+            <div class="text">{{ lastDesignation?.tutor_nombre || lastDesignation?.tutor?.nombre_completo || '-' }}</div>
+          </div>
+          <div class="col-12 col-md-4">
+            <strong>Área</strong>
+            <div class="text">{{ lastDesignation?.area || '-' }}</div>
+          </div>
+          <div class="col-12 col-md-4">
+            <strong>Convocatoria</strong>
+            <div class="text">{{ lastDesignation?.convocatoria_nom || 'Sin especificar' }}</div>
+          </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <button class="btn btn-sm btn-outline-primary" type="button" (click)="reopenDesignacion()">
+            <i class="bi bi-arrow-repeat me-1"></i>
+            Cambiar tutor
+          </button>
+          <button class="btn btn-sm btn-danger" type="button" (click)="clearSavedDesignation()">
+            <i class="bi bi-x-circle me-1"></i>
+            Quitar designación
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <ng-container *ngIf="showSeleccionTutores">
+      <!-- Selección de tutor -->
+      <div class="modalidad-card mb-3">
+        <div class="card-body">
+          <h5 class="card-title d-flex align-items-center gap-2">
+            <i class="bi bi-diagram-3"></i>
+            Filtrar por Áreas
+          </h5>
+          <div class="row g-2 align-items-center">
+            <div class="col-12">
+              <div class="d-flex flex-wrap gap-3">
+                <label class="form-check" *ngFor="let a of areas">
+                  <input class="form-check-input me-1" type="checkbox" [checked]="selectedAreaIds.includes(a.id)" (change)="onToggleArea($event, a.id)" />
+                  <span class="form-check-label">{{ a.nombre_pert }}</span>
+                </label>
+              </div>
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearAreas()"><i class="bi bi-x-circle me-1"></i> Limpiar selección</button>
             </div>
           </div>
-          <div class="col-12 d-flex justify-content-end">
-            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearAreas()"><i class="bi bi-x-circle me-1"></i> Limpiar selección</button>
+        </div>
+      </div>
+
+      <div class="student-table-card">
+        <div class="card-body">
+          <h5 class="card-title d-flex align-items-center gap-2">
+            <i class="bi bi-people"></i>
+            Tutores disponibles
+          </h5>
+          <p><i class="bi bi-info-circle me-2"></i> Seleccione un tutor para el postulante</p>
+          <div *ngIf="loadingTutores" class="text-muted small"><i class="bi bi-arrow-repeat spin me-1"></i> Cargando tutores...</div>
+          <div class="table-responsive" *ngIf="!loadingTutores && filteredTutores.length">
+            <table class="table table-sm table-striped align-middle">
+              <thead class="table-dark">
+                <tr>
+                  <th>Nombres</th>
+                  <th>Ap. Paterno</th>
+                  <th>Ap. Materno</th>
+                  <th>CI</th>
+                  <th>Celular</th>
+                  <th>Carrera</th>
+                  <th>Áreas</th>
+                  <th class="text-end">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let t of filteredTutores">
+                  <td>{{ t.nombre }}</td>
+                  <td>{{ t.apellido_p || '-' }}</td>
+                  <td>{{ t.apellido_m || '-' }}</td>
+                  <td>{{ t.ci }}</td>
+                  <td>{{ t.celular || '-' }}</td>
+                  <td>{{ t.cod_carrera }}</td>
+                  <td>{{ areasText(t) }}</td>
+                  <td class="text-end">
+                    <button class="btn btn-sm btn-success" [disabled]="isSaving" (click)="designarTutor(t)">
+                      <i class="bi" [ngClass]="isSaving ? 'bi-arrow-repeat spin' : 'bi-check2-circle'"></i>
+                      <span class="ms-1">{{ isSaving ? 'Guardando...' : 'Designar' }}</span>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
+          <div *ngIf="!loadingTutores && !filteredTutores.length" class="text-muted small">Sin tutores que coincidan con el filtro.</div>
         </div>
       </div>
-    </div>
-
-    <!-- Tutores filtrados -->
-    <div class="student-table-card">
-      <div class="card-body">
-        <h5 class="card-title d-flex align-items-center gap-2">
-          <i class="bi bi-people"></i>
-          Tutores registrados
-        </h5>
-        <div *ngIf="loadingTutores" class="text-muted small"><i class="bi bi-arrow-repeat spin me-1"></i> Cargando tutores...</div>
-        <div class="table-responsive" *ngIf="!loadingTutores && filteredTutores.length">
-          <table class="table table-sm table-striped align-middle">
-            <thead class="table-dark">
-              <tr>
-                <th>Nombres</th>
-                <th>Ap. Paterno</th>
-                <th>Ap. Materno</th>
-                <th>CI</th>
-                <th>Celular</th>
-                <th>Carrera</th>
-                <th>Áreas</th>
-                <th class="text-end">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let t of filteredTutores">
-                <td>{{ t.nombre }}</td>
-                <td>{{ t.apellido_p || '-' }}</td>
-                <td>{{ t.apellido_m || '-' }}</td>
-                <td>{{ t.ci }}</td>
-                <td>{{ t.celular || '-' }}</td>
-                <td>{{ t.cod_carrera }}</td>
-                <td>{{ areasText(t) }}</td>
-                <td class="text-end">
-                  <button class="btn btn-sm btn-success" [disabled]="isSaving" (click)="designarTutor(t)">
-                    <i class="bi" [ngClass]="isSaving ? 'bi-arrow-repeat spin' : 'bi-check2-circle'"></i>
-                    <span class="ms-1">{{ isSaving ? 'Guardando...' : 'Designar' }}</span>
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div *ngIf="!loadingTutores && !filteredTutores.length" class="text-muted small">Sin tutores que coincidan con el filtro.</div>
-      </div>
-    </div>
-
+    </ng-container>
   </div>
 </div>
 
@@ -150,19 +191,19 @@
             <div class="text-muted small" *ngIf="selectedTutor?.ci">CI: {{ selectedTutor?.ci }}</div>
           </div>
           <div class="mb-3" *ngIf="confirmArea">
-            <strong>Área sugerida:</strong>
+            <strong>Áreas del tutor:</strong>
             <div class="text-muted small">{{ confirmArea }}</div>
           </div>
           <div class="row g-3">
             <div class="col-12 col-md-6">
-              <label class="form-label">Convocatoria</label>
+              <strong class="form-label">Convocatoria:</strong>
               <select class="form-select" [(ngModel)]="selectedConvocatoriaId" name="convocatoriaSelect">
                 <option [ngValue]="null">Sin convocatoria</option>
                 <option *ngFor="let conv of convocatorias" [ngValue]="conv.id">{{ conv.nombre }} ({{ conv.anio }})</option>
               </select>
             </div>
             <div class="col-12 col-md-6">
-              <label class="form-label">Pertinencia</label>
+              <strong class="form-label">Pertinencia:</strong>
               <select class="form-select" [(ngModel)]="selectedPertinenciaId" name="pertinenciaSelect">
                 <option [ngValue]="null">Selecciona pertinencia</option>
                 <option *ngFor="let pertId of tutorPertinenciaIds" [ngValue]="pertId">
@@ -175,9 +216,8 @@
         </div>
         <div class="mt-3 d-flex justify-content-end gap-2 m-2">
           <button class="btn btn-success btn-sm d-flex align-items-center gap-2" type="submit" [disabled]="isSaving" (click)="confirmarDesignacion()">
-            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" *ngIf="isSaving"></span>
-            <i class="bi bi-check2-circle" *ngIf="!isSaving"></i>
-            {{ isSaving ? 'Guardando...' : 'Confirmar designación' }}
+            <i class="bi" [ngClass]="isSaving ? 'bi-hourglass-split' : 'bi-check2-circle'"></i>
+            <span>{{ isSaving ? 'Guardando...' : 'Confirmar designación' }}</span>
           </button>
           <button class="btn btn-outline-secondary btn-sm" type="button" (click)="cancelarConfirmacion()">
             Cancelar

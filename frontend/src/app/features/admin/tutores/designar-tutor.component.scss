@@ -137,6 +137,10 @@ $transition: all 0.3s ease;
   }
 }
 
+.modal .modal-dialog {
+  max-width: 560px;
+}
+
 .modal .modal-content {
   border-radius: $border-radius;
   box-shadow: $shadow;

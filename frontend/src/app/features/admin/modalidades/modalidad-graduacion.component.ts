@@ -60,9 +60,11 @@ export class ModalidadGraduacionComponent implements OnInit {
   loadingInscripcion = false;
 
   // Inscripción actual (si ya está inscrito en alguna modalidad)
-  inscripcionActual: { modalidad_id: number; nombre: string; estado?: string; fecha_inscripcion?: string; aranceles_completos?: boolean | number | string } | null = null;
+  inscripcionActual: { modalidad_id: number; nombre: string; estado?: string; fecha_inscripcion?: string; aranceles_completos?: boolean | number | string; convocatoria_nom?: string | null } | null = null;
   // Proyecto/Tema actual si existe
   proyectoActual: { id?: number; nombre?: string; estado?: string; objetivo?: string; tipo?: string; created_at?: string } | null = null;
+  // Última designación de tutor (si existe)
+  lastDesignation: { tutor_nombre?: string; area?: string; convocatoria_nom?: string; fecha_designacion?: string; tutor?: { nombre_completo?: string } | null } | null = null;
 
   // Validaciones
   private readonly CETA_REGEX = /^\d{9}$/; // exactamente 9 dígitos
@@ -171,6 +173,60 @@ export class ModalidadGraduacionComponent implements OnInit {
       catchError(() => { this.proyectoActual = null; return of(void 0); }),
       map(() => void 0)
     );
+  }
+
+  private formatConvocatoriaLabel(conv: any): string {
+    if (!conv) return '';
+    const numero = conv?.numero_convocatoria ?? conv?.numero ?? conv?.numeroConvocatoria ?? conv?.convocatoria_numero;
+    const nombreRaw = conv?.nombre ?? conv?.convocatoria_nom ?? conv?.titulo ?? '';
+    const nombre = typeof nombreRaw === 'string' ? nombreRaw.trim() : nombreRaw;
+    if (numero && nombre) return `${numero} - ${nombre}`;
+    if (numero) return `Convocatoria ${numero}`;
+    if (nombre) return String(nombre);
+    const anio = conv?.anio ?? conv?.gestion;
+    return anio ? `Convocatoria ${anio}` : '';
+  }
+
+  private normalizeCodCeta(value: any): string {
+    if (value === null || value === undefined) return '';
+    return String(value).trim();
+  }
+
+  private getEstudianteCodCeta(est?: any): string {
+    const src: any = est ?? this.estudiante;
+    if (!src || typeof src !== 'object') return '';
+    return this.normalizeCodCeta(src.cod_ceta ?? src.codCeta ?? src.codigo_ceta ?? src.cod_ceta_est);
+  }
+
+  private updateLastDesignationFromSession(cod?: string | number) {
+    try {
+      const raw = sessionStorage.getItem('datos_postulacion');
+      if (!raw) {
+        this.lastDesignation = null;
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      const stored = parsed?.last_designation || parsed?.designacion || parsed?.lastDesignation || null;
+      if (!stored) {
+        this.lastDesignation = null;
+        return;
+      }
+      let expectedCod = this.normalizeCodCeta(cod);
+      if (!expectedCod) {
+        expectedCod = this.getEstudianteCodCeta();
+      }
+      if (!expectedCod && parsed?.estudiante) {
+        expectedCod = this.getEstudianteCodCeta(parsed.estudiante);
+      }
+      const storedCod = this.normalizeCodCeta(stored?.cod_ceta ?? stored?.codCeta ?? stored?.cod_ceta_est);
+      if (expectedCod && storedCod && expectedCod !== storedCod) {
+        this.lastDesignation = null;
+        return;
+      }
+      this.lastDesignation = stored;
+    } catch {
+      this.lastDesignation = null;
+    }
   }
 
   // --- Utilidades de mapeo/merge ---
@@ -540,6 +596,8 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.modalidadSeleccionada = null;
     // No cargar inscripción aquí; se hará en seleccionarEstudianteYAbrirModal
     this.inscripcionActual = null;
+    const cod = (estudiante as any)?.cod_ceta || (estudiante as any)?.codCeta || (estudiante as any)?.codigo_ceta;
+    this.updateLastDesignationFromSession(cod);
   }
 
   seleccionarEstudianteYAbrirModal(estudiante: Estudiante) {
@@ -588,7 +646,8 @@ export class ModalidadGraduacionComponent implements OnInit {
     // Guardar datos en sessionStorage para pasarlos a postulantes
     const datosPostulacion = {
       estudiante: this.estudiante,
-      modalidad: this.modalidadSeleccionada
+      modalidad: this.modalidadSeleccionada,
+      last_designation: this.lastDesignation
     };
     sessionStorage.setItem('datos_postulacion', JSON.stringify(datosPostulacion));
     
@@ -611,7 +670,8 @@ export class ModalidadGraduacionComponent implements OnInit {
       : null;
     const datosPostulacion = {
       estudiante: this.estudiante,
-      modalidad: modalidad
+      modalidad: modalidad,
+      last_designation: this.lastDesignation
     };
     try {
       sessionStorage.setItem('datos_postulacion', JSON.stringify(datosPostulacion));
@@ -627,7 +687,7 @@ export class ModalidadGraduacionComponent implements OnInit {
     const modalidad = this.inscripcionActual
       ? { id: this.inscripcionActual.modalidad_id, nombre: this.inscripcionActual.nombre, descripcion: '', monto_arancel: '' }
       : null;
-    const datosPostulacion = { estudiante: this.estudiante, modalidad };
+    const datosPostulacion = { estudiante: this.estudiante, modalidad, last_designation: this.lastDesignation };
     try {
       sessionStorage.setItem('datos_postulacion', JSON.stringify(datosPostulacion));
       // Persistir un cache de proyecto actual (si existe) para hidratar inmediatamente el resumen
@@ -646,7 +706,7 @@ export class ModalidadGraduacionComponent implements OnInit {
     const modalidad = this.inscripcionActual
       ? { id: this.inscripcionActual.modalidad_id, nombre: this.inscripcionActual.nombre, descripcion: '', monto_arancel: '' }
       : null;
-    const datosPostulacion = { estudiante: this.estudiante, modalidad };
+    const datosPostulacion = { estudiante: this.estudiante, modalidad, last_designation: this.lastDesignation };
     try {
       sessionStorage.setItem('datos_postulacion', JSON.stringify(datosPostulacion));
       if (this.proyectoActual) {
@@ -657,6 +717,23 @@ export class ModalidadGraduacionComponent implements OnInit {
     const carreraKey = this.normalizeCarreraKey(((this.estudiante as any)?.carrera || (this.estudiante as any)?.carrera_nombre) ?? this.carreraSeleccionada) || this.carreraSeleccionada as any;
     this.cerrarModal();
     this.router.navigate(['/tutores/designar'], { queryParams: { cod_ceta: cod, carrera: carreraKey } });
+  }
+
+  verSeguimientoDesignacion() {
+    if (!this.estudiante || !this.lastDesignation) return;
+    const modalidad = this.inscripcionActual
+      ? { id: this.inscripcionActual.modalidad_id, nombre: this.inscripcionActual.nombre, descripcion: '', monto_arancel: '' }
+      : null;
+    const datosPostulacion = { estudiante: this.estudiante, modalidad, last_designation: this.lastDesignation };
+    try {
+      sessionStorage.setItem('datos_postulacion', JSON.stringify(datosPostulacion));
+      if (this.proyectoActual) {
+        sessionStorage.setItem('proyecto_cache', JSON.stringify(this.proyectoActual));
+      }
+    } catch {}
+    const cod = (this.estudiante as any)?.cod_ceta || (this.estudiante as any)?.codCeta || (this.estudiante as any)?.codigo_ceta;
+    this.cerrarModal();
+    this.router.navigate(['/tutores/designaciones'], { queryParams: { cod_ceta: cod } });
   }
 
   // --- Helpers de validación/sanitización ---
@@ -805,16 +882,18 @@ export class ModalidadGraduacionComponent implements OnInit {
             modalidad_id: Number(mod.id || mod.modalidad_id || 0),
             nombre: mod.nombre || '',
             estado: res?.estado || undefined,
-            fecha_inscripcion: res?.fecha_inscripcion || undefined
+            fecha_inscripcion: res?.fecha_inscripcion || undefined,
+            convocatoria_nom: (res?.convocatoria_nom || this.formatConvocatoriaLabel(res?.convocatoria)) || undefined
           };
         } else if (res?.modalidad_id) {
           const mid = Number(res.modalidad_id);
-          const found = (this.modalidades || []).find(m => m.id === mid);
+          const found = (this.modalidades || []).find(m => m.id === mid) || null;
           this.inscripcionActual = {
             modalidad_id: mid,
             nombre: found?.nombre || 'Modalidad #' + mid,
             estado: res?.estado || undefined,
-            fecha_inscripcion: res?.fecha_inscripcion || undefined
+            fecha_inscripcion: res?.fecha_inscripcion || undefined,
+            convocatoria_nom: res?.convocatoria_nom || undefined
           };
         } else {
           this.inscripcionActual = null;
@@ -841,6 +920,10 @@ export class ModalidadGraduacionComponent implements OnInit {
                 const ok = (v === true || v === 1 || v === '1');
                 // Solo actualizar el flag si ya existe una inscripción real
                 this.inscripcionActual = { ...this.inscripcionActual, aranceles_completos: ok } as any;
+              }
+              const convNom = row?.convocatoria_nom || row?.nom_convocatoria || row?.inscripcion?.convocatoria_nom;
+              if (convNom && this.inscripcionActual) {
+                this.inscripcionActual = { ...this.inscripcionActual, convocatoria_nom: convNom } as any;
               }
             } catch {}
           }),
