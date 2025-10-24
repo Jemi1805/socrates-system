@@ -284,4 +284,16 @@ export class PostulanteService {
     const body = { cod_ceta_est: codCeta, ...payload } as any;
     return this.http.post<any>(`${this.baseUrl}/inscrip_modalidad/upsert_by_cod`, body);
   }
+
+  getInscritos(params: { per_page?: number; carrera?: string; estado?: string; search?: string } = {}): Observable<any> {
+    let httpParams = new HttpParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && `${value}`.trim() !== '') {
+        httpParams = httpParams.set(key, String(value));
+      }
+    });
+    const root = this.baseUrl.replace(/\/+$/, '').replace(/\/postulantes$/i, '');
+    const url = `${root}/postulantes/inscritos`;
+    return this.http.get<any>(url, { params: httpParams });
+  }
 }

@@ -188,6 +188,83 @@
       </div>
     </div>
 
+    <!-- Tabla inicial con postulantes ya inscritos -->
+    <div *ngIf="mostrarTablaInscritos" class="student-table-card">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+          <h5 class="card-title mb-0 d-flex align-items-center gap-2">
+            <i class="bi bi-people-fill text-success"></i>
+            Postulantes inscritos ({{ postulantesInscritos.length }})
+          </h5>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2"
+            (click)="cargarPostulantesInscritos()"
+            [disabled]="loadingInscritos">
+            <i class="bi" [ngClass]="loadingInscritos ? 'bi-arrow-clockwise spin' : 'bi-arrow-repeat'"></i>
+            Actualizar lista
+          </button>
+        </div>
+
+        <div *ngIf="!loadingInscritos && postulantesInscritos.length === 0" class="alert alert-info mb-0">
+          <i class="bi bi-info-circle me-2"></i>
+          No hay postulantes inscritos registrados en la base de datos local.
+        </div>
+
+        <div *ngIf="loadingInscritos" class="text-center py-4 text-muted">
+          <i class="bi bi-arrow-clockwise spin fs-4 me-2"></i>
+          Cargando postulantes inscritos...
+        </div>
+
+        <div class="table-responsive" *ngIf="!loadingInscritos && postulantesInscritos.length > 0">
+          <table class="table table-hover align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th scope="col">Código CETA</th>
+                <th scope="col">Nombre completo</th>
+                <th scope="col">CI</th>
+                <th scope="col">Carrera</th>
+                <th scope="col">Modalidad</th>
+                <th scope="col">Fecha inscripción</th>
+                <th scope="col" class="text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let ins of postulantesInscritos">
+                <td>{{ ins.cod_ceta }}</td>
+                <td>
+                  {{ ins.ap_pat }} {{ ins.ap_mat }} {{ ins.nombres_est }}
+                </td>
+                <td>
+                  <span *ngIf="ins.ci; else sinCi">{{ ins.ci }} {{ ins.procedencia || '' }}</span>
+                  <ng-template #sinCi>
+                    <span class="text-muted">Sin CI registrado</span>
+                  </ng-template>
+                </td>
+                <td>{{ getCarreraLabel(ins) || '-' }}</td>
+                <td>{{ ins.modo || '-' }}</td>
+                <td>
+                  <span *ngIf="ins.fecha_inscripcion; else sinFecha">{{ getFechaInscripcion(ins) }}</span>
+                  <ng-template #sinFecha>
+                    <span class="text-muted">-</span>
+                  </ng-template>
+                </td>
+                <td class="text-center">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-success text-white d-inline-flex align-items-center gap-2"
+                    (click)="seleccionarInscrito(ins)">
+                    <i class="bi bi-check2-circle"></i>
+                    Seleccionar
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- Tabla de estudiantes encontrados (mostrar aunque siga cargando SGA) -->
     <div *ngIf="estudiantes.length > 0" class="student-table-card">
       <div class="card-body">

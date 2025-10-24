@@ -6,12 +6,103 @@ use App\Models\Postulante;
 use App\Models\InscripModalidad;
 use App\Models\Modalidad;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PostulanteController extends Controller
 {
     public function index()
     {
         return Postulante::all();
+    }
+
+    public function inscritos(Request $request)
+    {
+        $perPage = (int) $request->query('per_page', 25);
+        if ($perPage <= 0) {
+            $perPage = 25;
+        }
+
+        $estado = $request->query('estado', 'Inscrito');
+        $carrera = $request->query('carrera');
+        $search = trim((string) $request->query('search', ''));
+
+        $latestInscripciones = DB::table('inscrip_modalidad')
+            ->select('cod_ceta_est', DB::raw('MAX(id) as last_id'))
+            ->groupBy('cod_ceta_est');
+
+        $query = Postulante::query()
+            ->select([
+                'postulantes.cod_ceta',
+                'postulantes.nombres_est',
+                'postulantes.ap_pat',
+                'postulantes.ap_mat',
+                'postulantes.ci',
+                'postulantes.procedencia',
+                'postulantes.carrera',
+                'inscrip_modalidad.modalidad_id',
+                'inscrip_modalidad.modalidad_nom',
+                'inscrip_modalidad.estado',
+                'inscrip_modalidad.fecha_inscripcion',
+            ])
+            ->joinSub($latestInscripciones, 'latest_insc', function ($join) {
+                $join->on('latest_insc.cod_ceta_est', '=', 'postulantes.cod_ceta');
+            })
+            ->join('inscrip_modalidad', function ($join) {
+                $join->on('inscrip_modalidad.id', '=', 'latest_insc.last_id');
+            });
+
+        if ($estado !== null && $estado !== '') {
+            $query->where('inscrip_modalidad.estado', $estado);
+        }
+
+        if ($carrera) {
+            $normalized = $this->normalizeCarrera($carrera);
+            if ($normalized) {
+                $query->where(function ($q) use ($normalized) {
+                    $q->whereRaw('LOWER(postulantes.carrera) = ?', [$normalized])
+                        ->orWhereRaw('LOWER(postulantes.carrera_nombre) = ?', [$normalized]);
+                });
+            }
+        }
+
+        if ($search !== '') {
+            $like = '%' . mb_strtolower($search, 'UTF-8') . '%';
+            $query->where(function ($q) use ($like) {
+                $q->whereRaw('LOWER(postulantes.nombres_est) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(postulantes.ap_pat) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(postulantes.ap_mat) LIKE ?', [$like])
+                    ->orWhereRaw('CAST(postulantes.cod_ceta AS CHAR) LIKE ?', [$like]);
+            });
+        }
+
+        $query->orderByDesc('inscrip_modalidad.fecha_inscripcion');
+
+        return $query->paginate($perPage);
+    }
+
+    private function normalizeCarrera($carrera)
+    {
+        if (empty($carrera)) {
+            return null;
+        }
+
+        $normalized = trim(mb_strtolower($carrera));
+        $map = [
+            'mecanica' => 'mecanica',
+            'mecánica' => 'mecanica',
+            'mecanica automotriz' => 'mecanica',
+            'mecánica automotriz' => 'mecanica',
+            'mea' => 'mecanica',
+            'electricidad' => 'electricidad',
+            'electricidad y electrónica automotriz' => 'electricidad',
+            'electricidad y electronica automotriz' => 'electricidad',
+            'electronica' => 'electricidad',
+            'electrónica' => 'electricidad',
+            'eléctrica' => 'electricidad',
+            'eea' => 'electricidad',
+        ];
+
+        return $map[$normalized] ?? $normalized;
     }
 
     public function store(Request $request)

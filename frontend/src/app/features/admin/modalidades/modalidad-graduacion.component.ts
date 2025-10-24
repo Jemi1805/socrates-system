@@ -2,7 +2,7 @@ import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { tap, catchError, finalize, map, switchMap } from 'rxjs/operators';
 
-import { CommonModule } from '@angular/common';
+import { CommonModule, formatDate } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
@@ -11,6 +11,19 @@ import { PostulanteService } from '../postulantes/postulante.service';
 import { Postulante } from '../postulantes/postulante.model';
 import { ProyectoService } from '../proyectos/proyecto.service';
 import { LoadingService } from '../../../core/services/loading.service';
+
+interface PostulanteInscrito {
+  cod_ceta: number;
+  nombres_est: string;
+  ap_pat: string;
+  ap_mat: string;
+  ci?: string | null;
+  procedencia?: string | null;
+  modo?: string | null;
+  fecha_inscripcion?: string | null;
+  estado?: string | null;
+  carrera?: string | null;
+}
 
 interface ModalidadGraduacion {
   id: number;
@@ -46,6 +59,10 @@ export class ModalidadGraduacionComponent implements OnInit {
   estudiantes: Estudiante[] = [];
   estudianteEncontrado = false;
   estudiantesEncontrados = false;
+
+  postulantesInscritos: PostulanteInscrito[] = [];
+  loadingInscritos = false;
+  tablaInscritosVisible = true;
   
   // Modalidades de graduación
   modalidades: ModalidadGraduacion[] = [];
@@ -81,6 +98,121 @@ export class ModalidadGraduacionComponent implements OnInit {
 
   ngOnInit() {
     this.cargarModalidades();
+    this.cargarPostulantesInscritos();
+  }
+
+  cargarPostulantesInscritos() {
+    this.loadingInscritos = true;
+    this.postulanteService.getInscritos({ per_page: 200 }).subscribe({
+      next: (resp: any) => {
+        const payload = resp?.data ?? resp;
+        const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+        this.postulantesInscritos = rows.map((row: any) => ({
+          cod_ceta: Number(row?.cod_ceta_est ?? row?.cod_ceta ?? row?.codCeta ?? 0),
+          nombres_est: row?.nombres_est ?? row?.nombres ?? '',
+          ap_pat: row?.ap_pat ?? row?.apellido_p ?? '',
+          ap_mat: row?.ap_mat ?? row?.apellido_m ?? '',
+          ci: row?.ci ?? row?.ci_est ?? null,
+          procedencia: row?.procedencia ?? row?.expedido ?? null,
+          modo: row?.modalidad_nom ?? row?.modalidad ?? null,
+          fecha_inscripcion: row?.fecha_inscripcion ?? row?.created_at ?? null,
+          estado: row?.estado ?? null,
+          carrera: row?.carrera ?? row?.carrera_nombre ?? null,
+        })).filter((row: PostulanteInscrito) => !!row.cod_ceta);
+        this.loadingInscritos = false;
+      },
+      error: () => {
+        this.loadingInscritos = false;
+      }
+    });
+  }
+
+  private mapInscritoToEstudiante(p: PostulanteInscrito): Estudiante {
+    const carreraKey = this.normalizeCarreraKey(p.carrera || null);
+    const carreraLabel = this.formatCarreraLabel(carreraKey);
+    return {
+      cod_ceta: String(p.cod_ceta),
+      ap_pat: p.ap_pat || '',
+      ap_mat: p.ap_mat || '',
+      nombres: p.nombres_est || '',
+      ci: p.ci || '',
+      procedencia: p.procedencia || '',
+      carrera: carreraLabel,
+      fecha_nacimiento: undefined,
+      lugar_nacimiento: undefined,
+      pensum: undefined,
+    };
+  }
+
+  private formatCarreraLabel(key: string | null | undefined): string {
+    switch (key) {
+      case 'electricidad':
+        return 'Electricidad y Electrónica Automotriz';
+      case 'mecanica':
+        return 'Mecánica Automotriz';
+      default:
+        return key ? this.capitalizarPalabras(key) : '';
+    }
+  }
+
+  private formatFechaInscripcion(value?: string | null): string {
+    if (!value) {
+      return '-';
+    }
+    const raw = value.trim();
+    if (!raw) {
+      return '-';
+    }
+
+    const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+    const date = new Date(normalized);
+    if (!isNaN(date.getTime())) {
+      try {
+        return formatDate(date, 'dd/MM/yyyy HH:mm', 'es-BO', 'UTC-04:00');
+      } catch {}
+    }
+
+    const [fechaPart, timePart] = raw.split(/[T ]/);
+    if (fechaPart) {
+      const [y, m, d] = fechaPart.split('-');
+      if (y && m && d) {
+        const hora = (timePart || '').slice(0, 5);
+        const horaLabel = hora ? ` ${hora}` : '';
+        return `${d}/${m}/${y}${horaLabel}`;
+      }
+    }
+    return raw;
+  }
+
+  get mostrarTablaInscritos(): boolean {
+    if (!this.tablaInscritosVisible) {
+      return false;
+    }
+    if (this.loading) {
+      return false;
+    }
+    if (this.estudiantesEncontrados || this.estudiantes.length > 0) {
+      return false;
+    }
+    return true;
+  }
+
+  seleccionarInscrito(postulante: PostulanteInscrito) {
+    const estudiante = this.mapInscritoToEstudiante(postulante);
+    const carreraKey = this.normalizeCarreraKey(postulante.carrera || null);
+    if (carreraKey) {
+      this.carreraSeleccionada = carreraKey;
+    }
+    this.tablaInscritosVisible = false;
+    this.seleccionarEstudianteYAbrirModal(estudiante);
+  }
+
+  getCarreraLabel(ins: PostulanteInscrito): string {
+    return this.formatCarreraLabel(this.normalizeCarreraKey(ins.carrera || null));
+  }
+
+  getFechaInscripcion(ins: PostulanteInscrito): string {
+    return this.formatFechaInscripcion(ins.fecha_inscripcion);
   }
 
   // --- Proyecto/Tema existente ---
@@ -318,6 +450,7 @@ export class ModalidadGraduacionComponent implements OnInit {
       return;
     }
 
+    this.tablaInscritosVisible = false;
     this.loading = true;
     this.error = '';
     this.estudiante = null;
@@ -457,6 +590,7 @@ export class ModalidadGraduacionComponent implements OnInit {
       return;
     }
 
+    this.tablaInscritosVisible = false;
     this.loading = true;
     this.error = '';
     this.estudiante = null;
@@ -791,6 +925,10 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.error = '';
     this.intentoBusqueda = false;
     this.inscripcionActual = null;
+    this.tablaInscritosVisible = true;
+    if (!this.loadingInscritos && (!this.postulantesInscritos || this.postulantesInscritos.length === 0)) {
+      this.cargarPostulantesInscritos();
+    }
   }
 
   registrarNuevoPostulante() {
