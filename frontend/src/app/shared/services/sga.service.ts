@@ -11,6 +11,28 @@ export interface Rol {
   nombre: string;
 }
 
+export interface TutorDesignacionItem {
+  tutor_id: number;
+  tutor_ci: string | null;
+  tutor_nombre: string;
+  tutor_celular: string | null;
+  tutor_titulo: string | null;
+  cod_carrera: string | null;
+  carrera_nombre: string | null;
+  tipo_tutor_id: number | null;
+  tipo_tutor_nombre: string | null;
+  convocatoria_id: number | null;
+  convocatoria_label: string | null;
+  total_estudiantes: number;
+  estudiantes: Array<{
+    cod_ceta: number;
+    estudiante_nombre: string | null;
+    proyecto_id: number | null;
+    proyecto_nombre: string | null;
+    fecha_designacion: string | null;
+  }>;
+}
+
 export interface Usuario {
   id: number;
   nombre?: string;
@@ -143,6 +165,7 @@ export interface Convocatoria {
   updated_at?: string;
   inscripciones_count?: number;
   designaciones_tutor_count?: number;
+  convocatoria_nom?: string;
 }
 
 export interface Proyecto {
@@ -406,6 +429,21 @@ export class SgaService {
   // --- TUTORES: designación ---
   designarTutor(data: { tutor_id: number; cod_ceta: number; proyecto_id?: number; convocatoria_id?: number; convocatoria_nom?: string }): Observable<ApiResponse<any>> {
     return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/tutores/designar`, data)
+      .pipe(catchError(this.handleError));
+  }
+
+  getTutoresDesignados(params?: Record<string, any>): Observable<ApiResponse<TutorDesignacionItem[]>> {
+    let httpParams = new HttpParams();
+    if (params) {
+      Object.keys(params).forEach((key) => {
+        const val = params[key];
+        if (val !== undefined && val !== null && val !== '') {
+          httpParams = httpParams.set(key, val);
+        }
+      });
+    }
+    return this.http
+      .get<ApiResponse<TutorDesignacionItem[]>>(`${environment.apiUrl}/tutores/designaciones`, { params: httpParams })
       .pipe(catchError(this.handleError));
   }
 

@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
-import { SgaService, Docente, ApiResponse, Pertinencia, TutorReg, TutorTipo } from '../../../shared/services/sga.service';
+import { SgaService, Docente, ApiResponse, Pertinencia, TutorReg, TutorTipo, Convocatoria, TutorDesignacionItem } from '../../../shared/services/sga.service';
 import { forkJoin } from 'rxjs';
 
 @Component({
@@ -69,12 +69,96 @@ export class TutoresHomeComponent implements OnInit {
   // Filtro de carrera (MEA/EEA) para el panel de "Tutores registrados"
   carreraFiltroCode: string | null = null;
   skipFirstPertFocus = false;
+  // Tutores designados
+  showDesignados: boolean = false;
+  loadingDesignados: boolean = false;
+  errorDesignados: string | null = null;
+  designados: TutorDesignacionItem[] = [];
+  designadosConvocatorias: Convocatoria[] = [];
+  loadingConvocatoriasDesignados: boolean = false;
+  selectedConvocatoriaDesignados: number | null = null;
+  designadosSearchTerm: string = '';
 
   constructor(private sga: SgaService, private router: Router) {}
 
   ngOnInit(): void {
     this.loadPertinencias();
     this.loadTutorTipos();
+  }
+
+  toggleDesignados() {
+    const newVal = !this.showDesignados;
+    this.showDesignados = newVal;
+    if (newVal) {
+      this.showImport = false;
+      this.showRegistrados = false;
+      this.ensureDesignadosConvocatorias();
+      this.loadDesignados();
+    } else {
+      this.errorDesignados = null;
+    }
+  }
+
+  onDesignadosConvocatoriaChange() {
+    this.loadDesignados();
+  }
+
+  onDesignadosSearchEnter() {
+    this.loadDesignados();
+  }
+
+  clearDesignadosFilters() {
+    this.designadosSearchTerm = '';
+    this.selectedConvocatoriaDesignados = null;
+    this.loadDesignados();
+  }
+
+  get totalDesignaciones(): number {
+    return this.designados.reduce((acc, item) => acc + (item?.total_estudiantes || 0), 0);
+  }
+
+  private ensureDesignadosConvocatorias() {
+    if (this.designadosConvocatorias.length || this.loadingConvocatoriasDesignados) {
+      return;
+    }
+    this.loadingConvocatoriasDesignados = true;
+    this.sga.getConvocatorias({ per_page: 100 }).subscribe({
+      next: (resp) => {
+        const raw = (resp as any)?.data ?? resp;
+        const list = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
+        this.designadosConvocatorias = list as Convocatoria[];
+        this.loadingConvocatoriasDesignados = false;
+      },
+      error: () => {
+        this.designadosConvocatorias = [];
+        this.loadingConvocatoriasDesignados = false;
+      }
+    });
+  }
+
+  loadDesignados() {
+    if (!this.showDesignados) return;
+    this.loadingDesignados = true;
+    this.errorDesignados = null;
+    const params: Record<string, any> = {};
+    if (this.selectedConvocatoriaDesignados != null) {
+      params['convocatoria_id'] = this.selectedConvocatoriaDesignados;
+    }
+    if (this.designadosSearchTerm && this.designadosSearchTerm.trim()) {
+      params['search'] = this.designadosSearchTerm.trim();
+    }
+    this.sga.getTutoresDesignados(params).subscribe({
+      next: (resp) => {
+        const rows = (resp as any)?.data ?? resp;
+        this.designados = Array.isArray(rows) ? rows as TutorDesignacionItem[] : [];
+        this.loadingDesignados = false;
+      },
+      error: (err) => {
+        this.loadingDesignados = false;
+        this.designados = [];
+        this.errorDesignados = err?.message || 'Error al cargar tutores designados';
+      }
+    });
   }
 
   // -------- Multiselect Pertinencias (UI) --------
@@ -470,6 +554,7 @@ export class TutoresHomeComponent implements OnInit {
     if (newVal) {
       // Mostrar Importar -> ocultar panel de registrados
       this.showRegistrados = false;
+      this.showDesignados = false;
     } else {
       // Limpia estado al ocultar
       this.errorDocentes = null;

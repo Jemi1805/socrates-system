@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use App\Models\Tutor;
 use App\Models\PertinenciaAcad;
 use App\Models\TipoTutor;
+use App\Models\DesignacionTutor;
 
 class TutorController extends Controller
 {
@@ -76,6 +77,165 @@ class TutorController extends Controller
             'data' => $data,
             'total' => $data->count(),
         ]);
+    }
+
+    /**
+     * Listado de tutores designados agrupados por tutor y filtrables por convocatoria.
+     */
+    public function designaciones(Request $request)
+    {
+        $convocatoriaId = $request->query('convocatoria_id');
+        $search = trim((string)$request->query('search', ''));
+
+        $query = DesignacionTutor::query()
+            ->leftJoin('tutores', 'designacion_tutor.tutor_id', '=', 'tutores.id')
+            ->leftJoin('tipo_tutor', 'tutores.tipo_tutor_id', '=', 'tipo_tutor.id')
+            ->leftJoin('postulantes', 'designacion_tutor.cod_ceta', '=', 'postulantes.cod_ceta')
+            ->leftJoin('convocatorias', 'designacion_tutor.convocatoria_id', '=', 'convocatorias.id')
+            ->leftJoin('carrera', 'tutores.cod_carrera', '=', 'carrera.cod_carrera')
+            ->leftJoin('proyecto', 'designacion_tutor.proyecto_id', '=', 'proyecto.id')
+            ->select([
+                'designacion_tutor.id as designacion_id',
+                'designacion_tutor.tutor_id',
+                'designacion_tutor.cod_ceta',
+                'designacion_tutor.proyecto_id',
+                'designacion_tutor.fecha_designacion',
+                'designacion_tutor.convocatoria_id',
+                'designacion_tutor.convocatoria_nom as designacion_convocatoria_nom',
+                'designacion_tutor.estudiante_nombre as designacion_estudiante_nom',
+                'designacion_tutor.tutor_nombre as designacion_tutor_nom',
+                'tutores.nombre as tutor_nombre',
+                'tutores.apellido_p as tutor_apellido_p',
+                'tutores.apellido_m as tutor_apellido_m',
+                'tutores.celular as tutor_celular',
+                'tutores.cod_carrera',
+                'tutores.ci as tutor_ci',
+                'tutores.titulo as tutor_titulo',
+                'tipo_tutor.id as tipo_tutor_id',
+                'tipo_tutor.nombre as tipo_tutor_nombre',
+                'postulantes.nombres_est as postulante_nombres',
+                'postulantes.ap_pat as postulante_ap_pat',
+                'postulantes.ap_mat as postulante_ap_mat',
+                DB::raw("TRIM(CONCAT(IFNULL(postulantes.ap_pat,''),' ',IFNULL(postulantes.ap_mat,''),' ',IFNULL(postulantes.nombres_est,''))) AS postulante_nombre_completo"),
+                'convocatorias.nombre as convocatoria_nombre',
+                'convocatorias.numero_convocatoria as convocatoria_numero',
+                'convocatorias.anio as convocatoria_anio',
+                'convocatorias.es_activo as convocatoria_activo',
+                'carrera.nombre_carrera as carrera_nombre',
+                'proyecto.nombre as proyecto_nombre',
+            ])
+            ->orderBy('tutores.nombre')
+            ->orderBy('tutores.apellido_p')
+            ->orderBy('tutores.apellido_m')
+            ->orderBy('designacion_tutor.fecha_designacion', 'desc');
+
+        if ($convocatoriaId !== null && $convocatoriaId !== '') {
+            $query->where('designacion_tutor.convocatoria_id', (int)$convocatoriaId);
+        }
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $like = "%{$search}%";
+                $q->where('tutores.nombre', 'like', $like)
+                    ->orWhere('tutores.apellido_p', 'like', $like)
+                    ->orWhere('tutores.apellido_m', 'like', $like)
+                    ->orWhere('designacion_tutor.tutor_nombre', 'like', $like);
+            });
+        }
+
+        $rows = $query->get();
+
+        if ($rows->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+                'total' => 0,
+            ]);
+        }
+
+        $grouped = [];
+
+        foreach ($rows as $row) {
+            $tutorId = (isset($row->tutor_id) && $row->tutor_id !== null) ? (int)$row->tutor_id : 0;
+            if (!$tutorId) {
+                continue;
+            }
+
+            if (!isset($grouped[$tutorId])) {
+                $fullTutorName = $row->designacion_tutor_nom
+                    ?: trim(implode(' ', array_filter([$row->tutor_nombre, $row->tutor_apellido_p, $row->tutor_apellido_m])));
+
+                $convLabel = $this->formatConvocatoriaLabel(
+                    $row->designacion_convocatoria_nom,
+                    $row->convocatoria_numero,
+                    $row->convocatoria_nombre,
+                    $row->convocatoria_anio
+                );
+
+                $grouped[$tutorId] = [
+                    'tutor_id' => $tutorId,
+                    'tutor_ci' => $row->tutor_ci,
+                    'tutor_nombre' => $fullTutorName,
+                    'tutor_celular' => $row->tutor_celular,
+                    'tutor_titulo' => $row->tutor_titulo,
+                    'cod_carrera' => $row->cod_carrera,
+                    'carrera_nombre' => $row->carrera_nombre,
+                    'tipo_tutor_id' => $row->tipo_tutor_id ? (int)$row->tipo_tutor_id : null,
+                    'tipo_tutor_nombre' => $row->tipo_tutor_nombre,
+                    'convocatoria_id' => $row->convocatoria_id ? (int)$row->convocatoria_id : null,
+                    'convocatoria_label' => $convLabel,
+                    'estudiantes' => [],
+                ];
+            }
+
+            $estudianteNombre = $row->designacion_estudiante_nom ?: $row->postulante_nombre_completo;
+
+            $grouped[$tutorId]['estudiantes'][] = [
+                'cod_ceta' => $row->cod_ceta,
+                'estudiante_nombre' => $estudianteNombre,
+                'proyecto_id' => $row->proyecto_id,
+                'proyecto_nombre' => $row->proyecto_nombre,
+                'fecha_designacion' => $row->fecha_designacion,
+            ];
+        }
+
+        $data = array_values(array_map(function ($item) {
+            $item['total_estudiantes'] = count($item['estudiantes']);
+            return $item;
+        }, $grouped));
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+            'total' => count($data),
+        ]);
+    }
+
+    private function formatConvocatoriaLabel($fromDesignation, $numero, $nombre, $anio)
+    {
+        $fromDesignation = is_null($fromDesignation) ? '' : (string)$fromDesignation;
+        if ($fromDesignation !== '' && trim($fromDesignation) !== '') {
+            return trim($fromDesignation);
+        }
+
+        $numeroStr = $numero !== null ? trim((string)$numero) : '';
+        $nombreStr = $nombre !== null ? trim((string)$nombre) : '';
+        $anioStr = $anio !== null ? trim((string)$anio) : '';
+
+        if ($numeroStr !== '' && $nombreStr !== '') {
+            return $numeroStr . ' - ' . $nombreStr;
+        }
+        if ($numeroStr !== '') {
+            return 'Convocatoria ' . $numeroStr;
+        }
+        if ($nombreStr !== '') {
+            return $nombreStr;
+        }
+        if ($anioStr !== '') {
+            return 'Convocatoria ' . $anioStr;
+        }
+
+        return null;
     }
     /**
      * Registrar/actualizar tutores en lote (directamente en tabla tutores).
@@ -309,7 +469,9 @@ class TutorController extends Controller
         unset($data['user_id']);
 
         $authUser = $request->user();
-        $authUserId = $userIdFromPayload ?? ($authUser ? (int) $authUser->id : null);
+        $authUserId = $userIdFromPayload !== null
+            ? $userIdFromPayload
+            : ($authUser ? (int) $authUser->id : null);
         if ($authUserId !== null) {
             $existsUser = DB::table('users')->where('id', $authUserId)->exists();
             if (!$existsUser) {
@@ -318,7 +480,13 @@ class TutorController extends Controller
         }
         $authUserName = null;
         if ($authUser) {
-            $authUserName = $authUser->nombre_usuario ?? $authUser->name ?? ($authUser->email ?? null);
+            if (!empty($authUser->nombre_usuario)) {
+                $authUserName = $authUser->nombre_usuario;
+            } elseif (!empty($authUser->name)) {
+                $authUserName = $authUser->name;
+            } elseif (!empty($authUser->email)) {
+                $authUserName = $authUser->email;
+            }
             if (!$authUserName) {
                 $resolvedName = DB::table('usuario')
                     ->where('id', $authUser->id)

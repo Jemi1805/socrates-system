@@ -157,6 +157,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Tutores: listado
     Route::get('tutores', [TutorController::class, 'index'])
         ->middleware('permission:tutores.leer');
+    Route::get('tutores/designaciones', [TutorController::class, 'designaciones'])
+        ->middleware('permission:tutores.leer');
     // Tutores: catálogo de tipos
     Route::get('tutores/tipos', [TutorController::class, 'tipos'])
         ->middleware('permission:tutores.leer');

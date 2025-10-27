@@ -34,6 +34,10 @@
           <i class="bi bi-people-fill me-1"></i>
           {{ showRegistrados ? 'Ocultar tutores' : 'Tutores registrados' }}
         </button>
+        <button class="btn btn-outline-secondary" (click)="toggleDesignados()">
+          <i class="bi bi-journal-text me-1"></i>
+          {{ showDesignados ? 'Ocultar designados' : 'Tutores designados' }}
+        </button>
       </div>
     </div>
   </div>
@@ -167,6 +171,100 @@
     </div>
   </div>
   <div class="modal-backdrop fade show" (click)="cerrarModalEditarDocente()"></div>
+  </div>
+
+  <!-- Lista de Tutores Designados -->
+  <div class="row g-3 align-items-start" *ngIf="showDesignados">
+    <div class="col-12">
+      <div class="card action-card">
+        <div class="card-body">
+          <h5 class="card-title d-flex align-items-center gap-2">
+            <i class="bi bi-journal-text text-primary"></i>
+            Tutores designados
+          </h5>
+
+          <div class="filters-bar d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+            <div class="d-flex align-items-end gap-2 flex-wrap">
+              <div class="d-flex flex-column">
+                <label class="form-label fw-semibold mb-1">Convocatoria</label>
+                <select class="form-select form-select-sm"
+                        [(ngModel)]="selectedConvocatoriaDesignados"
+                        (ngModelChange)="onDesignadosConvocatoriaChange()"
+                        [disabled]="loadingConvocatoriasDesignados">
+                  <option [ngValue]="null">Todas</option>
+                  <option *ngFor="let conv of designadosConvocatorias" [ngValue]="conv.id">
+                    {{ conv.numero_convocatoria ? conv.numero_convocatoria + ' - ' : '' }}{{ conv.nombre || conv.convocatoria_nom || 'Convocatoria' }}
+                  </option>
+                </select>
+              </div>
+              <div class="d-flex flex-column">
+                <label class="form-label mb-1 fw-semibold">Buscar tutor</label>
+                <div class="input-group input-group-sm">
+                  <input type="text" class="form-control" [(ngModel)]="designadosSearchTerm" (keyup.enter)="onDesignadosSearchEnter()" placeholder="Nombre del tutor" />
+                  <button class="btn btn-outline-secondary" (click)="onDesignadosSearchEnter()">
+                    <i class="bi bi-search"></i>
+                  </button>
+                </div>
+              </div>
+              <button class="btn btn-outline-secondary btn-sm" type="button" (click)="clearDesignadosFilters()">
+                <i class="bi bi-eraser me-1"></i>
+                Limpiar filtros
+              </button>
+            </div>
+            <div class="d-flex align-items-end gap-3">
+              <small class="text-muted">Total tutores: <strong>{{ designados?.length || 0 }}</strong></small>
+              <small class="text-muted">Total designaciones: <strong>{{ totalDesignaciones }}</strong></small>
+              <button class="btn btn-outline-secondary btn-sm" (click)="loadDesignados()" [disabled]="loadingDesignados">
+                <i class="bi" [ngClass]="loadingDesignados ? 'bi-arrow-repeat spin' : 'bi-arrow-clockwise'"></i>
+                {{ loadingDesignados ? 'Actualizando...' : 'Actualizar' }}
+              </button>
+            </div>
+          </div>
+
+          <div *ngIf="errorDesignados" class="alert alert-danger py-2">{{ errorDesignados }}</div>
+          <div *ngIf="loadingDesignados" class="text-muted small">Cargando tutores designados...</div>
+
+          <div class="table-responsive" *ngIf="!loadingDesignados && designados.length">
+            <table class="table table-sm table-striped align-middle">
+              <thead class="table-dark">
+                <tr>
+                  <th>Tutor</th>
+                  <th>Tipo</th>
+                  <th>Carrera</th>
+                  <th>Convocatoria</th>
+                  <th>Total estudiantes</th>
+                  <th>Estudiantes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let item of designados">
+                  <td>
+                    <div class="fw-semibold">{{ item.tutor_nombre }}</div>
+                  </td>
+                  <td>{{ item.tipo_tutor_nombre || '-' }}</td>
+                  <td>{{ item.carrera_nombre || item.cod_carrera || '-' }}</td>
+                  <td>{{ item.convocatoria_label || '—' }}</td>
+                  <td class="text-center">
+                    <span class="badge bg-primary">{{ item.total_estudiantes }}</span>
+                  </td>
+                  <td>
+                    <ul class="mb-0 ps-3">
+                      <li *ngFor="let est of item.estudiantes">
+                        <div>{{ est.estudiante_nombre || '-' }}</div>
+                      </li>
+                    </ul>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div *ngIf="!loadingDesignados && !designados.length && !errorDesignados" class="text-muted small">
+            Sin tutores designados que coincidan con los filtros.
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Lista de Tutores Registrados -->
