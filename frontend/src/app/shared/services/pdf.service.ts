@@ -20,8 +20,12 @@ export interface Fmdg1Data {
 
 export interface TutorDesignacionPdfData {
   tutorNombre: string;
+  tutorApellidoP?: string;
+  tutorApellidoM?: string;
+  tutorNombres?: string;
   tutorTipo?: string;
   tutorTitulo?: string;
+  tutorTituloAcademico?: string;
   tutorCi?: string;
   tutorCelular?: string;
   area?: string;
@@ -595,10 +599,49 @@ export class PdfService {
       const numero = normalizeNumber(data.numeroDocumento);
       return isMemorandum ? `CETA/DA/MEM/${year}/${numero}` : `CETA/DA/COMINT/${year}/${numero}`;
     })();
-    const tutorTitle = (() => {
-      const raw = (data.tutorTitulo || '').toString().trim();
-      if (!raw || /planta/i.test(raw)) return 'DOCENTE TÉCNICO';
-      return raw;
+    const tutorTitle = 'DOCENTE TÉCNICO';
+
+    const buildParaNombre = (): string | null => {
+      const tituloAcadRaw = (data.tutorTituloAcademico || '').toString().trim();
+      const tituloNormalized = tituloAcadRaw ? tituloAcadRaw.replace(/\.+$/, '').toUpperCase() : '';
+      const prefijo = tituloNormalized ? `${tituloNormalized}.` : '';
+      const parts: string[] = [];
+      if (prefijo) parts.push(prefijo);
+      const apP = (data.tutorApellidoP || '').toString().trim();
+      const apM = (data.tutorApellidoM || '').toString().trim();
+      let nombres = (data.tutorNombres || '').toString().trim();
+      if (!nombres && !apP && !apM) {
+        nombres = (data.tutorNombre || '').toString().trim();
+      } else if (!nombres) {
+        const fallback = (data.tutorNombre || '').toString().trim();
+        if (fallback) {
+          const tokens = fallback.split(/\s+/).filter(Boolean);
+          const surnames = new Set([apP.toLowerCase(), apM.toLowerCase()].filter(Boolean));
+          const filtered = tokens.filter(tok => !surnames.has(tok.toLowerCase()));
+          nombres = filtered.join(' ').trim();
+        }
+      }
+      if (apP) parts.push(apP);
+      if (apM) parts.push(apM);
+      if (nombres) parts.push(nombres);
+      const deduped: string[] = [];
+      const seen = new Set<string>();
+      parts.forEach(part => {
+        const norm = part.toLowerCase();
+        if (!seen.has(norm)) {
+          seen.add(norm);
+          deduped.push(part);
+        }
+      });
+      const joined = deduped.join(' ').replace(/\s+/g, ' ').trim();
+      return joined || null;
+    };
+
+    const resolvedParaNombre = (() => {
+      if (data.paraNombre && data.paraNombre.trim().length) {
+        return data.paraNombre.trim();
+      }
+      return buildParaNombre();
     })();
 
     const estudianteRows = (): TutorDesignacionEstudiante[] => {
@@ -870,14 +913,12 @@ export class PdfService {
     };
 
     // Sección "Para"
-    if (data.paraNombre || data.tutorNombre) {
-      const indent = drawLabelValue('Para:', (data.paraNombre || data.tutorNombre || ''), { uppercase: false, boldValue: false, labelWidthOverride: 24, tabStop: 25, labelBold: true, rightMargin: labelRightMargin });
-      const cargoLineRaw = tutorTitle || 'DOCENTE TÉCNICO';
+    if (resolvedParaNombre) {
+      const indent = drawLabelValue('Para:', resolvedParaNombre, { uppercase: false, boldValue: false, labelWidthOverride: 24, tabStop: 25, labelBold: true, rightMargin: labelRightMargin });
+      const cargoLineRaw = tutorTitle;
       const cargoLine = cargoLineRaw.replace(/\s+/g, ' ').trim();
       if (cargoLine) {
-        drawValueLine(cargoLine, { uppercase: false, bold: true, lineSpacing: 7, indent });
-      } else {
-        cursorY += 4;
+        drawLabelValue('', cargoLine.toUpperCase(), { uppercase: false, boldValue: true, indent, tabStop: 0, labelBold: false, rightMargin: labelRightMargin });
       }
     }
 

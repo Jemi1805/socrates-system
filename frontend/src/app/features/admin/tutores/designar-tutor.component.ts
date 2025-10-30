@@ -720,9 +720,7 @@ export class DesignarTutorComponent implements OnInit {
     const tutorTipo = (tutor as any)?.tipo_tutor || (tutor as any)?.tipo_tutor_nombre || null;
     const tutorCi = (tutor as any)?.ci || designation?.tutor_ci || null;
     const tutorCel = (tutor as any)?.celular || designation?.tutor_celular || null;
-    const tituloAcademico = (designation?.tutor_titulo || (tutor as any)?.titulo || '').toString().trim();
-    const paraNombreLinea = this.buildParaNombreLinea(tutor as TutorReg | null, tutorNombre);
-    const cargoDocente = 'Docente Técnico';
+    const tituloAcademico = (designation?.tutor_titulo_academico || (tutor as any)?.titulo_academico || (tutor as any)?.titulo || '').toString().trim();
     const estudianteCodigo = designation?.cod_ceta || this.codCeta || null;
     const carrera = designation?.carrera_nombre || this.estudiante?.carrera || this.proyecto?.carrera || null;
     const proyectoNombre = designation?.proyecto_nombre || this.proyecto?.nombre || null;
@@ -742,8 +740,12 @@ export class DesignarTutorComponent implements OnInit {
       const modalidadGeneral = this.modalidadNombre;
       await this.pdfService.generarDesignacionTutorPdf({
         tutorNombre,
+        tutorApellidoP: tutor?.apellido_p || undefined,
+        tutorApellidoM: tutor?.apellido_m || undefined,
+        tutorNombres: tutor?.nombre || undefined,
         tutorTipo: tutorTipo || undefined,
-        tutorTitulo: cargoDocente,
+        tutorTitulo: 'DOCENTE TÉCNICO',
+        tutorTituloAcademico: tituloAcademico || undefined,
         tutorCi: tutorCi || undefined,
         tutorCelular: tutorCel || undefined,
         area: area || undefined,
@@ -760,8 +762,8 @@ export class DesignarTutorComponent implements OnInit {
         numeroDocumento: numeroDocumento ? String(numeroDocumento) : undefined,
         cite: designation?.cite || undefined,
         formatoCodigo: '«F3»',
-        paraNombre: paraNombreLinea,
-        paraCargo: undefined,
+        paraNombre: undefined,
+        paraCargo: 'DOCENTE TÉCNICO',
         deNombre: 'Ing. Bradley Jailita Burgoa',
         deCargo: 'DIRECTOR ACADÉMICO',
         asunto: 'Designación como tutor para proyectos de defensa de grado',
