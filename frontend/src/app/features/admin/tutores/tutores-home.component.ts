@@ -4,6 +4,8 @@ import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
 import { SgaService, Docente, ApiResponse, Pertinencia, TutorReg, TutorTipo, Convocatoria, TutorDesignacionItem } from '../../../shared/services/sga.service';
+import { PdfService } from '../../../shared/services/pdf.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { forkJoin } from 'rxjs';
 
 @Component({
@@ -78,8 +80,9 @@ export class TutoresHomeComponent implements OnInit {
   loadingConvocatoriasDesignados: boolean = false;
   selectedConvocatoriaDesignados: number | null = null;
   designadosSearchTerm: string = '';
+  generatingDesignadoId: number | null = null;
 
-  constructor(private sga: SgaService, private router: Router) {}
+  constructor(private sga: SgaService, private router: Router, private pdfService: PdfService, private auth: AuthService) {}
 
   ngOnInit(): void {
     this.loadPertinencias();
@@ -134,6 +137,57 @@ export class TutoresHomeComponent implements OnInit {
         this.loadingConvocatoriasDesignados = false;
       }
     });
+  }
+
+  async generarPdfDesignado(item: TutorDesignacionItem) {
+    if (!item || this.generatingDesignadoId === item.tutor_id) {
+      return;
+    }
+    this.generatingDesignadoId = item.tutor_id;
+    try {
+      const estudiantes = item.estudiantes || [];
+      const firstEst = estudiantes[0] || {} as any;
+      const estudianteNombre = estudiantes.length === 1
+        ? (firstEst.estudiante_nombre || 'Estudiante asignado')
+        : estudiantes.map(e => e.estudiante_nombre).filter(Boolean).join(', ') || 'Estudiantes asignados';
+      const estudianteCodigo = estudiantes.length === 1 ? (firstEst.cod_ceta ? String(firstEst.cod_ceta) : undefined) : undefined;
+      const proyectoNombre = estudiantes.length === 1 ? (firstEst.proyecto_nombre || undefined) : undefined;
+      const fechaDesignacion = estudiantes.length === 1 ? (firstEst.fecha_designacion || undefined) : undefined;
+      const user = this.auth.getUser();
+      const userNombre = user?.nombre_usuario
+        || [user?.nombre, user?.apellido_p, user?.apellido_m].filter(Boolean).join(' ').trim()
+        || user?.email
+        || undefined;
+
+      await this.pdfService.generarDesignacionTutorPdf({
+        tutorNombre: item.tutor_nombre,
+        tutorTipo: item.tipo_tutor_nombre || undefined,
+        tutorCi: item.tutor_ci || undefined,
+        tutorCelular: item.tutor_celular || undefined,
+        area: item.tutor_titulo || undefined,
+        estudianteNombre,
+        estudianteCodigo,
+        carrera: item.carrera_nombre || item.cod_carrera || undefined,
+        proyectoNombre,
+        convocatoria: item.convocatoria_label || undefined,
+        fecha: fechaDesignacion,
+        lugar: 'Cochabamba',
+        numeroDocumento: item.numero_documento || undefined,
+        cite: item.cite || undefined,
+        elaboradoPor: userNombre,
+        cargoElaborador: 'Responsable de Modalidad de Graduación',
+        observaciones: estudiantes.length > 1
+          ? `Se asigna la tutoría para ${estudiantes.length} estudiantes bajo la responsabilidad del tutor indicado.`
+          : undefined,
+      }, {
+        fileName: `designacion-${item.tutor_nombre.replace(/\s+/g, '-').toLowerCase()}.pdf`
+      });
+    } catch (err) {
+      console.error('Error generando PDF de designado:', err);
+      alert('No se pudo generar el documento PDF para este tutor.');
+    } finally {
+      this.generatingDesignadoId = null;
+    }
   }
 
   loadDesignados() {

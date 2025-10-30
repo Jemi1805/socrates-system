@@ -18,9 +18,73 @@ export interface Fmdg1Data {
   objetivo?: string;
 }
 
+export interface TutorDesignacionPdfData {
+  tutorNombre: string;
+  tutorTipo?: string;
+  tutorTitulo?: string;
+  tutorCi?: string;
+  tutorCelular?: string;
+  area?: string;
+  estudianteNombre?: string;
+  estudianteCodigo?: string;
+  carrera?: string;
+  modalidad?: string;
+  proyectoNombre?: string;
+  convocatoria?: string;
+  convocatoriaFechaInicio?: string | Date;
+  convocatoriaFechaFin?: string | Date;
+  fecha?: string | Date;
+  lugar?: string;
+  referencia?: string;
+  numeroDocumento?: string;
+  cite?: string;
+  formatoCodigo?: string;
+  paraNombre?: string;
+  paraCargo?: string;
+  deNombre?: string;
+  deCargo?: string;
+  asunto?: string;
+  introduccion?: string;
+  cronogramaInicio?: string | Date;
+  cronogramaFin?: string | Date;
+  cierre?: string;
+  elaboradoPor?: string;
+  cargoElaborador?: string;
+  observaciones?: string;
+  responsabilidades?: string[];
+  pieNotas?: string[];
+  estudiantes?: TutorDesignacionEstudiante[];
+}
+
+export interface TutorDesignacionEstudiante {
+  nombre: string;
+  codigo?: string;
+  carrera?: string;
+  modalidad?: string;
+  area?: string;
+  tema?: string;
+  fechaDesignacion?: string | Date;
+}
+
+const formatFechaLatam = (fecha?: string | Date | null): string | null => {
+  if (!fecha) return null;
+  try {
+    const date = fecha instanceof Date ? fecha : new Date(fecha);
+    if (Number.isNaN(date.getTime())) return null;
+    return new Intl.DateTimeFormat('es-BO', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    }).format(date);
+  } catch {
+    return null;
+  }
+};
+
 @Injectable({ providedIn: 'root' })
 export class PdfService {
   private verdanaReady = false;
+  private verdanaUnavailable = true;
 
   private async arrayBufferToBase64(buf: ArrayBuffer): Promise<string> {
     let binary = '';
@@ -95,23 +159,10 @@ export class PdfService {
     });
   }
 
-  private async ensureVerdana(doc: jsPDF) {
-    if (this.verdanaReady) return;
-    try {
-      const normalRes = await fetch('assets/fonts/verdana.ttf');
-      const boldRes = await fetch('assets/fonts/verdana-bold.ttf');
-      const normalBuf = await normalRes.arrayBuffer();
-      const boldBuf = await boldRes.arrayBuffer();
-      const normalB64 = await this.arrayBufferToBase64(normalBuf);
-      const boldB64 = await this.arrayBufferToBase64(boldBuf);
-      (doc as any).addFileToVFS('verdana-normal.ttf', normalB64);
-      (doc as any).addFileToVFS('verdana-bold.ttf', boldB64);
-      (doc as any).addFont('verdana-normal.ttf', 'verdana', 'normal');
-      (doc as any).addFont('verdana-bold.ttf', 'verdana', 'bold');
-      this.verdanaReady = true;
-    } catch {
-      // Si no existen las fuentes, jsPDF usará helvetica como fallback
-    }
+  private async ensureVerdana(doc: jsPDF): Promise<boolean> {
+    if (this.verdanaUnavailable) return false;
+    if (this.verdanaReady) return true;
+    return false;
   }
   private async loadImageDataUrl(url: string): Promise<string> {
     // Carga imagen y la convierte a DataURL para jsPDF
@@ -459,5 +510,466 @@ export class PdfService {
 
     // Guardar
     doc.save('FMDG-1.pdf');
+  }
+
+  async generarDesignacionTutorPdf(
+    data: TutorDesignacionPdfData,
+    options?: { fileName?: string; logoUrl?: string; logoWidthMm?: number; logoMaxHeightMm?: number; logoBgColor?: string; logoFormat?: 'PNG' | 'JPEG' }
+  ) {
+    const doc = new jsPDF({ unit: 'mm', format: 'letter' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const marginX = 30;
+    const marginY = 20;
+    const headerHeight = 26;
+    const headerOffsetX = 20;
+    const headerOffsetY = 20;
+    const headerRightMargin = 15;
+    const contentRightMargin = 25;
+    const labelRightMargin = 15;
+    const baseFont = 'helvetica';
+    const primaryTabStop = 12;
+    const nestedTabStop = 34;
+    const labelColumnIndent = 12;
+
+    const logoUrl = options?.logoUrl || 'assets/images/LOGO.png';
+    let logoMeta: { dataUrl: string; naturalWidth: number; naturalHeight: number; } | null = null;
+    let logoImage: string | null = null;
+    try {
+      logoMeta = await this.loadImageWithMeta(logoUrl);
+      const flattened = await this.flattenToPng(logoMeta.dataUrl, options?.logoBgColor || '#FFFFFF');
+      logoImage = flattened;
+    } catch {
+      logoMeta = null;
+      logoImage = null;
+    }
+
+    const toDate = (value?: string | Date | null): Date | null => {
+      if (!value) return null;
+      if (value instanceof Date) return value;
+      const parsed = new Date(value);
+      return Number.isFinite(parsed.getTime()) ? parsed : null;
+    };
+
+    const pad2 = (num: number): string => String(num).padStart(2, '0');
+
+    const formatDate = (value?: string | Date | null, fallback: string = ''): string => {
+      const date = toDate(value);
+      if (!date) return fallback || '';
+      const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      return `${date.getDate()} de ${meses[date.getMonth()]} de ${date.getFullYear()}`;
+    };
+
+    const formatDateShort = (value?: string | Date | null, fallback: string = ''): string => {
+      const date = toDate(value);
+      if (!date) return fallback || '';
+      return `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()}`;
+    };
+
+    const formatCronograma = (): string => {
+      const inicio = formatDate(data.cronogramaInicio, '___');
+      const fin = formatDate(data.cronogramaFin, '___');
+      return `${inicio} al ${fin}`;
+    };
+
+    const tutorTypeRaw = (data.tutorTipo || '').toString();
+    const tutorTypeLower = tutorTypeRaw.toLowerCase().trim();
+    const isMemorandum = tutorTypeLower.includes('planta') || tutorTypeLower.includes('interno');
+    const headerTitle = isMemorandum ? 'MEMORÁNDUM' : 'COMUNICACIÓN INTERNA';
+
+    const normalizeNumber = (value?: string | number | null): string => {
+      if (value === null || value === undefined) return '___';
+      const raw = String(value).trim();
+      if (!raw) return '___';
+      const digits = raw.replace(/\D/g, '');
+      if (digits.length) {
+        return digits.padStart(3, '0');
+      }
+      return raw;
+    };
+
+    const citeValue = (() => {
+      if (data.cite && data.cite.trim().length) return data.cite.trim();
+      const now = new Date();
+      const year = String(now.getFullYear());
+      const numero = normalizeNumber(data.numeroDocumento);
+      return isMemorandum ? `CETA/DA/MEM/${year}/${numero}` : `CETA/DA/COMINT/${year}/${numero}`;
+    })();
+    const tutorTitle = (() => {
+      const raw = (data.tutorTitulo || '').toString().trim();
+      if (!raw || /planta/i.test(raw)) return 'DOCENTE TÉCNICO';
+      return raw;
+    })();
+
+    const estudianteRows = (): TutorDesignacionEstudiante[] => {
+      if (data.estudiantes && data.estudiantes.length) {
+        return data.estudiantes.map((est) => ({
+          nombre: est.nombre,
+          carrera: est.carrera || data.carrera,
+          modalidad: est.modalidad && est.modalidad.trim().length ? est.modalidad : (data.modalidad && data.modalidad.trim().length ? data.modalidad : '-'),
+          area: est.area || data.area,
+          tema: est.tema || data.proyectoNombre,
+        }));
+      }
+
+      if (data.estudianteNombre) {
+        return [{
+          nombre: data.estudianteNombre,
+          carrera: data.carrera,
+          modalidad: data.modalidad && data.modalidad.trim().length ? data.modalidad : '-',
+          area: data.area,
+          tema: data.proyectoNombre,
+        }];
+      }
+
+      return [];
+    };
+
+    const renderHeader = (pageIndex: number, totalPages: number, opts: { clear?: boolean } = {}) => {
+      if (opts.clear) {
+        doc.setFillColor(255, 255, 255);
+        doc.rect(headerOffsetX, headerOffsetY, pageWidth - headerOffsetX - headerRightMargin, headerHeight, 'F');
+      }
+
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.3);
+      const headerWidth = pageWidth - headerOffsetX - headerRightMargin;
+      doc.rect(headerOffsetX, headerOffsetY, headerWidth, headerHeight);
+
+      const logoBoxWidth = 26;
+      const logoBoxHeight = headerHeight;
+      const logoX = headerOffsetX;
+      const logoY = headerOffsetY;
+      doc.setFillColor(255, 255, 255);
+      doc.rect(logoX, logoY, logoBoxWidth, logoBoxHeight, 'F');
+      doc.setDrawColor(0, 0, 0);
+      doc.rect(logoX, logoY, logoBoxWidth, logoBoxHeight);
+
+      if (logoMeta) {
+        const aspect = logoMeta.naturalHeight ? logoMeta.naturalWidth / logoMeta.naturalHeight : 1;
+        const availableW = logoBoxWidth - 4;
+        const availableH = logoBoxHeight - 4;
+        let imgW = availableW;
+        let imgH = imgW / (aspect || 1);
+        if (imgH > availableH) {
+          imgH = availableH;
+          imgW = imgH * (aspect || 1);
+        }
+        const imgX = logoX + (logoBoxWidth - imgW) / 2;
+        const imgY = logoY + (logoBoxHeight - imgH) / 2;
+        const imageSource = logoImage || logoMeta.dataUrl;
+        doc.addImage(imageSource, 'PNG', imgX, imgY, imgW, imgH, undefined, 'FAST');
+      }
+
+      const infoWidth = 55;
+      const availableCenterWidth = headerWidth - logoBoxWidth - infoWidth;
+      const centerX = headerOffsetX + logoBoxWidth + availableCenterWidth / 2;
+
+      const headerColor: [number, number, number] = [5, 37, 68];
+      doc.setTextColor(...headerColor);
+
+      doc.setFont(baseFont, 'bold');
+      doc.setFontSize(11);
+      doc.text('Instituto Tecnológico de Enseñanza Automotriz', centerX, headerOffsetY + 5.4, { align: 'center' });
+      doc.setFontSize(11);
+      doc.text('"CETA"', centerX, headerOffsetY + 10.2, { align: 'center' });
+
+      doc.setDrawColor(...headerColor);
+      const centerLeft = headerOffsetX + logoBoxWidth;
+      const centerRight = headerOffsetX + headerWidth - infoWidth;
+      doc.line(centerLeft, headerOffsetY + (headerHeight / 2), centerRight, headerOffsetY + (headerHeight / 2));
+      doc.setDrawColor(0, 0, 0);
+
+      doc.setFontSize(14);
+      doc.setFont(baseFont, 'bold');
+      doc.text(headerTitle, centerX, headerOffsetY + (headerHeight / 2) + 8.5, { align: 'center' });
+
+      doc.setTextColor(0, 0, 0);
+      const infoX = headerOffsetX + headerWidth - infoWidth;
+      const infoY = headerOffsetY;
+      const infoRowHeight = headerHeight / 3;
+      const fechaTexto = formatDateShort(data.fecha, formatDateShort(new Date(), ''));
+      const citeTexto = citeValue;
+      const total = Math.max(totalPages, pageIndex);
+      const hojaTexto = `${pageIndex} de ${total}`;
+
+      const infoRows: Array<{ label: string; value: string; }> = [
+        { label: 'Fecha:', value: fechaTexto },
+        { label: 'Cite:', value: citeTexto },
+        { label: 'Fojas:', value: hojaTexto },
+      ];
+
+      infoRows.forEach((row: { label: string; value: string; }, idx: number) => {
+        const yStart = infoY + idx * infoRowHeight;
+        doc.rect(infoX, yStart, infoWidth, infoRowHeight);
+        const labelBaseline = yStart + infoRowHeight / 2 + 1;
+        doc.setFont(baseFont, 'bold');
+        doc.setFontSize(10);
+        doc.text(row.label, infoX + 2, labelBaseline);
+        doc.setFont(baseFont, 'normal');
+        doc.setFontSize(9);
+        doc.text((row.value || '').trim(), infoX + infoWidth - 2, labelBaseline, { align: 'right' });
+      });
+    };
+
+    const refreshHeaders = () => {
+      const total = doc.getNumberOfPages();
+      for (let i = 1; i <= total; i++) {
+        doc.setPage(i);
+        renderHeader(i, total, { clear: true });
+      }
+      doc.setPage(total);
+    };
+
+    renderHeader(1, 1);
+
+    const contentWidth = pageWidth - marginX - contentRightMargin;
+    let cursorY = headerOffsetY + headerHeight + 8;
+
+    const ensureSpace = (minSpace: number) => {
+      if (cursorY + minSpace <= pageHeight - marginY) return;
+      doc.addPage();
+      renderHeader(doc.getNumberOfPages(), doc.getNumberOfPages());
+      cursorY = headerOffsetY + headerHeight + 8;
+    };
+
+    const drawLabelValue = (
+      label: string,
+      value?: string | null,
+      opts?: { uppercase?: boolean; boldValue?: boolean; lineSpacing?: number; indent?: number; labelWidthOverride?: number; tabStop?: number; labelBold?: boolean; rightMargin?: number }
+    ): number => {
+      if (value === null || value === undefined || value === '') {
+        return opts?.labelWidthOverride ?? 0;
+      }
+      const lineSpacing = opts?.lineSpacing ?? 6;
+      const startX = marginX + (opts?.indent ?? 0);
+      const effectiveRightMargin = opts?.rightMargin ?? contentRightMargin;
+      const contentEndX = pageWidth - effectiveRightMargin;
+      ensureSpace(lineSpacing + 2);
+      doc.setFont(baseFont, opts?.labelBold ? 'bold' : 'normal');
+      doc.setFontSize(11);
+
+      const labelText = label && label.trim().length ? label : '';
+      if (labelText) {
+        doc.text(labelText, startX, cursorY);
+      }
+
+      const measuredLabel = labelText ? doc.getTextWidth(labelText) : 0;
+      const labelWidthOverride = opts?.labelWidthOverride ?? 0;
+      const tabStop = opts?.tabStop ?? primaryTabStop;
+      const valueOffset = Math.max(tabStop, Math.max(labelWidthOverride, measuredLabel) + (labelText ? 2 : 0));
+
+      const rawValue = value ?? '';
+      const preparedValue = opts?.uppercase ? rawValue.toString().toUpperCase() : rawValue.toString();
+      const rightMarginBuffer = opts?.rightMargin ? 5 : 0;
+      const availableWidth = Math.max(20, contentEndX - (startX + valueOffset) - rightMarginBuffer);
+      const valueLines = doc.splitTextToSize(preparedValue, availableWidth) as string[];
+
+      doc.setFont(baseFont, opts?.boldValue === false ? 'normal' : 'bold');
+      doc.setFontSize(11);
+      let currentY = cursorY;
+      valueLines.forEach((line: string, idx: number) => {
+        if (idx > 0) {
+          currentY += lineSpacing;
+          ensureSpace(lineSpacing + 2);
+        }
+        doc.text(line, startX + valueOffset, currentY);
+      });
+
+      cursorY = currentY + lineSpacing;
+      return valueOffset;
+    };
+
+    const drawValueLine = (value?: string | null, opts?: { uppercase?: boolean; bold?: boolean; lineSpacing?: number; indent?: number }) => {
+      if (!value) return;
+      const lineSpacing = opts?.lineSpacing ?? 6;
+      const startX = marginX + (opts?.indent ?? 0);
+      ensureSpace(lineSpacing + 2);
+      doc.setFont(baseFont, opts?.bold ? 'bold' : 'normal');
+      doc.setFontSize(11);
+      const textValue = opts?.uppercase ? value.toUpperCase() : value;
+      doc.text(textValue, startX, cursorY);
+      cursorY += lineSpacing;
+    };
+
+    const drawSectionTitle = (text: string) => {
+      ensureSpace(8);
+      doc.setFont(baseFont, 'bold');
+      doc.setFontSize(11);
+      doc.text(text, marginX, cursorY);
+      cursorY += 6;
+    };
+
+    const drawParagraph = (text: string, spacing = 6, opts?: { indent?: number; firstLineOnly?: boolean; justify?: boolean }) => {
+      if (!text) return;
+      doc.setFont(baseFont, 'normal');
+      doc.setFontSize(11);
+      const indent = Math.max(0, opts?.indent ?? 0);
+      const firstLineX = marginX + indent;
+      const restLineX = opts?.firstLineOnly ? marginX : firstLineX;
+      const contentEndX = marginX + contentWidth;
+      const firstLineWidth = Math.max(20, contentEndX - firstLineX);
+      const restLineWidth = Math.max(20, contentEndX - restLineX);
+      const words = text.split(/\s+/).filter(Boolean);
+      const spaceWidth = doc.getTextWidth(' ');
+      const lines: string[][] = [];
+      let currentLine: string[] = [];
+      let currentWidth = 0;
+      let isFirstLine = true;
+      const getLimit = () => (isFirstLine ? firstLineWidth : restLineWidth);
+
+      const pushLine = () => {
+        if (currentLine.length) {
+          lines.push([...currentLine]);
+          currentLine = [];
+          currentWidth = 0;
+        }
+      };
+
+      words.forEach((word) => {
+        const wordWidth = doc.getTextWidth(word);
+        const extraSpace = currentLine.length === 0 ? 0 : spaceWidth;
+        if (currentWidth + extraSpace + wordWidth <= getLimit() || currentLine.length === 0) {
+          currentLine.push(word);
+          currentWidth += extraSpace + wordWidth;
+        } else {
+          pushLine();
+          isFirstLine = false;
+          currentLine.push(word);
+          currentWidth = wordWidth;
+        }
+      });
+      pushLine();
+
+      let first = true;
+      lines.forEach((lineWords, index) => {
+        ensureSpace(spacing + 2);
+        const x = first ? firstLineX : restLineX;
+        const limit = first ? firstLineWidth : restLineWidth;
+        const gaps = Math.max(0, lineWords.length - 1);
+        const isLastLine = index === lines.length - 1;
+        if (opts?.justify && !isLastLine && gaps > 0) {
+          const wordsWidth = lineWords.reduce((sum, word) => sum + doc.getTextWidth(word), 0);
+          const neededSpacing = Math.max(spaceWidth * gaps, limit - wordsWidth);
+          const spacingWidth = neededSpacing / gaps;
+          let xPos = x;
+          lineWords.forEach((word, idx) => {
+            doc.text(word, xPos, cursorY);
+            const wWidth = doc.getTextWidth(word);
+            if (idx < lineWords.length - 1) {
+              xPos += wWidth + spacingWidth;
+            }
+          });
+        } else {
+          doc.text(lineWords.join(' '), x, cursorY);
+        }
+        cursorY += spacing;
+        first = false;
+      });
+      cursorY += 2;
+    };
+
+    // Sección "Para"
+    if (data.paraNombre || data.tutorNombre) {
+      const indent = drawLabelValue('Para:', (data.paraNombre || data.tutorNombre || ''), { uppercase: false, boldValue: false, labelWidthOverride: 24, tabStop: 25, labelBold: true, rightMargin: labelRightMargin });
+      const cargoLineRaw = tutorTitle || 'DOCENTE TÉCNICO';
+      const cargoLine = cargoLineRaw.replace(/\s+/g, ' ').trim();
+      if (cargoLine) {
+        drawValueLine(cargoLine, { uppercase: false, bold: true, lineSpacing: 7, indent });
+      } else {
+        cursorY += 4;
+      }
+    }
+
+    // Sección "De"
+    const indentDe = drawLabelValue('De:', 'Ing. Bradley Jaillita Burgoa', { uppercase: false, boldValue: false, labelWidthOverride: 24, tabStop: 25, labelBold: true, rightMargin: labelRightMargin });
+    drawValueLine('DIRECTOR ACADÉMICO', { uppercase: true, bold: true, lineSpacing: 8, indent: indentDe });
+
+    // Sección "Asunto"
+    drawLabelValue('Asunto:', 'DESIGNACIÓN COMO TUTOR PARA PROYECTOS DE DEFENSA DE GRADO', { uppercase: true, lineSpacing: 6, labelWidthOverride: 24, tabStop: 25, labelBold: true, rightMargin: labelRightMargin });
+
+    // Separador
+    ensureSpace(4);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.3);
+    doc.line(headerOffsetX, cursorY, pageWidth - labelRightMargin, cursorY);
+    cursorY += 8;
+
+    const renderStudents = (students: TutorDesignacionEstudiante[]) => {
+      students.forEach((est, idx) => {
+        ensureSpace(18);
+        const fields: Array<{ label: string; value?: string | null; bold?: boolean }> = [
+          { label: 'Nombre:', value: est.nombre || '-', bold: true },
+          { label: 'Carrera:', value: est.carrera || '-', bold: true },
+          { label: 'Modalidad:', value: est.modalidad || data.modalidad || '-', bold: true },
+          { label: 'Área:', value: est.area || '-', bold: true },
+          { label: 'Tema:', value: est.tema || '-', bold: true },
+        ];
+
+        const firstLineIndent = primaryTabStop;
+
+        fields.forEach(field => {
+          drawLabelValue(field.label, field.value || '-', {
+            boldValue: field.bold ?? false,
+            lineSpacing: 6,
+            indent: firstLineIndent,
+            tabStop: nestedTabStop,
+            rightMargin: contentRightMargin,
+          });
+        });
+
+        cursorY += 2;
+        if (idx < students.length - 1) {
+          ensureSpace(10);
+        }
+      });
+    };
+
+    const students = estudianteRows();
+    const introduccionTextoBase = 'En cumplimiento al Reglamento de Modalidades de Graduación de Institutos Técnicos y Tecnológicos de Carácter Fiscal, de Convenio y Privado aprobado por la Resolución Ministerial Nº 0487/2023 del 14 de junio de 2023 y del Reglamento Interno de Modalidades de Graduación del Instituto “CETA”, la Dirección Académica del Instituto, lo designa como Tutor para Defensas de Grado de los siguientes estudiantes:';
+    const introduccionTexto = (data.introduccion && data.introduccion.trim().length)
+      ? data.introduccion
+      : introduccionTextoBase;
+
+    drawParagraph(introduccionTexto, 6, { indent: labelColumnIndent, firstLineOnly: true, justify: true });
+    cursorY += 2;
+    if (students.length) {
+      renderStudents(students);
+      cursorY += 4;
+    }
+
+    const seguimientoTexto = data.observaciones || 'Por esta razón, se le solicita orientar y asesorar a los postulantes en la preparación de sus temas y realizar el correspondiente seguimiento y evaluación tanto de la parte teórica como práctica, a fin de que los mismos culminen satisfactoriamente,';
+
+    const rawConvocatoriaInicio = data.convocatoriaFechaInicio ?? data.cronogramaInicio ?? data.fecha ?? null;
+    const rawConvocatoriaFin = data.convocatoriaFechaFin ?? data.cronogramaFin ?? data.fecha ?? null;
+    const convocatoriaInicio = formatFechaLatam(rawConvocatoriaInicio);
+    const convocatoriaFin = formatFechaLatam(rawConvocatoriaFin);
+    const cronogramaTexto = convocatoriaInicio && convocatoriaFin
+      ? `este proceso académico se llevará a cabo bajo cronograma del ${convocatoriaInicio} al ${convocatoriaFin}.`
+      : null;
+    const seguimientoCronograma = cronogramaTexto
+      ? `${seguimientoTexto} ${cronogramaTexto}`
+      : seguimientoTexto;
+    drawParagraph(seguimientoCronograma, 6, { indent: labelColumnIndent, firstLineOnly: true, justify: true });
+
+    const cierreTexto = data.cierre || 'Seguro de que alcanzará y logrará los objetivos de esta labor y de su profesionalismo, le saludo deseándole éxito.';
+    drawParagraph(cierreTexto, 6, { indent: labelColumnIndent, firstLineOnly: true, justify: true });
+
+    const pieNotas = data.pieNotas && data.pieNotas.length ? data.pieNotas : ['BJB', 'CC: REC/DA'];
+    if (pieNotas.length) {
+      cursorY += 10;
+      doc.setFont(baseFont, 'normal');
+      doc.setFontSize(6);
+      pieNotas.forEach((nota) => {
+        ensureSpace(4);
+        doc.text(nota, marginX, cursorY);
+        cursorY += 4;
+      });
+    }
+
+    refreshHeaders();
+
+    const fileName = options?.fileName || `designacion-tutor-${(data.numeroDocumento || data.tutorNombre || 'documento')}.pdf`;
+    doc.save(fileName);
   }
 }

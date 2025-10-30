@@ -20,6 +20,7 @@ class DesignacionTutor extends Model
         'fecha_designacion',
         'convocatoria_id',
         'convocatoria_nom',
+        'area',
         'estudiante_nombre',
         'tutor_nombre',
     ];

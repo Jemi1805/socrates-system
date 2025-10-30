@@ -15,6 +15,12 @@ use App\Models\DesignacionTutor;
 
 class TutorController extends Controller
 {
+    private const DOC_INTRO_TEXT = 'En cumplimiento al Reglamento de Modalidades de Graduación de Institutos Técnicos y Tecnológicos de Carácter Fiscal, de Convenio y Privado aprobado por la Resolución Ministerial Nº 0487/2023 del 14 de junio de 2023 y del Reglamento Interno de Modalidades de Graduación del Instituto “CETA”, la Dirección Académica del Instituto, lo designa como Tutor para Defensas de Grado de los siguientes estudiantes:';
+    private const DOC_PARA_CARGO = 'DOCENTE TÉCNICO';
+    private const DOC_DE_NOMBRE = 'Ing. Bradley Jaillita Burgoa';
+    private const DOC_DE_CARGO = 'DIRECTOR ACADÉMICO';
+    private const DOC_ASUNTO = 'DESIGNACIÓN COMO TUTOR PARA PROYECTOS DE DEFENSA DE GRADO';
+    private const DOC_PIE_NOTAS = ['BJB', 'ML', 'CC: REG/DA'];
     /**
      * Listar tutores registrados.
      * Filtros opcionales: ?carrera=MEA|EEA|Nombre
@@ -94,6 +100,7 @@ class TutorController extends Controller
             ->leftJoin('convocatorias', 'designacion_tutor.convocatoria_id', '=', 'convocatorias.id')
             ->leftJoin('carrera', 'tutores.cod_carrera', '=', 'carrera.cod_carrera')
             ->leftJoin('proyecto', 'designacion_tutor.proyecto_id', '=', 'proyecto.id')
+            ->leftJoin('doc_designaciones', 'doc_designaciones.designacion_tutor_id', '=', 'designacion_tutor.id')
             ->select([
                 'designacion_tutor.id as designacion_id',
                 'designacion_tutor.tutor_id',
@@ -104,6 +111,20 @@ class TutorController extends Controller
                 'designacion_tutor.convocatoria_nom as designacion_convocatoria_nom',
                 'designacion_tutor.estudiante_nombre as designacion_estudiante_nom',
                 'designacion_tutor.tutor_nombre as designacion_tutor_nom',
+                'doc_designaciones.doc_tipo as doc_doc_tipo',
+                'doc_designaciones.year as doc_year',
+                'doc_designaciones.correlativo as doc_correlativo',
+                'doc_designaciones.cite as doc_cite',
+                'doc_designaciones.para_nombre as doc_para_nombre',
+                'doc_designaciones.para_cargo as doc_para_cargo',
+                'doc_designaciones.de_nombre as doc_de_nombre',
+                'doc_designaciones.de_cargo as doc_de_cargo',
+                'doc_designaciones.asunto as doc_asunto',
+                'doc_designaciones.introduccion as doc_introduccion',
+                'doc_designaciones.pie_notas as doc_pie_notas',
+                'doc_designaciones.tutor_nombre as doc_tutor_nombre',
+                'doc_designaciones.tutor_titulo as doc_tutor_titulo',
+                'doc_designaciones.estudiantes_resumen as doc_estudiantes_resumen',
                 'tutores.nombre as tutor_nombre',
                 'tutores.apellido_p as tutor_apellido_p',
                 'tutores.apellido_m as tutor_apellido_m',
@@ -172,6 +193,9 @@ class TutorController extends Controller
                     $row->convocatoria_anio
                 );
 
+                $numeroDocumento = $this->normalizeNumero($row->doc_correlativo ?? null);
+                $pieNotas = $this->decodeJsonColumn($row->doc_pie_notas ?? null) ?: self::DOC_PIE_NOTAS;
+                $estResumen = $this->decodeJsonColumn($row->doc_estudiantes_resumen ?? null);
                 $grouped[$tutorId] = [
                     'tutor_id' => $tutorId,
                     'tutor_ci' => $row->tutor_ci,
@@ -184,6 +208,22 @@ class TutorController extends Controller
                     'tipo_tutor_nombre' => $row->tipo_tutor_nombre,
                     'convocatoria_id' => $row->convocatoria_id ? (int)$row->convocatoria_id : null,
                     'convocatoria_label' => $convLabel,
+                    'designacion_id' => $row->designacion_id ? (int)$row->designacion_id : null,
+                    'doc_tipo' => $row->doc_doc_tipo,
+                    'doc_year' => $row->doc_year,
+                    'numero_documento' => $numeroDocumento,
+                    'cite' => $row->doc_cite,
+                    'area' => $row->area ?? null,
+                    'doc_para_nombre' => $row->doc_para_nombre,
+                    'doc_para_cargo' => $row->doc_para_cargo ?: self::DOC_PARA_CARGO,
+                    'doc_de_nombre' => $row->doc_de_nombre ?: self::DOC_DE_NOMBRE,
+                    'doc_de_cargo' => $row->doc_de_cargo ?: self::DOC_DE_CARGO,
+                    'doc_asunto' => $row->doc_asunto ?: self::DOC_ASUNTO,
+                    'doc_introduccion' => $row->doc_introduccion ?: self::DOC_INTRO_TEXT,
+                    'doc_pie_notas' => $pieNotas,
+                    'doc_tutor_nombre' => $row->doc_tutor_nombre,
+                    'doc_tutor_titulo' => $row->doc_tutor_titulo,
+                    'doc_estudiantes_resumen' => $estResumen,
                     'estudiantes' => [],
                 ];
             }
@@ -196,6 +236,7 @@ class TutorController extends Controller
                 'proyecto_id' => $row->proyecto_id,
                 'proyecto_nombre' => $row->proyecto_nombre,
                 'fecha_designacion' => $row->fecha_designacion,
+                'area' => $row->area ?? null,
             ];
         }
 
@@ -236,6 +277,278 @@ class TutorController extends Controller
         }
 
         return null;
+    }
+
+    private function resolveDocumentoTipo($tipoTutorNombre)
+    {
+        $nombre = strtolower((string) $tipoTutorNombre);
+        if (strpos($nombre, 'planta') !== false || strpos($nombre, 'interno') !== false) {
+            return 'MEM';
+        }
+        return 'COMINT';
+    }
+
+    private function extractYear($fechaDesignacion)
+    {
+        if ($fechaDesignacion) {
+            try {
+                return Carbon::parse($fechaDesignacion)->year;
+            } catch (\Exception $e) {
+                // fall-through
+            }
+        }
+        return Carbon::now()->year;
+    }
+
+    private function buildCite($docType, $year, $numero)
+    {
+        $yearStr = str_pad((string) $year, 4, '0', STR_PAD_LEFT);
+        return $docType === 'MEM'
+            ? sprintf('CETA/DA/MEM/%s/%s', $yearStr, $numero)
+            : sprintf('CETA/DA/COMINT/%s/%s', $yearStr, $numero);
+    }
+
+    private function normalizeNumero($correlativo)
+    {
+        if ($correlativo === null) {
+            return null;
+        }
+        $n = (int) $correlativo;
+        if ($n <= 0) {
+            return null;
+        }
+        return str_pad((string) $n, 3, '0', STR_PAD_LEFT);
+    }
+
+    private function decodeJsonColumn($value)
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_array($value)) {
+            return $value;
+        }
+
+        $decoded = json_decode($value, true);
+        return json_last_error() === JSON_ERROR_NONE ? $decoded : null;
+    }
+
+    private function ensureDocDesignacion($row, $tutorNombreResolved, $estudianteNombreResolved)
+    {
+        $docType = $this->resolveDocumentoTipo($row->tipo_tutor_nombre ?? null);
+        $year = $this->extractYear($row->fecha_designacion ?? null);
+
+        $paraNombre = $tutorNombreResolved ?: ($row->tutor_nombre ?? null);
+        $paraNombre = $paraNombre ? trim(preg_replace('/\s+/', ' ', $paraNombre)) : null;
+        $tutorTitulo = null;
+        if (!empty($row->tutor_titulo_base)) {
+            $tutorTitulo = trim((string) $row->tutor_titulo_base);
+        }
+
+        $doc = DB::table('doc_designaciones')
+            ->where('designacion_tutor_id', $row->id)
+            ->lockForUpdate()
+            ->first();
+
+        $now = Carbon::now();
+
+        $estudiantesResumen = $doc && $doc->estudiantes_resumen
+            ? $this->decodeJsonColumn($doc->estudiantes_resumen)
+            : $this->buildEstudiantesResumen($row->id);
+
+        if (!$doc) {
+            [$numeroInt, $numeroStr, $cite] = $this->nextSequence($docType, $year);
+
+            DB::table('doc_designaciones')->insert([
+                'designacion_tutor_id' => $row->id,
+                'doc_tipo' => $docType,
+                'year' => $year,
+                'correlativo' => $numeroInt,
+                'cite' => $cite,
+                'para_nombre' => $paraNombre,
+                'para_cargo' => self::DOC_PARA_CARGO,
+                'de_nombre' => self::DOC_DE_NOMBRE,
+                'de_cargo' => self::DOC_DE_CARGO,
+                'asunto' => self::DOC_ASUNTO,
+                'introduccion' => self::DOC_INTRO_TEXT,
+                'cronograma_inicio' => $row->cronograma_inicio ?? null,
+                'cronograma_fin' => $row->cronograma_fin ?? null,
+                'cierre' => null,
+                'pie_notas' => json_encode(self::DOC_PIE_NOTAS),
+                'tutor_nombre' => $tutorNombreResolved ?: $paraNombre,
+                'tutor_titulo' => $tutorTitulo,
+                'estudiantes_resumen' => $estudiantesResumen ? json_encode($estudiantesResumen) : null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            DB::table('doc_designacion_secuencias')->updateOrInsert(
+                ['doc_tipo' => $docType, 'year' => $year],
+                [
+                    'last_correlativo' => $numeroInt,
+                    'updated_at' => $now,
+                    'created_at' => $now,
+                ]
+            );
+
+            $doc = (object) [
+                'doc_tipo' => $docType,
+                'year' => $year,
+                'correlativo' => $numeroInt,
+                'cite' => $cite,
+                'para_nombre' => $paraNombre,
+                'para_cargo' => self::DOC_PARA_CARGO,
+                'de_nombre' => self::DOC_DE_NOMBRE,
+                'de_cargo' => self::DOC_DE_CARGO,
+                'asunto' => self::DOC_ASUNTO,
+                'introduccion' => self::DOC_INTRO_TEXT,
+                'pie_notas' => self::DOC_PIE_NOTAS,
+                'tutor_nombre' => $tutorNombreResolved ?: $paraNombre,
+                'tutor_titulo' => $tutorTitulo,
+                'estudiantes_resumen' => $estudiantesResumen,
+            ];
+
+            return [$doc, $numeroStr, $cite];
+        }
+
+        $numeroStr = $this->normalizeNumero($doc->correlativo ?? null);
+        $citeExisting = is_string($doc->cite ?? null) ? trim($doc->cite) : '';
+        $citeHasPlaceholder = $citeExisting === '' || strpos($citeExisting, '___') !== false;
+
+        if (!$numeroStr) {
+            [$numeroInt, $numeroStr, $citeGenerated] = $this->nextSequence($docType, $year);
+            DB::table('doc_designaciones')
+                ->where('designacion_tutor_id', $row->id)
+                ->update([
+                    'correlativo' => $numeroInt,
+                    'cite' => $citeGenerated,
+                    'updated_at' => $now,
+                ]);
+
+            $doc = DB::table('doc_designaciones')
+                ->where('designacion_tutor_id', $row->id)
+                ->first();
+
+            $numeroStr = $this->normalizeNumero($doc->correlativo ?? null);
+            $citeExisting = is_string($doc->cite ?? null) ? trim($doc->cite) : '';
+            $citeHasPlaceholder = $citeExisting === '' || strpos($citeExisting, '___') !== false;
+        }
+
+        $cite = $citeHasPlaceholder
+            ? $this->buildCite($docType, $year, $numeroStr ?? '')
+            : $citeExisting;
+
+        $updateData = [];
+        if (($citeHasPlaceholder || !$doc->cite) && $cite) {
+            $updateData['cite'] = $cite;
+        }
+        if (!$doc->para_nombre && $paraNombre) {
+            $updateData['para_nombre'] = $paraNombre;
+        }
+        if (!$doc->tutor_nombre && $tutorNombreResolved) {
+            $updateData['tutor_nombre'] = $tutorNombreResolved;
+        }
+        if (!$doc->tutor_titulo && $tutorTitulo) {
+            $updateData['tutor_titulo'] = $tutorTitulo;
+        }
+        if (!$doc->estudiantes_resumen && $estudiantesResumen) {
+            $updateData['estudiantes_resumen'] = json_encode($estudiantesResumen);
+        }
+        if (!$doc->pie_notas) {
+            $updateData['pie_notas'] = json_encode(self::DOC_PIE_NOTAS);
+        }
+
+        if (!empty($updateData)) {
+            $updateData['updated_at'] = $now;
+            DB::table('doc_designaciones')
+                ->where('designacion_tutor_id', $row->id)
+                ->update($updateData);
+
+            $doc = DB::table('doc_designaciones')->where('designacion_tutor_id', $row->id)->first();
+        }
+
+        DB::table('doc_designacion_secuencias')->updateOrInsert(
+            ['doc_tipo' => $docType, 'year' => $year],
+            [
+                'last_correlativo' => $doc->correlativo ?? ($numeroStr ? (int) ltrim($numeroStr, '0') : null),
+                'updated_at' => $now,
+                'created_at' => $now,
+            ]
+        );
+
+        $doc->pie_notas = $this->decodeJsonColumn($doc->pie_notas ?? null) ?: self::DOC_PIE_NOTAS;
+        $doc->estudiantes_resumen = $this->decodeJsonColumn($doc->estudiantes_resumen ?? null);
+
+        return [$doc, $numeroStr, $cite];
+    }
+
+    private function buildEstudiantesResumen($designacionId)
+    {
+        $rows = DB::table('designacion_tutor as dt')
+            ->where('dt.id', $designacionId)
+            ->join('postulantes as p', 'dt.cod_ceta', '=', 'p.cod_ceta')
+            ->select(
+                'p.cod_ceta',
+                DB::raw("TRIM(CONCAT(IFNULL(p.ap_pat,''),' ',IFNULL(p.ap_mat,''),' ',IFNULL(p.nombres_est,''))) AS nombre"),
+                'dt.proyecto_id'
+            )
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        $list = $rows->map(function ($item) {
+            return [
+                'cod_ceta' => $item->cod_ceta,
+                'nombre' => $item->nombre,
+                'proyecto_id' => $item->proyecto_id,
+            ];
+        })->toArray();
+
+        return $list;
+    }
+
+    private function nextSequence($docType, $year)
+    {
+        $now = Carbon::now();
+        $baseNumero = 0;
+
+        $sequenceRow = DB::table('doc_designacion_secuencias')
+            ->where('doc_tipo', $docType)
+            ->where('year', $year)
+            ->lockForUpdate()
+            ->first();
+
+        if ($sequenceRow && isset($sequenceRow->last_correlativo)) {
+            $baseNumero = max(0, (int) $sequenceRow->last_correlativo);
+        } else {
+            $maxNumero = DB::table('doc_designaciones')
+                ->where('doc_tipo', $docType)
+                ->where('year', $year)
+                ->max('correlativo');
+            $baseNumero = max(0, (int) $maxNumero);
+        }
+
+        $numero = $baseNumero + 1;
+        if ($numero <= 0) {
+            $numero = 1;
+        }
+
+        $normalized = $this->normalizeNumero($numero);
+        $cite = $this->buildCite($docType, $year, $normalized);
+
+        DB::table('doc_designacion_secuencias')->updateOrInsert(
+            ['doc_tipo' => $docType, 'year' => $year],
+            [
+                'last_correlativo' => $numero,
+                'updated_at' => $now,
+                'created_at' => $now,
+            ]
+        );
+
+        return [$numero, $normalized, $cite];
     }
     /**
      * Registrar/actualizar tutores en lote (directamente en tabla tutores).
@@ -451,6 +764,7 @@ class TutorController extends Controller
             'proyecto_id' => 'nullable|integer|exists:proyecto,id',
             'convocatoria_id' => 'nullable|integer|exists:convocatorias,id',
             'convocatoria_nom' => 'nullable|string|max:150',
+            'area' => 'nullable|string|max:255',
             'user_id' => 'nullable|integer',
             'user_name' => 'nullable|string|max:150',
         ]);
@@ -528,6 +842,7 @@ class TutorController extends Controller
                 'fecha_designacion' => $now->toDateString(),
                 'convocatoria_id' => isset($data['convocatoria_id']) ? $data['convocatoria_id'] : null,
                 'convocatoria_nom' => isset($data['convocatoria_nom']) ? $data['convocatoria_nom'] : null,
+                'area' => isset($data['area']) && trim((string)$data['area']) !== '' ? trim((string)$data['area']) : null,
                 'tutor_nombre' => $tutNombre,
                 'estudiante_nombre' => $estNombre,
                 'updated_at' => $now,
@@ -551,12 +866,100 @@ class TutorController extends Controller
                 $updateData
             );
 
-            $row = DB::table('designacion_tutor')
-                ->where('tutor_id', $data['tutor_id'])
-                ->where('cod_ceta', $data['cod_ceta'])
+            $baseRow = DB::table('designacion_tutor as dt')
+                ->leftJoin('tutores as t', 'dt.tutor_id', '=', 't.id')
+                ->leftJoin('tipo_tutor as tt', 't.tipo_tutor_id', '=', 'tt.id')
+                ->leftJoin('proyecto', 'dt.proyecto_id', '=', 'proyecto.id')
+                ->select(
+                    'dt.*',
+                    'tt.nombre as tipo_tutor_nombre',
+                    't.titulo as tutor_titulo_base',
+                    'proyecto.nombre as proyecto_nombre'
+                )
+                ->where('dt.tutor_id', $data['tutor_id'])
+                ->where('dt.cod_ceta', $data['cod_ceta'])
                 ->first();
 
+            if (!$baseRow) {
+                throw new \RuntimeException('No se pudo recuperar la designación recién creada.');
+            }
+
+            [$docRecord, $numeroDocumento, $cite] = $this->ensureDocDesignacion($baseRow, $tutNombre ?? '', $estNombre ?? '');
+
             DB::commit();
+
+            $row = DB::table('designacion_tutor as dt')
+                ->leftJoin('tutores as t', 'dt.tutor_id', '=', 't.id')
+                ->leftJoin('tipo_tutor as tt', 't.tipo_tutor_id', '=', 'tt.id')
+                ->leftJoin('doc_designaciones as dd', 'dd.designacion_tutor_id', '=', 'dt.id')
+                ->select(
+                    'dt.*',
+                    'tt.nombre as tipo_tutor_nombre',
+                    'dd.doc_tipo as doc_doc_tipo',
+                    'dd.year as doc_year',
+                    'dd.correlativo as doc_correlativo',
+                    'dd.cite as doc_cite',
+                    'dd.para_nombre as doc_para_nombre',
+                    'dd.para_cargo as doc_para_cargo',
+                    'dd.de_nombre as doc_de_nombre',
+                    'dd.de_cargo as doc_de_cargo',
+                    'dd.asunto as doc_asunto',
+                    'dd.introduccion as doc_introduccion',
+                    'dd.cronograma_inicio as doc_cronograma_inicio',
+                    'dd.cronograma_fin as doc_cronograma_fin',
+                    'dd.cierre as doc_cierre',
+                    'dd.pie_notas as doc_pie_notas',
+                    'dd.tutor_nombre as doc_tutor_nombre',
+                    'dd.tutor_titulo as doc_tutor_titulo',
+                    'dd.estudiantes_resumen as doc_estudiantes_resumen'
+                )
+                ->where('dt.tutor_id', $data['tutor_id'])
+                ->where('dt.cod_ceta', $data['cod_ceta'])
+                ->first();
+
+            if ($row) {
+                $row->designacion_id = $row->id ?? null;
+                $row->numero_documento = $this->normalizeNumero($row->doc_correlativo ?? null) ?? $numeroDocumento;
+                $row->cite = $row->doc_cite ?? $cite;
+                $row->doc_para_cargo = $row->doc_para_cargo ?: self::DOC_PARA_CARGO;
+                $row->doc_de_nombre = $row->doc_de_nombre ?: self::DOC_DE_NOMBRE;
+                $row->doc_de_cargo = $row->doc_de_cargo ?: self::DOC_DE_CARGO;
+                $row->doc_asunto = $row->doc_asunto ?: self::DOC_ASUNTO;
+                $row->doc_introduccion = $row->doc_introduccion ?: self::DOC_INTRO_TEXT;
+                $row->doc_pie_notas = $this->decodeJsonColumn($row->doc_pie_notas ?? null) ?: self::DOC_PIE_NOTAS;
+                $row->doc_estudiantes_resumen = $this->decodeJsonColumn($row->doc_estudiantes_resumen ?? null);
+                if (!$row->doc_para_nombre && isset($docRecord->para_nombre)) {
+                    $row->doc_para_nombre = $docRecord->para_nombre;
+                }
+                if (!$row->doc_para_cargo && isset($docRecord->para_cargo)) {
+                    $row->doc_para_cargo = $docRecord->para_cargo;
+                }
+                if (!$row->doc_de_nombre && isset($docRecord->de_nombre)) {
+                    $row->doc_de_nombre = $docRecord->de_nombre;
+                }
+                if (!$row->doc_de_cargo && isset($docRecord->de_cargo)) {
+                    $row->doc_de_cargo = $docRecord->de_cargo;
+                }
+                if (!$row->doc_asunto && isset($docRecord->asunto)) {
+                    $row->doc_asunto = $docRecord->asunto;
+                }
+                if (!$row->doc_introduccion && isset($docRecord->introduccion)) {
+                    $row->doc_introduccion = $docRecord->introduccion;
+                }
+                if (!$row->doc_tutor_nombre && isset($docRecord->tutor_nombre)) {
+                    $row->doc_tutor_nombre = $docRecord->tutor_nombre;
+                }
+                if (!$row->doc_tutor_titulo && isset($docRecord->tutor_titulo)) {
+                    $row->doc_tutor_titulo = $docRecord->tutor_titulo;
+                }
+                if (!$row->doc_pie_notas && isset($docRecord->pie_notas)) {
+                    $row->doc_pie_notas = $docRecord->pie_notas;
+                }
+                if (!$row->doc_estudiantes_resumen && isset($docRecord->estudiantes_resumen)) {
+                    $row->doc_estudiantes_resumen = $docRecord->estudiantes_resumen;
+                }
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Tutor designado correctamente',
@@ -568,6 +971,7 @@ class TutorController extends Controller
                 'payload' => $request->all(),
                 'exception' => $e->getMessage(),
             ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error al designar tutor',

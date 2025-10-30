@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
@@ -7,6 +7,7 @@ import { SgaService, Pertinencia, TutorReg, Convocatoria, InscripModalidad, ApiR
 import { ProyectoService } from '../proyectos/proyecto.service';
 import { LoadingService } from '../../../core/services/loading.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { PdfService } from '../../../shared/services/pdf.service';
 
 @Component({
   selector: 'app-designar-tutor',
@@ -16,6 +17,8 @@ import { AuthService } from '../../../core/services/auth.service';
   styleUrls: ['./designar-tutor.component.scss']
 })
 export class DesignarTutorComponent implements OnInit {
+  @Input() modalidadSeleccionadaNombre?: string | null;
+
   // Contexto del estudiante y proyecto
   estudiante: any = null;
   proyecto: any = null;
@@ -44,9 +47,122 @@ export class DesignarTutorComponent implements OnInit {
   convocatorias: Convocatoria[] = [];
   selectedConvocatoriaId: number | null = null;
   confirmConvocatoriaNombre: string | null = null;
+  confirmConvocatoriaInicio: string | Date | null = null;
+  confirmConvocatoriaFin: string | Date | null = null;
   confirmArea: string | null = null;
   tutorPertinenciaIds: number[] = [];
   selectedPertinenciaId: number | null = null;
+  generatingPdf = false;
+
+  private normalizeModalidad(value: any): string | undefined {
+    if (value === null || value === undefined) return undefined;
+    const text = String(value).replace(/\s+/g, ' ').trim();
+    if (!text.length) return undefined;
+    return text;
+  }
+
+  private isGenericProyectoDeGrado(value: string): boolean {
+    return /proyecto\s+de\s+grado/i.test(value);
+  }
+
+  private pickModalidadCandidate(values: Array<any>): string | undefined {
+    let fallbackProyecto: string | undefined;
+    for (const raw of values) {
+      const normalized = this.normalizeModalidad(raw);
+      if (!normalized) continue;
+      if (!this.isGenericProyectoDeGrado(normalized)) {
+        return normalized;
+      }
+      if (!fallbackProyecto) {
+        fallbackProyecto = normalized;
+      }
+    }
+    return fallbackProyecto;
+  }
+
+  private getTemaModalidad(tema?: any): string | undefined {
+    if (!tema) return undefined;
+    const direct = this.pickModalidadCandidate([
+      tema?.modalidad,
+      tema?.modalidad_nombre,
+      tema?.modalidadNombre,
+      tema?.modalidad_inscrita,
+      tema?.tipo,
+      tema?.modalidad_tipo,
+      tema?.modalidadGraduacion,
+      tema?.modalidadGraduacionNombre,
+    ]);
+    if (direct) return direct;
+
+    if (tema?.modalidad_objeto && typeof tema.modalidad_objeto === 'object') {
+      const nested = this.getTemaModalidad(tema.modalidad_objeto);
+      if (nested) return nested;
+    }
+    if (tema?.modalidad_detalle && typeof tema.modalidad_detalle === 'object') {
+      const nestedDetalle = this.getTemaModalidad(tema.modalidad_detalle);
+      if (nestedDetalle) return nestedDetalle;
+    }
+    if (Array.isArray(tema?.modalidades) && tema.modalidades.length) {
+      const listCandidates = tema.modalidades.map((m: any) => {
+        if (typeof m === 'string') return m;
+        if (!m) return undefined;
+        return m.nombre || m.modalidad || m.tipo || m.descripcion;
+      });
+      const fromList = this.pickModalidadCandidate(listCandidates);
+      if (fromList) return fromList;
+    }
+    return undefined;
+  }
+
+  private resolveEstudianteModalidad(est: any, modalidadGeneral?: string): string | undefined {
+    if (!est) return this.normalizeModalidad(modalidadGeneral);
+    const tema = est.tema_registro || est.temaDetalle || est.tema || est.proyecto;
+    return this.pickModalidadCandidate([
+      est.modalidad,
+      est.modalidad_nombre,
+      est.modalidadNombre,
+      est.modalidad_inscrita,
+      this.getTemaModalidad(tema),
+      modalidadGeneral,
+    ]);
+  }
+
+  private resolveModalidad(): string | undefined {
+    const temaActual = this.proyecto
+      || this.lastDesignation?.tema_registro
+      || (this.estudiante as any)?.tema_registro
+      || (this.estudiante as any)?.tema
+      || (this.lastDesignation as any)?.tema
+      || (this.lastDesignation as any)?.temaDetalle
+      || (this.lastDesignation as any)?.tema_registro_detalle
+      || null;
+
+    const primary = this.pickModalidadCandidate([
+      this.getTemaModalidad(temaActual),
+      this.modalidadSeleccionadaNombre,
+      (this.proyecto as any)?.tipo,
+      (this.proyecto as any)?.modalidad,
+      (this.proyecto as any)?.modalidad_nombre,
+      (this.proyecto as any)?.modalidadNombre,
+      (this.proyecto as any)?.modalidad_inscrita,
+      this.estudiante?.modalidad,
+      (this.estudiante as any)?.modalidad_nombre,
+      this.inscripcion ? (this.inscripcion as any)?.modalidad : undefined,
+      this.inscripcion ? (this.inscripcion as any)?.modalidad_nombre : undefined,
+      this.inscripcion ? (this.inscripcion as any)?.modalidad_descripcion : undefined,
+    ]);
+    if (primary) return primary;
+
+    return this.pickModalidadCandidate([
+      this.lastDesignation?.modalidad,
+      this.lastDesignation?.modalidad_nombre,
+      this.lastDesignationEstudiantes()?.[0]?.modalidad,
+    ]);
+  }
+
+  get modalidadNombre(): string | undefined {
+    return this.resolveModalidad();
+  }
 
   constructor(
     private route: ActivatedRoute,
@@ -55,6 +171,7 @@ export class DesignarTutorComponent implements OnInit {
     private proyectoService: ProyectoService,
     private loadingService: LoadingService,
     private auth: AuthService,
+    private pdfService: PdfService,
   ) {}
 
   ngOnInit(): void {
@@ -83,6 +200,13 @@ export class DesignarTutorComponent implements OnInit {
         }
         if (this.estudiante && this.inscripcion) {
           this.estudiante = { ...this.estudiante, inscripcion: this.inscripcion };
+        }
+        if (this.lastDesignation) {
+          this.confirmConvocatoriaNombre = this.lastDesignation?.convocatoria_nom || this.confirmConvocatoriaNombre;
+          const storedInicio = this.resolveConvocatoriaFechaInicioFromSource(this.lastDesignation);
+          const storedFin = this.resolveConvocatoriaFechaFinFromSource(this.lastDesignation);
+          if (storedInicio) this.confirmConvocatoriaInicio = storedInicio;
+          if (storedFin) this.confirmConvocatoriaFin = storedFin;
         }
       }
       const pc = sessionStorage.getItem('proyecto_cache');
@@ -296,14 +420,22 @@ export class DesignarTutorComponent implements OnInit {
       return;
     }
     this.selectedTutor = t;
-    this.confirmArea = this.areasText(t);
     this.syncSelectedConvocatoriaWithConvocatorias();
     const convRow = this.convocatorias.find(c => Number(c.id) === this.selectedConvocatoriaId) || null;
     if (convRow) {
       this.confirmConvocatoriaNombre = this.formatConvocatoriaLabel(convRow);
+      const inicio = this.resolveConvocatoriaFechaInicioFromSource(convRow);
+      const fin = this.resolveConvocatoriaFechaFinFromSource(convRow);
+      this.confirmConvocatoriaInicio = inicio;
+      this.confirmConvocatoriaFin = fin;
     } else {
       const storedLabel = (this.inscripcion as any)?.convocatoria_nom || (this.inscripcion as any)?.nom_convocatoria;
       this.confirmConvocatoriaNombre = storedLabel ? String(storedLabel) : null;
+      const fallbackSource = this.inscripcion || (this.estudiante as any)?.inscripcion || this.lastDesignation;
+      const inicio = this.resolveConvocatoriaFechaInicioFromSource(fallbackSource);
+      const fin = this.resolveConvocatoriaFechaFinFromSource(fallbackSource);
+      this.confirmConvocatoriaInicio = inicio;
+      this.confirmConvocatoriaFin = fin;
     }
     this.tutorPertinenciaIds = this.extraerPertinenciaIds(t);
     const selectedSet = new Set((this.selectedAreaIds || []).map(id => Number(id)));
@@ -313,6 +445,7 @@ export class DesignarTutorComponent implements OnInit {
     } else {
       this.selectedPertinenciaId = this.tutorPertinenciaIds.length ? Number(this.tutorPertinenciaIds[0]) : null;
     }
+    this.confirmArea = this.resolveTutorAreaLabel(t, this.selectedPertinenciaId);
     this.showConfirmModal = true;
   }
 
@@ -321,14 +454,29 @@ export class DesignarTutorComponent implements OnInit {
       this.showConfirmModal = false;
       return;
     }
-    const cod = Number(this.codCeta || this.estudiante?.cod_ceta);
+    const codRaw = this.normalizeCodCetaValue(this.codCeta ?? this.estudiante?.cod_ceta);
+    if (!codRaw) {
+      this.showConfirmModal = false;
+      return;
+    }
+    const codNumeric = Number(codRaw);
+    if (!Number.isFinite(codNumeric)) {
+      this.showConfirmModal = false;
+      return;
+    }
     const proyectoId = this.proyecto?.id ? Number(this.proyecto.id) : undefined;
-    const payload: any = { tutor_id: Number(this.selectedTutor.id), cod_ceta: cod, proyecto_id: proyectoId };
+    const payload: any = { tutor_id: Number(this.selectedTutor.id), cod_ceta: codNumeric, proyecto_id: proyectoId };
+    const areaSeleccionada = this.confirmArea || this.resolveTutorAreaLabel(this.selectedTutor, this.selectedPertinenciaId);
+    if (areaSeleccionada) {
+      payload.area = areaSeleccionada;
+    }
+    let currentConvocatoriaRow: any = null;
     if (this.selectedConvocatoriaId) {
       payload.convocatoria_id = Number(this.selectedConvocatoriaId);
       const convRow = this.convocatorias.find(c => Number(c.id) === Number(this.selectedConvocatoriaId));
       if (convRow) {
         payload.convocatoria_nom = this.formatConvocatoriaLabel(convRow);
+        currentConvocatoriaRow = convRow;
       } else if (this.confirmConvocatoriaNombre) {
         payload.convocatoria_nom = this.confirmConvocatoriaNombre;
       }
@@ -369,14 +517,34 @@ export class DesignarTutorComponent implements OnInit {
                 this.selectedTutor.apellido_m,
               ].filter(Boolean).join(' ').trim();
             }
-            if (!this.lastDesignation.cod_ceta && cod) {
-              this.lastDesignation.cod_ceta = cod;
+            if (codRaw) {
+              this.lastDesignation.cod_ceta = codRaw;
+            }
+            if (resp?.data?.numero_documento) {
+              (this.lastDesignation as any).numero_documento = resp.data.numero_documento;
+            }
+            if (resp?.data?.cite) {
+              (this.lastDesignation as any).cite = resp.data.cite;
             }
             if (!this.lastDesignation.user_name && resolvedName) {
               this.lastDesignation.user_name = resolvedName;
             }
             if (!this.lastDesignation.user_id && resolvedUserId !== null) {
               this.lastDesignation.user_id = resolvedUserId;
+            }
+            const resolvedInicio = currentConvocatoriaRow
+              ? this.resolveConvocatoriaFechaInicioFromSource(currentConvocatoriaRow)
+              : this.resolveConvocatoriaFechaInicioFromSource(this.lastDesignation);
+            const resolvedFin = currentConvocatoriaRow
+              ? this.resolveConvocatoriaFechaFinFromSource(currentConvocatoriaRow)
+              : this.resolveConvocatoriaFechaFinFromSource(this.lastDesignation);
+            if (resolvedInicio) {
+              this.confirmConvocatoriaInicio = resolvedInicio;
+              (this.lastDesignation as any).convocatoria_fecha_inicio = resolvedInicio;
+            }
+            if (resolvedFin) {
+              this.confirmConvocatoriaFin = resolvedFin;
+              (this.lastDesignation as any).convocatoria_fecha_fin = resolvedFin;
             }
           }
           this.persistLastDesignation(this.lastDesignation);
@@ -432,6 +600,18 @@ export class DesignarTutorComponent implements OnInit {
     return found?.nombre_pert || '-';
   }
 
+  private resolveTutorAreaLabel(tutor: TutorReg | null, pertinenciaId: number | null | undefined): string | null {
+    if (!tutor) return null;
+    if (pertinenciaId != null) {
+      const name = this.pertinenciaNombre(pertinenciaId);
+      if (name && name !== '-') {
+        return name;
+      }
+    }
+    const label = this.areasText(tutor);
+    return label && label !== '-' ? label : null;
+  }
+
   // Toggle de áreas por checkbox
   public onToggleArea(ev: Event, id: number) {
     const checked = (ev.target as HTMLInputElement).checked;
@@ -470,13 +650,163 @@ export class DesignarTutorComponent implements OnInit {
     this.showSeleccionTutores = true;
   }
 
+  private lastDesignationEstudiantes(): any[] | null {
+    const designation: any = this.lastDesignation || null;
+    if (!designation) return null;
+
+    const direct = designation.estudiantes;
+    if (Array.isArray(direct) && direct.length) {
+      return direct;
+    }
+
+    const candidateKeys = ['detalles', 'detalle', 'estudiantes_asignados', 'postulantes', 'lista_estudiantes'];
+    for (const key of candidateKeys) {
+      const value = designation[key];
+      if (Array.isArray(value) && value.length) {
+        return value;
+      }
+    }
+
+    if (designation.estudiante_nombre) {
+      return [{
+        estudiante_nombre: designation.estudiante_nombre,
+        carrera: designation.carrera_nombre,
+        modalidad: designation.modalidad || designation.modalidad_nombre,
+        area: designation.area,
+        proyecto_nombre: designation.proyecto_nombre,
+      }];
+    }
+
+    return null;
+  }
+
   public reopenDesignacion() {
     this.selectedTutor = null;
     this.showConfirmModal = false;
     this.confirmArea = null;
     this.confirmConvocatoriaNombre = null;
+    this.confirmConvocatoriaInicio = null;
+    this.confirmConvocatoriaFin = null;
     this.showResumenDesignacion = false;
     this.showSeleccionTutores = true;
+  }
+
+  public async generarDesignacionPdf() {
+    if (this.generatingPdf) return;
+    const designation = this.lastDesignation;
+    if (!designation) {
+      alert('No se encontró una designación para generar el documento.');
+      return;
+    }
+    const tutorId = designation?.tutor_id ?? (this.selectedTutor?.id ?? null);
+    const tutor = this.resolveTutorById(tutorId) || this.selectedTutor || null;
+    const tutorNombreRaw = designation?.tutor_nombre
+      || (tutor ? [tutor.nombre, tutor.apellido_p, tutor.apellido_m].filter(Boolean).join(' ').trim() : null)
+      || 'Tutor designado';
+    const tutorNombre = this.formatNombreApellidosPrimero(
+      tutor?.apellido_p,
+      tutor?.apellido_m,
+      tutor?.nombre,
+      tutorNombreRaw
+    ) || tutorNombreRaw;
+    const resolvedArea = this.resolveDesignationArea(designation);
+    const area = resolvedArea || undefined;
+    const estudianteNombre = this.formatNombreApellidosPrimero(
+      this.estudiante?.apellido_p,
+      this.estudiante?.apellido_m,
+      this.estudiante?.nombres,
+      designation?.estudiante_nombre || this.estudianteNombre()
+    ) || this.estudianteNombre();
+    const tutorTipo = (tutor as any)?.tipo_tutor || (tutor as any)?.tipo_tutor_nombre || null;
+    const tutorCi = (tutor as any)?.ci || designation?.tutor_ci || null;
+    const tutorCel = (tutor as any)?.celular || designation?.tutor_celular || null;
+    const tituloAcademico = (designation?.tutor_titulo || (tutor as any)?.titulo || '').toString().trim();
+    const paraNombreLinea = this.buildParaNombreLinea(tutor as TutorReg | null, tutorNombre);
+    const cargoDocente = 'Docente Técnico';
+    const estudianteCodigo = designation?.cod_ceta || this.codCeta || null;
+    const carrera = designation?.carrera_nombre || this.estudiante?.carrera || this.proyecto?.carrera || null;
+    const proyectoNombre = designation?.proyecto_nombre || this.proyecto?.nombre || null;
+    const convocatoria = designation?.convocatoria_nom || this.confirmConvocatoriaNombre || null;
+    const convocatoriaInicio = (designation as any)?.convocatoria_fecha_inicio || this.confirmConvocatoriaInicio || null;
+    const convocatoriaFin = (designation as any)?.convocatoria_fecha_fin || this.confirmConvocatoriaFin || null;
+    const fecha = designation?.fecha_designacion || new Date();
+    const numeroDocumento = designation?.numero_documento || designation?.numeroDocumento || designation?.designacion_id || undefined;
+    const user = this.auth.getUser();
+    const userName = designation?.user_name
+      || user?.nombre_usuario
+      || [user?.nombre, user?.apellido_p, user?.apellido_m].filter(Boolean).join(' ').trim()
+      || user?.email
+      || undefined;
+    this.generatingPdf = true;
+    try {
+      const modalidadGeneral = this.modalidadNombre;
+      await this.pdfService.generarDesignacionTutorPdf({
+        tutorNombre,
+        tutorTipo: tutorTipo || undefined,
+        tutorTitulo: cargoDocente,
+        tutorCi: tutorCi || undefined,
+        tutorCelular: tutorCel || undefined,
+        area: area || undefined,
+        estudianteNombre,
+        estudianteCodigo: estudianteCodigo ? String(estudianteCodigo) : undefined,
+        carrera: carrera || undefined,
+        modalidad: modalidadGeneral,
+        proyectoNombre: proyectoNombre || undefined,
+        convocatoria: convocatoria || undefined,
+        convocatoriaFechaInicio: convocatoriaInicio || undefined,
+        convocatoriaFechaFin: convocatoriaFin || undefined,
+        fecha,
+        lugar: 'Cochabamba',
+        numeroDocumento: numeroDocumento ? String(numeroDocumento) : undefined,
+        cite: designation?.cite || undefined,
+        formatoCodigo: '«F3»',
+        paraNombre: paraNombreLinea,
+        paraCargo: undefined,
+        deNombre: 'Ing. Bradley Jailita Burgoa',
+        deCargo: 'DIRECTOR ACADÉMICO',
+        asunto: 'Designación como tutor para proyectos de defensa de grado',
+        introduccion: designation?.introduccion || undefined,
+        cronogramaInicio: designation?.cronograma_inicio || fecha,
+        cronogramaFin: designation?.cronograma_fin || fecha,
+        cierre: designation?.cierre || undefined,
+        elaboradoPor: userName,
+        cargoElaborador: 'Responsable de Modalidad de Graduación',
+        pieNotas: ['BJB', 'CC: REC/DA'],
+        estudiantes: (designation?.estudiantes || this.lastDesignationEstudiantes())
+          ?.map((est: any) => {
+            const resolvedModalidad = this.resolveEstudianteModalidad(est, modalidadGeneral);
+            return {
+              nombre: this.formatNombreApellidosPrimero(
+                est.apellido_p,
+                est.apellido_m,
+                est.nombres,
+                est.estudiante_nombre || this.estudianteNombre()
+              ) || this.estudianteNombre(),
+              carrera: est.carrera || carrera || undefined,
+              modalidad: resolvedModalidad || 'Proyecto de Grado',
+              area,
+              tema: est.proyecto_nombre || proyectoNombre || undefined,
+            };
+          }) || undefined,
+      }, {
+        fileName: `designacion-tutor-${estudianteCodigo || this.codCeta || 'documento'}.pdf`
+      });
+    } catch (err) {
+      console.error('Error generando PDF de designación:', err);
+      alert('No se pudo generar el documento PDF.');
+    } finally {
+      this.generatingPdf = false;
+    }
+  }
+
+  private resolveTutorById(id: number | null | undefined): TutorReg | null {
+    if (!id) return null;
+    const numericId = Number(id);
+    if (!Number.isFinite(numericId)) return null;
+    const fromList = (this.tutores || []).find(t => Number(t.id) === numericId);
+    if (fromList) return fromList;
+    if (this.selectedTutor && Number(this.selectedTutor.id) === numericId) return this.selectedTutor;
+    return null;
   }
 
   private resolveUserId(user: any): number | null {
@@ -495,7 +825,15 @@ export class DesignarTutorComponent implements OnInit {
       const raw = sessionStorage.getItem('datos_postulacion');
       const parsed = raw ? JSON.parse(raw) : {};
       if (designation) {
-        parsed.last_designation = designation;
+        const normalizedCod = this.normalizeCodCetaValue(designation.cod_ceta ?? this.codCeta ?? this.estudiante?.cod_ceta);
+        const normalizedDesignation = {
+          ...designation,
+          ...(normalizedCod ? { cod_ceta: normalizedCod } : {}),
+        };
+        this.lastDesignation = normalizedDesignation;
+        parsed.last_designation = normalizedDesignation;
+        delete parsed.lastDesignation;
+        delete parsed.designacion;
       } else {
         delete parsed.last_designation;
         delete parsed.lastDesignation;
@@ -503,5 +841,98 @@ export class DesignarTutorComponent implements OnInit {
       }
       sessionStorage.setItem('datos_postulacion', JSON.stringify(parsed));
     } catch {}
+  }
+
+  private normalizeCodCetaValue(value: any): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    const raw = value.toString().trim();
+    return raw || null;
+  }
+
+  private resolveDesignationArea(designation: any): string | null {
+    const direct = designation?.area ?? this.confirmArea ?? null;
+    if (!direct) return null;
+    if (Array.isArray(direct)) {
+      const first = direct.find((item: any) => item != null && String(item).trim().length);
+      return first ? String(first).trim() : null;
+    }
+    const text = String(direct).trim();
+    return text.length ? text : null;
+  }
+
+  private formatNombreApellidosPrimero(
+    apellidoP?: string | null,
+    apellidoM?: string | null,
+    nombres?: string | null,
+    fallback?: string | null,
+  ): string | null {
+    const parts: string[] = [];
+    if (apellidoP && apellidoP.trim()) parts.push(apellidoP.trim());
+    if (apellidoM && apellidoM.trim()) parts.push(apellidoM.trim());
+    if (nombres && nombres.trim()) parts.push(nombres.trim());
+    if (parts.length) {
+      return parts.join(' ').replace(/\s+/g, ' ').trim();
+    }
+    const fb = (fallback || '').trim();
+    if (!fb) return null;
+    const tokens = fb.split(/\s+/).filter(Boolean);
+    if (tokens.length >= 3) {
+      const lastTwo = tokens.slice(-2);
+      const rest = tokens.slice(0, -2);
+      return [...lastTwo, ...rest].join(' ').replace(/\s+/g, ' ').trim();
+    }
+    return fb;
+  }
+
+  private buildParaNombreLinea(tutor: TutorReg | null, nombreNormalizado: string): string {
+    const resolvedName = nombreNormalizado.trim();
+    const prefijo = 'T.S.';
+    if (!tutor) {
+      return `${prefijo} ${resolvedName}`.replace(/\s+/g, ' ').trim();
+    }
+    const baseNombre = this.formatNombreApellidosPrimero(
+      (tutor as any)?.apellido_p,
+      (tutor as any)?.apellido_m,
+      tutor?.nombre,
+      resolvedName
+    ) || resolvedName;
+    return `${prefijo} ${baseNombre}`.replace(/\s+/g, ' ').trim();
+  }
+
+  private resolveConvocatoriaFechaInicioFromSource(source: any): string | Date | null {
+    if (!source) return null;
+    const candidates = [
+      source?.convocatoria_fecha_inicio,
+      source?.fecha_inicio,
+      source?.fechaInicio,
+      source?.fecha_inicio_convocatoria,
+      source?.fechaInicioConvocatoria,
+      source?.inicio,
+    ];
+    return this.pickFirstNonEmpty(candidates);
+  }
+
+  private resolveConvocatoriaFechaFinFromSource(source: any): string | Date | null {
+    if (!source) return null;
+    const candidates = [
+      source?.convocatoria_fecha_fin,
+      source?.fecha_fin,
+      source?.fechaFin,
+      source?.fecha_fin_convocatoria,
+      source?.fechaFinConvocatoria,
+      source?.fin,
+    ];
+    return this.pickFirstNonEmpty(candidates);
+  }
+
+  private pickFirstNonEmpty(values: Array<any>): string | Date | null {
+    for (const value of values) {
+      if (value === null || value === undefined) continue;
+      if (typeof value === 'string' && !value.trim()) continue;
+      return value;
+    }
+    return null;
   }
 }

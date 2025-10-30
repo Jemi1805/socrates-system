@@ -23,6 +23,8 @@ export interface TutorDesignacionItem {
   tipo_tutor_nombre: string | null;
   convocatoria_id: number | null;
   convocatoria_label: string | null;
+  numero_documento?: string | null;
+  cite?: string | null;
   total_estudiantes: number;
   estudiantes: Array<{
     cod_ceta: number;
@@ -574,7 +576,7 @@ export class SgaService {
 
   // --- INSCRIPCIÓN MODALIDAD ---
   getInscripModalidadByPostulante(cod_ceta_est: number): Observable<ApiResponse<InscripModalidad[]>> {
-    return this.http.get<ApiResponse<InscripModalidad[]>>(`${this.baseUrl}/postulantes/${cod_ceta_est}/inscripciones`)
+    return this.http.get<ApiResponse<InscripModalidad[]>>(`${this.baseUrl}/inscripciones/${cod_ceta_est}`)
       .pipe(catchError(this.handleError));
   }
 

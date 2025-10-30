@@ -685,7 +685,7 @@ class SocratesApiService
 
     /**
      * Parsear HTML de docentes (tabla legacy dataTables-docentes) a array estructurado
-     * Retorna elementos con: nombre, apellido_p, apellido_m, ci, profesion, celular
+     * Retorna elementos con: nombre, apellido_p, apellido_m, ci, profesion, celular, nombre_corto
      */
     private function parseDocentesHtml($html)
     {
@@ -722,7 +722,7 @@ class SocratesApiService
             // Validar que parezca la tabla de docentes
             $headerText = strtolower(implode(' ', $headers));
             $looksLike = (strpos($headerText, 'nombres') !== false && strpos($headerText, 'paterno') !== false && strpos($headerText, 'materno') !== false)
-                      || (strpos($headerText, 'cédula') !== false && strpos($headerText, 'profesion') !== false);
+                      || (strpos($headerText, 'cédula') !== false && strpos($headerText, 'profesion') !== false) && (strpos($headerText, 'celular') !== false);
             if (!$looksLike && !$table) { continue; }
 
             $startRow = ($headerRowIndex > -1) ? $headerRowIndex + 1 : 1;
@@ -750,7 +750,8 @@ class SocratesApiService
                 $apMat     = trim($tds->item($offset + 2)->textContent);
                 $ci        = trim($tds->item($offset + 3)->textContent);
                 $profesion = trim($tds->item($offset + 4)->textContent);
-                $celular   = trim($tds->item($offset + 5)->textContent);
+                $nombreCorto = trim($tds->item($offset + 5)->textContent);
+                $celular   = trim($tds->item($offset + 6)->textContent);
 
                 // Filtrar filas vacías
                 if ($nombre === '' && $apPat === '' && $apMat === '' && $ci === '') { continue; }
@@ -761,6 +762,7 @@ class SocratesApiService
                     'apellido_m' => $apMat,
                     'ci' => $ci,
                     'profesion' => $profesion,
+                    'nombre_corto' => $nombreCorto,
                     'celular' => $celular,
                 ];
             }
