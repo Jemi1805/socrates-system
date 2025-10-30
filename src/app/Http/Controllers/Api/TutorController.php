@@ -65,6 +65,7 @@ class TutorController extends Controller
                 'apellido_m' => $t->apellido_m,
                 'celular' => $t->celular,
                 'titulo' => $t->titulo,
+                'titulo_academico' => $t->titulo_academico,
                 'ci' => $t->ci,
                 'cod_carrera' => $t->cod_carrera,
                 'carrera' => $t->carrera_nom,
@@ -132,6 +133,7 @@ class TutorController extends Controller
                 'tutores.cod_carrera',
                 'tutores.ci as tutor_ci',
                 'tutores.titulo as tutor_titulo',
+                'tutores.titulo_academico as tutor_titulo_academico',
                 'tipo_tutor.id as tipo_tutor_id',
                 'tipo_tutor.nombre as tipo_tutor_nombre',
                 'postulantes.nombres_est as postulante_nombres',
@@ -202,6 +204,7 @@ class TutorController extends Controller
                     'tutor_nombre' => $fullTutorName,
                     'tutor_celular' => $row->tutor_celular,
                     'tutor_titulo' => $row->tutor_titulo,
+                    'tutor_titulo_academico' => $row->tutor_titulo_academico,
                     'cod_carrera' => $row->cod_carrera,
                     'carrera_nombre' => $row->carrera_nombre,
                     'tipo_tutor_id' => $row->tipo_tutor_id ? (int)$row->tipo_tutor_id : null,
@@ -570,6 +573,7 @@ class TutorController extends Controller
             'items.*.pertinencia_acad_ids.*' => 'integer|exists:pertinencia_acad,id',
             'items.*.pertinencia' => 'nullable|string|max:255',
             'items.*.titulo' => 'nullable|string|max:255',
+            'items.*.titulo_academico' => ['nullable', 'string', 'in:T.S.,Lic.,Ing.'],
             'items.*.tipo_tutor_id' => 'nullable|integer|exists:tipo_tutor,id',
             'items.*.activo' => 'nullable|boolean',
         ]);
@@ -646,6 +650,9 @@ class TutorController extends Controller
                 } elseif (isset($i['profesion'])) {
                     $snapBase['titulo'] = $i['profesion'];
                 }
+                if (isset($i['titulo_academico'])) {
+                    $snapBase['titulo_academico'] = $i['titulo_academico'];
+                }
                 if (isset($i['cod_carrera'])) $snapBase['cod_carrera'] = $i['cod_carrera'];
                 if (!is_null($primaryId)) $snapBase['pertinencia_acad_id'] = $primaryId;
                 if (!is_null($pertNom)) $snapBase['pertinencia_nom'] = $pertNom;
@@ -713,6 +720,7 @@ class TutorController extends Controller
             'cod_carrera' => 'sometimes|nullable|string|max:10',
             'pertinencia_acad_id' => 'sometimes|nullable|integer|exists:pertinencia_acad,id',
             'titulo' => 'sometimes|nullable|string|max:255',
+            'titulo_academico' => ['sometimes', 'nullable', 'string', 'in:T.S.,Lic.,Ing.'],
             'tipo_tutor_id' => 'required|integer|exists:tipo_tutor,id',
         ]);
         if ($validator->fails()) {

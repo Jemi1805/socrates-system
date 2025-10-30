@@ -19,6 +19,7 @@ class Tutor extends Model
         'apellido_m',
         'celular',
         'titulo',
+        'titulo_academico',
         'cod_carrera',
         'ci',
         'pertinencia_acad_id',

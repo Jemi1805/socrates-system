@@ -37,6 +37,7 @@ export class TutoresHomeComponent implements OnInit {
   pertinencias: Pertinencia[] = [];
   // Selección múltiple de pertinencias en el modal
   selectedPertIds: number[] = [];
+  tituloAcademicoOpciones: string[] = ['T.S.', 'Lic.', 'Ing.'];
   // UI del multiselect con chips
   pertDropdownOpen = false;
   pertSearch = '';
@@ -458,6 +459,7 @@ export class TutoresHomeComponent implements OnInit {
       celular,
       profesion: this.editingDocente.profesion || undefined,
       titulo: this.editingDocente.profesion || undefined,
+      titulo_academico: this.editingDocente.titulo_academico || undefined,
       cod_carrera: codCarr,
       pertinencia_acad_id: primaryPertId,
       pertinencia_acad_ids: this.selectedPertIds,
@@ -537,6 +539,7 @@ export class TutoresHomeComponent implements OnInit {
           pertinencia_acad_id: primaryPertId,
           pertinencia_acad_ids: this.selectedPertIds,
           pertinencia: pertNom || undefined,
+          titulo_academico: doc.titulo_academico || undefined,
         };
         this.sga.registerTutoresBulk([item], { updateOnly: true }).subscribe({ next: () => {}, error: () => {} });
       },
@@ -553,6 +556,7 @@ export class TutoresHomeComponent implements OnInit {
     const ci = (this.editingDocente?.ci || '').toString().trim();
     const celular = (this.editingDocente?.celular || '').toString().trim();
     const titulo = (this.editingDocente?.profesion || '').toString().trim();
+    const tituloAcademico = (this.editingDocente?.titulo_academico || '').toString().trim();
     const hasAnyPert = (this.selectedPertIds?.length || 0) > 0;
     const tipoTutor = this.selectedTipoTutorId;
     if (!(cod === 'MEA' || cod === 'EEA')) miss.push('Carrera');
@@ -561,6 +565,7 @@ export class TutoresHomeComponent implements OnInit {
     if (!ci) miss.push('CI');
     if (!celular) miss.push('Celular');
     if (!titulo) miss.push('Título(s)');
+    if (!tituloAcademico) miss.push('Título académico');
     if (!tipoTutor) miss.push('Tipo de Tutor');
     if (!hasAnyPert) miss.push('Pertinencia académica');
     // Validaciones de formato
@@ -665,6 +670,7 @@ export class TutoresHomeComponent implements OnInit {
               ci: key,
               profesion: (d as any).profesion || '',
               celular: (d as any).celular || '',
+              titulo_academico: (d as any).titulo_academico ?? null,
               pertinencia: (d as any).pertinencia || '',
               pertinencia_acad_id: (d as any).pertinencia_acad_id ?? null,
               tipo_tutor_id: (d as any).tipo_tutor_id ?? null,
@@ -727,6 +733,7 @@ export class TutoresHomeComponent implements OnInit {
               apellido_m: (ld as any).apellido_m ?? prev.apellido_m,
               profesion: (ld as any).profesion ?? prev.profesion,
               celular: pickCel,
+              titulo_academico: (ld as any).titulo_academico ?? (prev as any).titulo_academico ?? null,
               pertinencia: (ld as any).pertinencia ?? prev.pertinencia,
               pertinencia_acad_id: (ld as any).pertinencia_acad_id != null ? (ld as any).pertinencia_acad_id : prev.pertinencia_acad_id,
               // Si hicimos merge por nombre (prev venía de SGA con CI malo), sobreescribir el CI mostrado con el local
@@ -810,6 +817,9 @@ export class TutoresHomeComponent implements OnInit {
               if (!docVal.profesion && (tutorInfo as any).titulo) {
                 docVal.profesion = (tutorInfo as any).titulo;
               }
+              if (!(docVal as any).titulo_academico && (tutorInfo as any).titulo_academico) {
+                (docVal as any).titulo_academico = (tutorInfo as any).titulo_academico;
+              }
             } else {
               (docVal as any).tutor_reg_id = undefined;
               (docVal as any).tutor_activo = false;
@@ -845,7 +855,8 @@ export class TutoresHomeComponent implements OnInit {
       profesion: doc.profesion,
       celular: doc.celular,
       pertinencia: doc.pertinencia || '',
-      pertinencia_acad_id: (doc.pertinencia_acad_id ?? null)
+      pertinencia_acad_id: (doc.pertinencia_acad_id ?? null),
+      titulo_academico: (doc as any).titulo_academico ?? null,
     } as Partial<Docente>;
     this.editingCiOriginal = (doc.ci || '').toString().trim() || null;
     this.showFieldErrors = false;
@@ -887,6 +898,7 @@ export class TutoresHomeComponent implements OnInit {
     this.pertDropdownOpen = false;
     this.skipFirstPertFocus = true;
     this.selectedTipoTutorId = null;
+    this.editingDocente!.titulo_academico = null;
     this.modalEditarDocenteVisible = true;
   }
 
@@ -934,6 +946,7 @@ export class TutoresHomeComponent implements OnInit {
       ...this.editingDocente,
       ci: ciKey,
       profesion: this.editingDocente.profesion || '',
+      titulo_academico: this.editingDocente?.titulo_academico ?? null,
       pertinencia: pertNombre,
       pertinencia_acad_id: primaryPertId as any,
       pertinencia_ids: [...this.selectedPertIds],
@@ -1021,6 +1034,7 @@ export class TutoresHomeComponent implements OnInit {
       celular: d.celular || '',
       profesion: d.profesion || '',
       titulo: d.profesion || '',
+      titulo_academico: (d as any).titulo_academico ?? null,
       cod_carrera: codCarr,
       pertinencia_acad_id: (d as any).pertinencia_acad_id ?? null,
       pertinencia_acad_ids: (d as any).pertinencia_ids,

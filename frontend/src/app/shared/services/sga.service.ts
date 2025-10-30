@@ -17,6 +17,7 @@ export interface TutorDesignacionItem {
   tutor_nombre: string;
   tutor_celular: string | null;
   tutor_titulo: string | null;
+  tutor_titulo_academico?: string | null;
   cod_carrera: string | null;
   carrera_nombre: string | null;
   tipo_tutor_id: number | null;
@@ -81,6 +82,7 @@ export interface Docente {
   ci: string;
   profesion: string;
   celular: string;
+  titulo_academico?: string | null;
   pertinencia?: string;
   pertinencia_acad_id?: number | null;
   pertinencia_ids?: number[];
@@ -106,6 +108,7 @@ export interface TutorBulkItem {
   apellido_m?: string;
   celular: string;
   profesion?: string;
+  titulo_academico?: string | null;
   cod_carrera?: string; // MEA/EEA
   pertinencia_acad_id?: number | null;
   pertinencia_acad_ids?: number[]; // soporte multi-pertinencias
@@ -121,6 +124,7 @@ export interface TutorReg {
   ci: string;
   celular?: string;
   titulo?: string;
+  titulo_academico?: string | null;
   cod_carrera?: string;
   carrera?: string;
   pertinencia?: string;
@@ -359,6 +363,7 @@ export class SgaService {
           apellido_m: t.apellido_m || '',
           ci: t.ci,
           profesion: t.titulo || '',
+          titulo_academico: t.titulo_academico ?? null,
           celular: t.celular || '',
           pertinencia: t.pertinencia || '',
           pertinencia_acad_id: t.pertinencia_acad_id ?? null,

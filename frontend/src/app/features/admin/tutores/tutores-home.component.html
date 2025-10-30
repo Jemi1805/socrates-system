@@ -120,6 +120,15 @@
               <div class="invalid-feedback">Ingrese título o profesión</div>
             </div>
             <div class="col-md-6">
+              <label class="form-label">Título Académico <span class="text-danger">*</span></label>
+              <select class="form-select" [(ngModel)]="editingDocente!.titulo_academico"
+                      [ngClass]="{'is-invalid': showFieldErrors && !((editingDocente?.titulo_academico ?? '').trim())}">
+                <option value="" disabled>Seleccione título académico</option>
+                <option *ngFor="let titulo of tituloAcademicoOpciones" [value]="titulo">{{ titulo }}</option>
+              </select>
+              <div class="invalid-feedback">Seleccione el título académico</div>
+            </div>
+            <div class="col-md-6">
               <label class="form-label">Tipo de Tutor <span class="text-danger">*</span></label>
               <select class="form-select" [(ngModel)]="selectedTipoTutorId" [ngClass]="{'is-invalid': showFieldErrors && !selectedTipoTutorId}">
                 <option [ngValue]="null" disabled>Seleccione tipo</option>
