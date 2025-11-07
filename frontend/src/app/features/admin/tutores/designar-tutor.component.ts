@@ -465,7 +465,13 @@ export class DesignarTutorComponent implements OnInit {
       return;
     }
     const proyectoId = this.proyecto?.id ? Number(this.proyecto.id) : undefined;
-    const payload: any = { tutor_id: Number(this.selectedTutor.id), cod_ceta: codNumeric, proyecto_id: proyectoId };
+    const payload: any = {
+      tutor_id: Number(this.selectedTutor.id),
+      cod_ceta: codNumeric,
+      proyecto_id: proyectoId,
+      generar_documento: true,
+      refrescar_correlativo: true,
+    };
     const areaSeleccionada = this.confirmArea || this.resolveTutorAreaLabel(this.selectedTutor, this.selectedPertinenciaId);
     if (areaSeleccionada) {
       payload.area = areaSeleccionada;
@@ -476,11 +482,14 @@ export class DesignarTutorComponent implements OnInit {
       const convRow = this.convocatorias.find(c => Number(c.id) === Number(this.selectedConvocatoriaId));
       if (convRow) {
         payload.convocatoria_nom = this.formatConvocatoriaLabel(convRow);
+        payload.convocatoria_fecha_inicio = this.resolveConvocatoriaFechaInicioFromSource(convRow);
+        payload.convocatoria_fecha_fin = this.resolveConvocatoriaFechaFinFromSource(convRow);
         currentConvocatoriaRow = convRow;
       } else if (this.confirmConvocatoriaNombre) {
         payload.convocatoria_nom = this.confirmConvocatoriaNombre;
       }
     }
+    console.debug('[DesignarTutor] payload listo', payload);
     const user = this.auth.getUser();
     const resolvedName = user?.nombre_usuario
       || [user?.nombre, user?.apellido_p, user?.apellido_m].filter(Boolean).join(' ').trim()
@@ -501,7 +510,8 @@ export class DesignarTutorComponent implements OnInit {
         this.showConfirmModal = false;
         this.loadingService.hideModal();
         if (resp?.success) {
-          this.lastDesignation = resp?.data || null;
+          const respData: any = resp?.data || null;
+          this.lastDesignation = respData;
           if (this.lastDesignation) {
             const areaLabel = this.confirmArea || (this.selectedTutor ? this.areasText(this.selectedTutor) : null);
             if (areaLabel) {
@@ -532,19 +542,31 @@ export class DesignarTutorComponent implements OnInit {
             if (!this.lastDesignation.user_id && resolvedUserId !== null) {
               this.lastDesignation.user_id = resolvedUserId;
             }
+            const apiConvInicio = respData?.convocatoria_fecha_inicio ?? null;
+            const apiConvFin = respData?.convocatoria_fecha_fin ?? null;
+            const apiCronogramaInicio = respData?.cronograma_inicio ?? respData?.doc_cronograma_inicio ?? null;
+            const apiCronogramaFin = respData?.cronograma_fin ?? respData?.doc_cronograma_fin ?? null;
             const resolvedInicio = currentConvocatoriaRow
               ? this.resolveConvocatoriaFechaInicioFromSource(currentConvocatoriaRow)
-              : this.resolveConvocatoriaFechaInicioFromSource(this.lastDesignation);
+              : this.resolveConvocatoriaFechaInicioFromSource(apiConvInicio ? { convocatoria_fecha_inicio: apiConvInicio } : this.lastDesignation);
             const resolvedFin = currentConvocatoriaRow
               ? this.resolveConvocatoriaFechaFinFromSource(currentConvocatoriaRow)
-              : this.resolveConvocatoriaFechaFinFromSource(this.lastDesignation);
-            if (resolvedInicio) {
-              this.confirmConvocatoriaInicio = resolvedInicio;
-              (this.lastDesignation as any).convocatoria_fecha_inicio = resolvedInicio;
+              : this.resolveConvocatoriaFechaFinFromSource(apiConvFin ? { convocatoria_fecha_fin: apiConvFin } : this.lastDesignation);
+            const finalConvInicio = apiConvInicio || resolvedInicio || this.confirmConvocatoriaInicio;
+            const finalConvFin = apiConvFin || resolvedFin || this.confirmConvocatoriaFin;
+            if (finalConvInicio) {
+              this.confirmConvocatoriaInicio = finalConvInicio;
+              (this.lastDesignation as any).convocatoria_fecha_inicio = finalConvInicio;
             }
-            if (resolvedFin) {
-              this.confirmConvocatoriaFin = resolvedFin;
-              (this.lastDesignation as any).convocatoria_fecha_fin = resolvedFin;
+            if (finalConvFin) {
+              this.confirmConvocatoriaFin = finalConvFin;
+              (this.lastDesignation as any).convocatoria_fecha_fin = finalConvFin;
+            }
+            if (apiCronogramaInicio) {
+              (this.lastDesignation as any).cronograma_inicio = apiCronogramaInicio;
+            }
+            if (apiCronogramaFin) {
+              (this.lastDesignation as any).cronograma_fin = apiCronogramaFin;
             }
           }
           this.persistLastDesignation(this.lastDesignation);
@@ -689,6 +711,7 @@ export class DesignarTutorComponent implements OnInit {
     this.confirmConvocatoriaFin = null;
     this.showResumenDesignacion = false;
     this.showSeleccionTutores = true;
+    this.persistLastDesignation(this.lastDesignation);
   }
 
   public async generarDesignacionPdf() {
@@ -737,7 +760,7 @@ export class DesignarTutorComponent implements OnInit {
       || undefined;
     this.generatingPdf = true;
     try {
-      const modalidadGeneral = this.modalidadNombre;
+      const modalidadGeneral = this.modalidadNombre || 'Proyecto de Grado';
       await this.pdfService.generarDesignacionTutorPdf({
         tutorNombre,
         tutorApellidoP: tutor?.apellido_p || undefined,
@@ -757,10 +780,9 @@ export class DesignarTutorComponent implements OnInit {
         convocatoria: convocatoria || undefined,
         convocatoriaFechaInicio: convocatoriaInicio || undefined,
         convocatoriaFechaFin: convocatoriaFin || undefined,
-        fecha,
-        lugar: 'Cochabamba',
-        numeroDocumento: numeroDocumento ? String(numeroDocumento) : undefined,
-        cite: designation?.cite || undefined,
+        numeroDocumento: (designation?.numero_documento ?? numeroDocumento ?? null)?.toString() || undefined,
+        cite: designation?.cite || this.lastDesignation?.cite || undefined,
+        fecha: new Date().toISOString(),
         formatoCodigo: '«F3»',
         paraNombre: undefined,
         paraCargo: 'DOCENTE TÉCNICO',

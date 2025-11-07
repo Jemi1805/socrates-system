@@ -1,6 +1,6 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { Observable, of } from 'rxjs';
-import { tap, catchError, finalize, map, switchMap } from 'rxjs/operators';
+import { tap, catchError, finalize, map, switchMap, take } from 'rxjs/operators';
 
 import { CommonModule, formatDate } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -11,6 +11,8 @@ import { PostulanteService } from '../postulantes/postulante.service';
 import { Postulante } from '../postulantes/postulante.model';
 import { ProyectoService } from '../proyectos/proyecto.service';
 import { LoadingService } from '../../../core/services/loading.service';
+import { SgaService, TutorDesignacionItem } from '../../../shared/services/sga.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 interface PostulanteInscrito {
   cod_ceta: number;
@@ -91,6 +93,7 @@ export class ModalidadGraduacionComponent implements OnInit {
     private estudianteService: EstudianteService,
     private router: Router,
     private postulanteService: PostulanteService,
+    private sgaService: SgaService,
     private cdr: ChangeDetectorRef,
     private proyectoService: ProyectoService,
     private loadingService: LoadingService
@@ -335,12 +338,20 @@ export class ModalidadGraduacionComponent implements OnInit {
       const raw = sessionStorage.getItem('datos_postulacion');
       if (!raw) {
         this.lastDesignation = null;
+        const expected = this.normalizeCodCeta(cod);
+        if (expected) {
+          this.fetchDesignationFromBackend(expected);
+        }
         return;
       }
       const parsed = JSON.parse(raw);
       const stored = parsed?.last_designation || parsed?.designacion || parsed?.lastDesignation || null;
       if (!stored) {
         this.lastDesignation = null;
+        const expected = this.normalizeCodCeta(cod);
+        if (expected) {
+          this.fetchDesignationFromBackend(expected);
+        }
         return;
       }
       let expectedCod = this.normalizeCodCeta(cod);
@@ -353,12 +364,129 @@ export class ModalidadGraduacionComponent implements OnInit {
       const storedCod = this.normalizeCodCeta(stored?.cod_ceta ?? stored?.codCeta ?? stored?.cod_ceta_est);
       if (expectedCod && storedCod && expectedCod !== storedCod) {
         this.lastDesignation = null;
+        this.fetchDesignationFromBackend(expectedCod);
         return;
       }
       this.lastDesignation = stored;
+      this.persistLastDesignationInSession(stored);
+      if (expectedCod) {
+        this.fetchDesignationFromBackend(expectedCod);
+      }
     } catch {
       this.lastDesignation = null;
+      const expected = this.normalizeCodCeta(cod);
+      if (expected) {
+        this.fetchDesignationFromBackend(expected);
+      }
     }
+  }
+
+  private persistLastDesignationInSession(designation: any | null) {
+    try {
+      const raw = sessionStorage.getItem('datos_postulacion');
+      const parsed = raw ? JSON.parse(raw) : {};
+      if (designation) {
+        parsed.last_designation = designation;
+      } else {
+        delete parsed.last_designation;
+      }
+      sessionStorage.setItem('datos_postulacion', JSON.stringify(parsed));
+    } catch {
+      // Ignorar errores de almacenamiento
+    }
+  }
+
+  private fetchDesignationFromBackend(codCeta: string | number) {
+    const normalized = this.normalizeCodCeta(codCeta);
+    if (!normalized) return;
+    this.sgaService.getTutoresDesignados({ cod_ceta: normalized })
+      .pipe(take(1), catchError(() => of(null)))
+      .subscribe((resp) => {
+        const rows = (resp as any)?.data ?? resp;
+        const list = Array.isArray(rows) ? rows as TutorDesignacionItem[] : [];
+        const first = list.length ? list[0] : null;
+        if (first) {
+          const merged = this.normalizeDesignationData(first, this.lastDesignation);
+          this.lastDesignation = merged;
+          this.persistLastDesignationInSession(merged);
+        }
+        this.cdr.detectChanges();
+      });
+  }
+
+  private resolveFirstNonEmpty(...values: Array<any>): string | null {
+    for (const value of values) {
+      if (value === null || value === undefined) continue;
+      const text = String(value).trim();
+      if (!text || text === '-') continue;
+      return text;
+    }
+    return null;
+  }
+
+  private normalizeDesignationData(data: any, fallback: any | null): any {
+    const merged = { ...(fallback || {}) } as any;
+
+    const tutorNombre = this.resolveFirstNonEmpty(
+      data?.tutor_nombre,
+      data?.tutor?.nombre_completo,
+      (data?.tutor?.nombre && data?.tutor?.apellido_p) ? `${data.tutor.apellido_p} ${data.tutor.apellido_m || ''} ${data.tutor.nombre}` : null,
+      fallback?.tutor_nombre,
+    );
+    if (tutorNombre) merged.tutor_nombre = tutorNombre;
+
+    const area = this.resolveFirstNonEmpty(
+      data?.area,
+      (data as any)?.area_nombre,
+      (data as any)?.area_label,
+      (data as any)?.pertinencia,
+      fallback?.area,
+    );
+    if (!area) {
+      const areaFromStudents = Array.isArray(data?.estudiantes)
+        ? data.estudiantes.map((est: any) => this.resolveFirstNonEmpty(
+            est?.area,
+            (est as any)?.area_nombre,
+            (est as any)?.area_label,
+            (est as any)?.pertinencia,
+          )).find((val: string | null | undefined) => !!val)
+        : null;
+      if (areaFromStudents) {
+        merged.area = areaFromStudents;
+      }
+    } else {
+      merged.area = area;
+    }
+
+    const convocatoria = this.resolveFirstNonEmpty(
+      data?.convocatoria_nom,
+      data?.convocatoria_label,
+      (data as any)?.convocatoria_nombre,
+      (data as any)?.convocatoria,
+      fallback?.convocatoria_nom,
+    );
+    if (convocatoria) merged.convocatoria_nom = convocatoria;
+
+    const fecha = this.resolveFirstNonEmpty(
+      data?.fecha_designacion,
+      (Array.isArray(data?.estudiantes) ? data.estudiantes.map((est: any) => est?.fecha_designacion) : []),
+      data?.fecha,
+      data?.created_at,
+      fallback?.fecha_designacion,
+    );
+    if (fecha) merged.fecha_designacion = fecha;
+
+    const codCeta = data?.cod_ceta ?? data?.codCeta ?? fallback?.cod_ceta ?? fallback?.codCeta;
+    if (codCeta) {
+      merged.cod_ceta = codCeta;
+    }
+
+    merged.tutor_id = data?.tutor_id ?? merged.tutor_id;
+    merged.convocatoria_id = data?.convocatoria_id ?? merged.convocatoria_id;
+    merged.numero_documento = data?.numero_documento ?? merged.numero_documento;
+    merged.cite = data?.cite ?? merged.cite;
+
+    return merged;
   }
 
   // --- Utilidades de mapeo/merge ---

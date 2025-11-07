@@ -258,19 +258,38 @@
                     <span class="badge bg-primary">{{ item.total_estudiantes }}</span>
                   </td>
                   <td>
-                    <ul class="mb-0 ps-3">
-                      <li *ngFor="let est of item.estudiantes">
-                        <div>{{ est.estudiante_nombre || '-' }}</div>
+                    <div class="form-check mb-2 ms-1">
+                      <input class="form-check-input" type="checkbox"
+                             [checked]="item.estudiantes?.length && hasSelectedStudents(item)"
+                             (change)="selectAllStudents(item, $event.target.checked)"
+                      />
+                      <label class="form-check-label small">Seleccionar todos</label>
+                    </div>
+                    <ul class="mb-0 ps-0 list-unstyled">
+                      <li *ngFor="let est of item.estudiantes" class="mb-1">
+                        <div class="form-check ms-1">
+                          <input class="form-check-input" type="checkbox"
+                                 [checked]="isStudentSelected(item.tutor_id, est.cod_ceta)"
+                                 (change)="toggleStudentSelection(item.tutor_id, est.cod_ceta, $event.target.checked)"
+                                 [id]="'est-' + item.tutor_id + '-' + est.cod_ceta"
+                          />
+                          <label class="form-check-label" [for]="'est-' + item.tutor_id + '-' + est.cod_ceta">
+                            {{ est.estudiante_nombre || '-' }}
+                          </label>
+                        </div>
                       </li>
                     </ul>
                   </td>
                   <td class="text-end">
                     <button class="btn btn-success btn-sm d-inline-flex align-items-center gap-2"
-                            (click)="generarPdfDesignado(item)"
-                            [disabled]="generatingDesignadoId === item.tutor_id">
-                      <i class="bi" [ngClass]="generatingDesignadoId === item.tutor_id ? 'bi-arrow-repeat spin' : 'bi-file-earmark-pdf'"> </i>
-                      <span>{{ generatingDesignadoId === item.tutor_id ? 'Generando...' : 'Descargar' }}</span>
+                            (click)="openConfirmModal(item)"
+                            [disabled]="generatingDesignadoId === item.tutor_id || !hasSelectedStudents(item)">
+                      <i class="bi" [ngClass]="generatingDesignadoId === item.tutor_id ? 'bi-arrow-repeat spin' : 'bi-file-earmark-pdf'"></i>
+                      <span>{{ generatingDesignadoId === item.tutor_id ? 'Generando...' : 'Generar documento' }}</span>
                     </button>
+                    <div class="text-muted small mt-1" *ngIf="!hasSelectedStudents(item)">
+                      Seleccione estudiantes
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -535,3 +554,43 @@
     </div>
   </div>
 </div>
+
+<!-- Modal confirmación generación documento designado -->
+<ng-container *ngIf="confirmModalVisible">
+  <div class="modal fade show d-block confirm-document-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalConfirmarDesignacionLabel">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header py-2">
+          <h5 class="modal-title" id="modalConfirmarDesignacionLabel">
+            <i class="bi bi-file-earmark-text me-2"></i>
+            Confirmar documento
+          </h5>
+          <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="closeConfirmModal()"></button>
+        </div>
+        <div class="modal-body text-start">
+          <p class="mb-3">
+            Se generará la designación del tutor <strong>{{ confirmModalTutor?.tutor_nombre }}</strong> para los siguientes postulantes:
+          </p>
+          <div class="confirm-students mb-3">
+            <div *ngFor="let est of confirmModalEstudiantes" class="confirm-student">
+              <div class="confirm-student-icon">
+                <i class="bi bi-person-fill-check"></i>
+              </div>
+              <div class="confirm-student-data">
+                <div class="confirm-student-code">{{ est.cod_ceta }}</div>
+                <div class="confirm-student-name">{{ est.nombre }}</div>
+              </div>
+            </div>
+          </div>
+          <p class="text-muted small mb-0">Confirme para proceder con la generación del documento PDF.</p>
+        </div>
+        <div class="modal-footer py-2 d-flex justify-content-end gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="closeConfirmModal()">Cancelar</button>
+          <button type="button" class="btn btn-success btn-sm" (click)="confirmGenerateDesignado()" [disabled]="generatingDesignadoId === confirmModalTutor?.tutor_id">
+            {{ generatingDesignadoId === confirmModalTutor?.tutor_id ? 'Generando...' : 'Confirmar y generar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</ng-container>

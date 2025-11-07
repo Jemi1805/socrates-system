@@ -20,10 +20,15 @@ export interface TutorDesignacionItem {
   tutor_titulo_academico?: string | null;
   cod_carrera: string | null;
   carrera_nombre: string | null;
+  area?: string | null;
   tipo_tutor_id: number | null;
   tipo_tutor_nombre: string | null;
   convocatoria_id: number | null;
   convocatoria_label: string | null;
+  convocatoria_fecha_inicio?: string | null;
+  convocatoria_fecha_fin?: string | null;
+  cronograma_inicio?: string | null;
+  cronograma_fin?: string | null;
   numero_documento?: string | null;
   cite?: string | null;
   total_estudiantes: number;
@@ -436,6 +441,11 @@ export class SgaService {
   // --- TUTORES: designación ---
   designarTutor(data: { tutor_id: number; cod_ceta: number; proyecto_id?: number; convocatoria_id?: number; convocatoria_nom?: string }): Observable<ApiResponse<any>> {
     return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/tutores/designar`, data)
+      .pipe(catchError(this.handleError));
+  }
+
+  designarTutorNueva(data: any): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/tutores/designaciones`, data)
       .pipe(catchError(this.handleError));
   }
 

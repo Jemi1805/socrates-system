@@ -85,14 +85,6 @@
             <i class="bi bi-arrow-repeat me-1"></i>
             Cambiar tutor
           </button>
-          <button class="btn btn-sm btn-danger" type="button" (click)="clearSavedDesignation()">
-            <i class="bi bi-x-circle me-1"></i>
-            Quitar designación
-          </button>
-          <button class="btn btn-sm btn-success" type="button" (click)="generarDesignacionPdf()" [disabled]="generatingPdf">
-            <i class="bi" [ngClass]="generatingPdf ? 'bi-arrow-repeat spin' : 'bi-file-earmark-pdf'" ></i>
-            {{ generatingPdf ? 'Generando PDF...' : 'Descargar documento' }}
-          </button>
         </div>
       </div>
     </div>
@@ -248,10 +240,6 @@
       </div>
       <div class="modal-footer">
         <div class="d-flex flex-wrap gap-2">
-          <button type="button" class="btn btn-outline-success" (click)="generarDesignacionPdf()" [disabled]="generatingPdf">
-            <i class="bi" [ngClass]="generatingPdf ? 'bi-arrow-repeat spin' : 'bi-file-earmark-pdf'" ></i>
-            {{ generatingPdf ? 'Generando PDF...' : 'Descargar memorándum' }}
-          </button>
           <button type="button" class="btn btn-primary" (click)="closeSuccessModal()">Aceptar</button>
         </div>
       </div>

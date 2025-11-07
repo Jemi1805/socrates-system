@@ -6,7 +6,7 @@ import { HeaderComponent } from '../../../shared/components/header/header.compon
 import { SgaService, Docente, ApiResponse, Pertinencia, TutorReg, TutorTipo, Convocatoria, TutorDesignacionItem } from '../../../shared/services/sga.service';
 import { PdfService } from '../../../shared/services/pdf.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { forkJoin } from 'rxjs';
+import { firstValueFrom, forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-tutores-home',
@@ -82,6 +82,24 @@ export class TutoresHomeComponent implements OnInit {
   selectedConvocatoriaDesignados: number | null = null;
   designadosSearchTerm: string = '';
   generatingDesignadoId: number | null = null;
+  selectedStudentsByTutor: Map<number, Set<number>> = new Map<number, Set<number>>();
+  confirmModalVisible = false;
+  confirmModalTutor: TutorDesignacionItem | null = null;
+  confirmModalEstudiantes: Array<{
+    cod_ceta: number;
+    nombre: string | null;
+    modalidad?: string | null;
+    area?: string | null;
+    proyecto_nombre?: string | null;
+    fecha_designacion?: string | null;
+  }> = [];
+
+  @HostListener('document:keydown.escape', ['$event'])
+  onEscapeKey(_event?: Event) {
+    if (this.confirmModalVisible) {
+      this.closeConfirmModal();
+    }
+  }
 
   constructor(private sga: SgaService, private router: Router, private pdfService: PdfService, private auth: AuthService) {}
 
@@ -140,54 +158,280 @@ export class TutoresHomeComponent implements OnInit {
     });
   }
 
-  async generarPdfDesignado(item: TutorDesignacionItem) {
-    if (!item || this.generatingDesignadoId === item.tutor_id) {
+  private getSelectedStudentSet(tutorId: number): Set<number> {
+    if (!this.selectedStudentsByTutor.has(tutorId)) {
+      this.selectedStudentsByTutor.set(tutorId, new Set<number>());
+    }
+    return this.selectedStudentsByTutor.get(tutorId)!;
+  }
+
+  private resolveFirstNonEmpty(...values: Array<string | null | undefined>): string | null {
+    for (const value of values) {
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed.length) {
+          return trimmed;
+        }
+      }
+    }
+    return null;
+  }
+
+  private normalizeEstudianteData(est: any) {
+    const modalidad = this.resolveFirstNonEmpty(est?.modalidad, est?.modalidad_nombre, est?.modalidad_label);
+    const area = this.resolveFirstNonEmpty(est?.area, est?.area_nombre, est?.area_label);
+    const proyecto = this.resolveFirstNonEmpty(est?.proyecto_nombre, est?.tema, est?.tema_registro);
+    const fechaDesignacion = est?.fecha_designacion ? new Date(est.fecha_designacion) : null;
+    const codCetaRaw = Number(est?.cod_ceta ?? 0);
+
+    return {
+      cod_ceta: Number.isFinite(codCetaRaw) ? codCetaRaw : 0,
+      nombre: (est?.estudiante_nombre || '-').toString(),
+      modalidad,
+      area,
+      tema: proyecto,
+      fechaDesignacion,
+      raw: est,
+    };
+  }
+
+  isStudentSelected(tutorId: number, codCeta: number): boolean {
+    return this.getSelectedStudentSet(tutorId).has(codCeta);
+  }
+
+  private buildDesignacionPayload(tutor: TutorDesignacionItem, estudiante: any, userName?: string, userId?: number): any {
+    const codCeta = Number(estudiante?.cod_ceta ?? 0);
+    const payload: any = {
+      tutor_id: Number(tutor.tutor_id),
+      cod_ceta: codCeta,
+      generar_documento: true,
+      refrescar_correlativo: true,
+    };
+
+    if (estudiante?.proyecto_id != null) {
+      payload.proyecto_id = Number(estudiante.proyecto_id);
+    }
+
+    const area = this.resolveFirstNonEmpty(estudiante?.area, estudiante?.area_nombre, estudiante?.area_label, tutor.area ?? null);
+    if (area) {
+      payload.area = area;
+    }
+
+    if (tutor.convocatoria_id != null) {
+      payload.convocatoria_id = Number(tutor.convocatoria_id);
+    }
+    if (tutor.convocatoria_label) {
+      payload.convocatoria_nom = tutor.convocatoria_label;
+    }
+    if (tutor.convocatoria_fecha_inicio) {
+      payload.convocatoria_fecha_inicio = tutor.convocatoria_fecha_inicio;
+    }
+    if (tutor.convocatoria_fecha_fin) {
+      payload.convocatoria_fecha_fin = tutor.convocatoria_fecha_fin;
+    }
+
+    if (userName) {
+      payload.user_name = userName;
+    }
+    if (userId != null) {
+      payload.user_id = userId;
+    }
+
+    return payload;
+  }
+
+  private resolveUserId(user: any): number | null {
+    if (!user) return null;
+    const candidates = [user.id, user.user_id, user.usuario_id];
+    for (const value of candidates) {
+      if (value !== undefined && value !== null) {
+        const num = Number(value);
+        if (Number.isFinite(num)) {
+          return num;
+        }
+      }
+    }
+    return null;
+  }
+
+  private normalizeNumeroDocumento(value: unknown): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) {
+        return null;
+      }
+      return value.toString().padStart(3, '0');
+    }
+    const str = value.toString().trim();
+    return str.length ? str : null;
+  }
+
+  toggleStudentSelection(tutorId: number, codCeta: number, checked: boolean) {
+    const set = this.getSelectedStudentSet(tutorId);
+    if (checked) {
+      set.add(codCeta);
+    } else {
+      set.delete(codCeta);
+    }
+  }
+
+  selectAllStudents(tutor: TutorDesignacionItem, checked: boolean) {
+    const set = this.getSelectedStudentSet(tutor.tutor_id);
+    set.clear();
+    if (checked) {
+      (tutor.estudiantes || []).forEach(est => set.add(est.cod_ceta));
+    }
+  }
+
+  hasSelectedStudents(tutor: TutorDesignacionItem): boolean {
+    return this.getSelectedStudentSet(tutor.tutor_id).size > 0;
+  }
+
+  openConfirmModal(tutor: TutorDesignacionItem) {
+    const selectedSet = this.getSelectedStudentSet(tutor.tutor_id);
+    if (!selectedSet.size) {
       return;
     }
-    this.generatingDesignadoId = item.tutor_id;
+    const estudiantes = (tutor.estudiantes || []).filter(est => selectedSet.has(est.cod_ceta));
+    if (!estudiantes.length) {
+      return;
+    }
+    const normalizados = estudiantes.map(est => this.normalizeEstudianteData(est));
+    this.confirmModalTutor = tutor;
+    this.confirmModalEstudiantes = normalizados.map((n) => ({
+      cod_ceta: n.cod_ceta,
+      nombre: n.nombre,
+      modalidad: n.modalidad,
+      area: n.area,
+      proyecto_nombre: n.tema,
+      fecha_designacion: n.fechaDesignacion ? n.fechaDesignacion.toISOString() : null,
+    }));
+    this.confirmModalVisible = true;
+  }
+
+  closeConfirmModal() {
+    this.confirmModalVisible = false;
+    this.confirmModalTutor = null;
+    this.confirmModalEstudiantes = [];
+    this.generatingDesignadoId = null;
+  }
+
+  async confirmGenerateDesignado() {
+    const tutor = this.confirmModalTutor;
+    if (!tutor || !this.confirmModalEstudiantes.length || this.generatingDesignadoId === tutor.tutor_id) {
+      return;
+    }
+    this.generatingDesignadoId = tutor.tutor_id;
     try {
-      const estudiantes = item.estudiantes || [];
-      const firstEst = estudiantes[0] || {} as any;
-      const estudianteNombre = estudiantes.length === 1
-        ? (firstEst.estudiante_nombre || 'Estudiante asignado')
-        : estudiantes.map(e => e.estudiante_nombre).filter(Boolean).join(', ') || 'Estudiantes asignados';
-      const estudianteCodigo = estudiantes.length === 1 ? (firstEst.cod_ceta ? String(firstEst.cod_ceta) : undefined) : undefined;
-      const proyectoNombre = estudiantes.length === 1 ? (firstEst.proyecto_nombre || undefined) : undefined;
-      const fechaDesignacion = estudiantes.length === 1 ? (firstEst.fecha_designacion || undefined) : undefined;
+      const selectedSet = this.getSelectedStudentSet(tutor.tutor_id);
+      const estudiantesSeleccionados = (tutor.estudiantes || []).filter(est => selectedSet.has(est.cod_ceta));
+      if (!estudiantesSeleccionados.length) {
+        return;
+      }
       const user = this.auth.getUser();
       const userNombre = user?.nombre_usuario
         || [user?.nombre, user?.apellido_p, user?.apellido_m].filter(Boolean).join(' ').trim()
         || user?.email
         || undefined;
+      const resolvedUserId = this.resolveUserId(user);
+
+      const responseDataByCod = new Map<number, any>();
+
+      for (const est of estudiantesSeleccionados) {
+        const payload = this.buildDesignacionPayload(tutor, est, userNombre, resolvedUserId ?? undefined);
+        try {
+          const resp = await firstValueFrom(this.sga.designarTutor(payload));
+          if (!resp?.success) {
+            throw new Error(resp?.message || 'Respuesta inválida del backend');
+          }
+          if (resp.data) {
+            responseDataByCod.set(Number(est.cod_ceta), resp.data);
+          }
+        } catch (error) {
+          console.error('Error al actualizar la designación en backend', error);
+          alert('No se pudo generar el documento porque la actualización en el servidor falló.');
+          return;
+        }
+      }
+
+      const normalizados = estudiantesSeleccionados.map(est => {
+        const normalized = this.normalizeEstudianteData(est);
+        const respData = responseDataByCod.get(Number(est.cod_ceta));
+        if (respData?.fecha_designacion) {
+          normalized.fechaDesignacion = new Date(respData.fecha_designacion);
+        }
+        return normalized;
+      });
+
+      const primaryData = responseDataByCod.values().next().value || null;
+      if (primaryData) {
+        const numeroDocumento = this.normalizeNumeroDocumento(primaryData.numero_documento ?? primaryData.doc_correlativo ?? primaryData.correlativo);
+        if (numeroDocumento) {
+          tutor.numero_documento = numeroDocumento;
+        }
+        const cite = this.resolveFirstNonEmpty(primaryData.cite, primaryData.doc_cite, tutor.cite);
+        if (cite) {
+          tutor.cite = cite;
+        }
+        tutor.convocatoria_fecha_inicio = this.resolveFirstNonEmpty(primaryData.convocatoria_fecha_inicio, tutor.convocatoria_fecha_inicio);
+        tutor.convocatoria_fecha_fin = this.resolveFirstNonEmpty(primaryData.convocatoria_fecha_fin, tutor.convocatoria_fecha_fin);
+        tutor.cronograma_inicio = this.resolveFirstNonEmpty(primaryData.cronograma_inicio, tutor.cronograma_inicio);
+        tutor.cronograma_fin = this.resolveFirstNonEmpty(primaryData.cronograma_fin, tutor.cronograma_fin);
+        tutor.area = this.resolveFirstNonEmpty(primaryData.area, tutor.area ?? null);
+      }
+
+      const fechaDocumento = normalizados[0]?.fechaDesignacion
+        || (primaryData?.fecha_designacion ? new Date(primaryData.fecha_designacion) : new Date());
+
+      // Actualizar información local de estudiantes (fecha de designación)
+      for (const [cod, data] of responseDataByCod.entries()) {
+        const match = (tutor.estudiantes || []).find(est => Number(est.cod_ceta) === cod);
+        if (match && data?.fecha_designacion) {
+          match.fecha_designacion = data.fecha_designacion;
+        }
+      }
 
       await this.pdfService.generarDesignacionTutorPdf({
-        tutorNombre: item.tutor_nombre,
-        tutorTipo: item.tipo_tutor_nombre || undefined,
-        tutorCi: item.tutor_ci || undefined,
-        tutorCelular: item.tutor_celular || undefined,
-        area: item.tutor_titulo || undefined,
-        estudianteNombre,
-        estudianteCodigo,
-        carrera: item.carrera_nombre || item.cod_carrera || undefined,
-        proyectoNombre,
-        convocatoria: item.convocatoria_label || undefined,
-        fecha: fechaDesignacion,
+        tutorNombre: tutor.tutor_nombre,
+        tutorTipo: tutor.tipo_tutor_nombre || undefined,
+        tutorCi: tutor.tutor_ci || undefined,
+        tutorCelular: tutor.tutor_celular || undefined,
+        tutorTitulo: tutor.tutor_titulo || undefined,
+        tutorTituloAcademico: tutor.tutor_titulo_academico || undefined,
+        area: tutor.area || tutor.tutor_titulo || undefined,
+        carrera: tutor.carrera_nombre || tutor.cod_carrera || undefined,
+        convocatoria: tutor.convocatoria_label || undefined,
+        convocatoriaFechaInicio: tutor.convocatoria_fecha_inicio || undefined,
+        convocatoriaFechaFin: tutor.convocatoria_fecha_fin || undefined,
+        cronogramaInicio: tutor.cronograma_inicio || tutor.convocatoria_fecha_inicio || fechaDocumento,
+        cronogramaFin: tutor.cronograma_fin || tutor.convocatoria_fecha_fin || fechaDocumento,
+        fecha: fechaDocumento,
         lugar: 'Cochabamba',
-        numeroDocumento: item.numero_documento || undefined,
-        cite: item.cite || undefined,
+        numeroDocumento: tutor.numero_documento || undefined,
+        cite: tutor.cite || undefined,
         elaboradoPor: userNombre,
         cargoElaborador: 'Responsable de Modalidad de Graduación',
-        observaciones: estudiantes.length > 1
-          ? `Se asigna la tutoría para ${estudiantes.length} estudiantes bajo la responsabilidad del tutor indicado.`
-          : undefined,
+        estudiantes: normalizados.map((est) => ({
+          nombre: est.nombre || '-',
+          codigo: est.cod_ceta ? String(est.cod_ceta) : undefined,
+          carrera: tutor.carrera_nombre || tutor.cod_carrera || undefined,
+          modalidad: est.modalidad || undefined,
+          area: est.area || undefined,
+          tema: est.tema || undefined,
+          fechaDesignacion: est.fechaDesignacion || fechaDocumento,
+        })),
       }, {
-        fileName: `designacion-${item.tutor_nombre.replace(/\s+/g, '-').toLowerCase()}.pdf`
+        fileName: `designacion-${tutor.tutor_nombre.replace(/\s+/g, '-').toLowerCase()}.pdf`
       });
     } catch (err) {
       console.error('Error generando PDF de designado:', err);
       alert('No se pudo generar el documento PDF para este tutor.');
     } finally {
-      this.generatingDesignadoId = null;
+      this.closeConfirmModal();
+      const set = this.getSelectedStudentSet(tutor.tutor_id);
+      set.clear();
     }
   }
 
@@ -640,7 +884,13 @@ export class TutoresHomeComponent implements OnInit {
       regAlt: this.sga.getTutores({ gestion: this.gestionAlternaActual }),
       regAll: this.sga.getTutores()
     }).subscribe({
-      next: ({ sga, local, reg, regAlt, regAll }) => {
+      next: ({ sga, local, reg, regAlt, regAll }: {
+        sga: ApiResponse<Docente[]>;
+        local: ApiResponse<Docente[]>;
+        reg: ApiResponse<TutorReg[]>;
+        regAlt: ApiResponse<TutorReg[]>;
+        regAll: ApiResponse<TutorReg[]>;
+      }) => {
         this.loadingDocentes = false;
         const map = new Map<string, Docente>();
         const normCi = (v: any) => {
@@ -836,9 +1086,10 @@ export class TutoresHomeComponent implements OnInit {
           this.setTipoSeleccionado(d.ci, (d as any).tipo_tutor_id ?? null);
         }
       },
-      error: (err) => {
+      error: (err: unknown) => {
         this.loadingDocentes = false;
-        this.errorDocentes = err?.message || 'Error al cargar docentes';
+        const message = err instanceof Error ? err.message : 'Error al cargar docentes';
+        this.errorDocentes = message;
       }
     });
   }

@@ -70,16 +70,53 @@ export interface TutorDesignacionEstudiante {
   fechaDesignacion?: string | Date;
 }
 
-const formatFechaLatam = (fecha?: string | Date | null): string | null => {
-  if (!fecha) return null;
+const formatFechaLatam = (fecha?: string | Date | number | null): string | null => {
+  if (fecha === null || fecha === undefined) return null;
+
+  const buildDate = (): Date | null => {
+    if (fecha instanceof Date) return fecha;
+
+    if (typeof fecha === 'number') {
+      const fromNumber = new Date(fecha);
+      return Number.isNaN(fromNumber.getTime()) ? null : fromNumber;
+    }
+
+    if (typeof fecha === 'string') {
+      const trimmed = fecha.trim();
+      if (!trimmed) return null;
+
+      const slashMatch = trimmed.match(/^([0-3]?\d)\/(0[1-9]|1[0-2])\/(\d{4})$/);
+      if (slashMatch) {
+        const day = Number(slashMatch[1]);
+        const month = Number(slashMatch[2]) - 1;
+        const year = Number(slashMatch[3]);
+        const candidate = new Date(year, month, day);
+        if (
+          candidate.getFullYear() === year &&
+          candidate.getMonth() === month &&
+          candidate.getDate() === day
+        ) {
+          return candidate;
+        }
+        return null;
+      }
+
+      const parsed = new Date(trimmed);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    return null;
+  };
+
   try {
-    const date = fecha instanceof Date ? fecha : new Date(fecha);
-    if (Number.isNaN(date.getTime())) return null;
-    return new Intl.DateTimeFormat('es-BO', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-    }).format(date);
+    const date = buildDate();
+    if (!date) return null;
+    const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const dia = date.getDate();
+    const mes = meses[date.getMonth()] ?? '';
+    const anio = date.getFullYear();
+    if (!mes) return null;
+    return `${dia} de ${mes} de ${anio}`;
   } catch {
     return null;
   }
@@ -527,7 +564,7 @@ export class PdfService {
     const marginY = 20;
     const headerHeight = 26;
     const headerOffsetX = 20;
-    const headerOffsetY = 20;
+    const headerOffsetY = 15;
     const headerRightMargin = 15;
     const contentRightMargin = 25;
     const labelRightMargin = 15;
@@ -557,17 +594,19 @@ export class PdfService {
 
     const pad2 = (num: number): string => String(num).padStart(2, '0');
 
-    const formatDate = (value?: string | Date | null, fallback: string = ''): string => {
-      const date = toDate(value);
-      if (!date) return fallback || '';
-      const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-      return `${date.getDate()} de ${meses[date.getMonth()]} de ${date.getFullYear()}`;
-    };
+    const now = new Date();
 
     const formatDateShort = (value?: string | Date | null, fallback: string = ''): string => {
       const date = toDate(value);
       if (!date) return fallback || '';
       return `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()}`;
+    };
+
+    const formatDate = (value?: string | Date | null, fallback: string = ''): string => {
+      const date = toDate(value);
+      if (!date) return fallback || '';
+      const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      return `${date.getDate()} de ${meses[date.getMonth()]} de ${date.getFullYear()}`;
     };
 
     const formatCronograma = (): string => {
@@ -594,7 +633,6 @@ export class PdfService {
 
     const citeValue = (() => {
       if (data.cite && data.cite.trim().length) return data.cite.trim();
-      const now = new Date();
       const year = String(now.getFullYear());
       const numero = normalizeNumber(data.numeroDocumento);
       return isMemorandum ? `CETA/DA/MEM/${year}/${numero}` : `CETA/DA/COMINT/${year}/${numero}`;
@@ -649,7 +687,11 @@ export class PdfService {
         return data.estudiantes.map((est) => ({
           nombre: est.nombre,
           carrera: est.carrera || data.carrera,
-          modalidad: est.modalidad && est.modalidad.trim().length ? est.modalidad : (data.modalidad && data.modalidad.trim().length ? data.modalidad : '-'),
+          modalidad: (() => {
+            if (est.modalidad && est.modalidad.trim().length) return est.modalidad;
+            if (data.modalidad && data.modalidad.trim().length) return data.modalidad;
+            return 'Proyecto de Grado';
+          })(),
           area: est.area || data.area,
           tema: est.tema || data.proyectoNombre,
         }));
@@ -659,7 +701,7 @@ export class PdfService {
         return [{
           nombre: data.estudianteNombre,
           carrera: data.carrera,
-          modalidad: data.modalidad && data.modalidad.trim().length ? data.modalidad : '-',
+          modalidad: data.modalidad && data.modalidad.trim().length ? data.modalidad : 'Proyecto de Grado',
           area: data.area,
           tema: data.proyectoNombre,
         }];
@@ -981,8 +1023,8 @@ export class PdfService {
 
     const seguimientoTexto = data.observaciones || 'Por esta razón, se le solicita orientar y asesorar a los postulantes en la preparación de sus temas y realizar el correspondiente seguimiento y evaluación tanto de la parte teórica como práctica, a fin de que los mismos culminen satisfactoriamente,';
 
-    const rawConvocatoriaInicio = data.convocatoriaFechaInicio ?? data.cronogramaInicio ?? data.fecha ?? null;
-    const rawConvocatoriaFin = data.convocatoriaFechaFin ?? data.cronogramaFin ?? data.fecha ?? null;
+    const rawConvocatoriaInicio = data.convocatoriaFechaInicio ?? data.cronogramaInicio ?? null;
+    const rawConvocatoriaFin = data.convocatoriaFechaFin ?? data.cronogramaFin ?? null;
     const convocatoriaInicio = formatFechaLatam(rawConvocatoriaInicio);
     const convocatoriaFin = formatFechaLatam(rawConvocatoriaFin);
     const cronogramaTexto = convocatoriaInicio && convocatoriaFin
@@ -998,11 +1040,13 @@ export class PdfService {
 
     const pieNotas = data.pieNotas && data.pieNotas.length ? data.pieNotas : ['BJB', 'CC: REC/DA'];
     if (pieNotas.length) {
-      cursorY += 10;
+      cursorY += 8;
       doc.setFont(baseFont, 'normal');
       doc.setFontSize(6);
       pieNotas.forEach((nota) => {
         ensureSpace(4);
+        doc.setFont(baseFont, 'normal');
+        doc.setFontSize(6);
         doc.text(nota, marginX, cursorY);
         cursorY += 4;
       });
