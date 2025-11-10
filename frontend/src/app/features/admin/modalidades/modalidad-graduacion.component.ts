@@ -348,6 +348,7 @@ export class ModalidadGraduacionComponent implements OnInit {
       const stored = parsed?.last_designation || parsed?.designacion || parsed?.lastDesignation || null;
       if (!stored) {
         this.lastDesignation = null;
+        this.persistLastDesignationInSession(null);
         const expected = this.normalizeCodCeta(cod);
         if (expected) {
           this.fetchDesignationFromBackend(expected);
@@ -364,6 +365,7 @@ export class ModalidadGraduacionComponent implements OnInit {
       const storedCod = this.normalizeCodCeta(stored?.cod_ceta ?? stored?.codCeta ?? stored?.cod_ceta_est);
       if (expectedCod && storedCod && expectedCod !== storedCod) {
         this.lastDesignation = null;
+        this.persistLastDesignationInSession(null);
         this.fetchDesignationFromBackend(expectedCod);
         return;
       }
@@ -374,6 +376,7 @@ export class ModalidadGraduacionComponent implements OnInit {
       }
     } catch {
       this.lastDesignation = null;
+      this.persistLastDesignationInSession(null);
       const expected = this.normalizeCodCeta(cod);
       if (expected) {
         this.fetchDesignationFromBackend(expected);
@@ -409,6 +412,9 @@ export class ModalidadGraduacionComponent implements OnInit {
           const merged = this.normalizeDesignationData(first, this.lastDesignation);
           this.lastDesignation = merged;
           this.persistLastDesignationInSession(merged);
+        } else {
+          this.lastDesignation = null;
+          this.persistLastDesignationInSession(null);
         }
         this.cdr.detectChanges();
       });

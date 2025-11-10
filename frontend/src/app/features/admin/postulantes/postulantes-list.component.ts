@@ -708,11 +708,6 @@ private validarCampos(): string[] {
       // Sin opción seleccionada, no validamos secciones específicas
       break;
   }
-  // Aranceles: exigir al menos uno seleccionado para poder registrar
-  if (!Array.isArray(this.selectedAranceles) || this.selectedAranceles.length === 0) {
-    faltantes.push('Seleccione al menos un arancel');
-  }
-
   return faltantes;
 }
 
@@ -802,28 +797,6 @@ private validarCamposSecciones(): Array<{ titulo: string; items: string[] }> {
     }
   }
   if (tran.length) secciones.push({ titulo: 'Transitabilidad', items: tran });
-
-  // Aranceles seleccionados
-  const ar: string[] = [];
-  if (!Array.isArray(this.selectedAranceles) || this.selectedAranceles.length === 0) {
-    ar.push('Seleccione al menos un arancel');
-    // Si es postulante nuevo y está el formulario manual visible, listar faltantes del formulario
-    if (this.esNuevoPostulante && !this.tieneArancelesSga) {
-      const n: any = this.nuevoArancel || {};
-      if (!this.isNonEmpty(n.gestion)) ar.push('Gestión');
-      if (!this.isNonEmpty(n.fecha)) ar.push('Fecha');
-      if (!this.isNonEmpty(n.concepto)) ar.push('Concepto');
-      const mn = this.toNumber(n.monto);
-      if (!(mn > 0)) ar.push('Monto (> 0)');
-      const hasFactura = !!(n.num_factura && String(n.num_factura).trim());
-      const hasRecibo = !!(n.num_comprobante && String(n.num_comprobante).trim());
-      if (!hasFactura && !hasRecibo) ar.push('N° Factura o N° Recibo');
-      if (!this.isNonEmpty(n.razon)) ar.push('Razón Social');
-      if (!this.isNonEmpty(n.nit)) ar.push('NIT');
-      if (this.isNonEmpty(n.nit) && !/^\d+$/.test(String(n.nit).trim())) ar.push('NIT (solo números)');
-    }
-  }
-  if (ar.length) secciones.push({ titulo: 'Aranceles', items: ar });
 
   return secciones;
 }
@@ -3235,6 +3208,10 @@ private cargarPostulanteDesdeBD() {
     const nombres = this.postulanteActual?.nombres_est || '';
     const apellidos = [this.postulanteActual?.ap_pat || '', this.postulanteActual?.ap_mat || ''].filter(Boolean).join(' ');
 
+    const arancelesSeleccionados = Array.isArray(this.selectedAranceles) ? this.selectedAranceles : [];
+    const tieneAranceles = arancelesSeleccionados.length > 0;
+    const pagoCompleto = tieneAranceles && !!this.pagoCompletoSeleccionados;
+
     const payload: any = {
       cod_ceta_est: codEst,
       nombres_est: nombres,
@@ -3243,8 +3220,8 @@ private cargarPostulanteDesdeBD() {
       modalidad_nom: this.modalidad?.nombre,
       convocatoria_id: this.convocatoriaSeleccionada?.id || null,
       carrera: this.carreraNormalizada || this.postulanteActual.carrera || null,
-      aranceles_completos: !!this.pagoCompletoSeleccionados,
-      aranceles: (this.selectedAranceles || []).map((a: any) => ({
+      aranceles_completos: pagoCompleto,
+      aranceles: arancelesSeleccionados.map((a: any) => ({
         id: a.id || null,
         gestion: a.gestion || null,
         fecha: this.normalizarFecha(a.fecha),
@@ -3254,11 +3231,13 @@ private cargarPostulanteDesdeBD() {
         num_comprobante: a.num_comprobante || null,
         razon: a.razon || null,
         nit: a.nit || null,
-        pagado: !!(a.pagado || this.pagoCompletoSeleccionados),
+        pagado: !!(a.pagado || pagoCompleto),
         origen: a.origen || 'sga',
         seleccionado: true,
       }))
     };
+
+    this.pagoCompletoSeleccionados = pagoCompleto;
 
     // Incluir datos de Bachillerato si corresponde (enviar en minúsculas para pasar validación backend)
     payload.tipo_bachiller = (this.tipoBachiller || null) ? this.tipoBachiller!.toString().trim().toLowerCase() : null;

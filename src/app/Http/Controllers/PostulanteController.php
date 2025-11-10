@@ -22,7 +22,7 @@ class PostulanteController extends Controller
             $perPage = 25;
         }
 
-        $estado = $request->query('estado', 'Inscrito');
+        $estado = $request->query('estado');
         $carrera = $request->query('carrera');
         $search = trim((string) $request->query('search', ''));
 
