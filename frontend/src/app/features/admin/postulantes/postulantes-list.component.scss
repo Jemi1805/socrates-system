@@ -65,6 +65,27 @@ $transition: all 0.3s ease;
   }
 }
 
+.modal-confirm-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1065; // por encima del modal base (1050)
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+
+  .modal-confirm {
+    z-index: 1066;
+    pointer-events: auto;
+  }
+
+  .modal-confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1064;
+  }
+}
+
 // Priorizar superposición de la tarjeta de Inicio sobre la de Conclusión
 .inicio-card {
   position: relative;

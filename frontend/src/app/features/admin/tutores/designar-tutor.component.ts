@@ -246,11 +246,9 @@ export class DesignarTutorComponent implements OnInit {
   }
 
   private loadConvocatorias() {
-    this.sga.getConvocatorias({ per_page: 100 }).subscribe({
-      next: (resp) => {
-        const raw = (resp?.data ?? resp) as any;
-        const list = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
-        this.convocatorias = list as Convocatoria[];
+    this.sga.getConvocatoriasActivas({ per_page: 100 }).subscribe({
+      next: (list) => {
+        this.convocatorias = Array.isArray(list) ? list : [];
         this.syncSelectedConvocatoriaWithConvocatorias();
       },
       error: () => {

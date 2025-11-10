@@ -1204,8 +1204,8 @@
   </div>
 
   <!-- Modal de confirmación de cambio de modalidad -->
-  <div *ngIf="modalConfirmCambioVisible && !esNuevoPostulante">
-    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalConfirmCambioLabel">
+  <div *ngIf="modalConfirmCambioVisible && !esNuevoPostulante" class="modal-confirm-layer">
+    <div class="modal fade show d-block modal-confirm" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalConfirmCambioLabel">
       <div class="modal-dialog modal-md modal-dialog-centered" role="document">
         <div class="modal-content">
           <div class="modal-header py-2">
@@ -1237,9 +1237,18 @@
               </div>
             </div>
           </div>
+          <div class="modal-footer py-2 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cancelarCambioModalidad()">
+              Cancelar
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" (click)="confirmarCambioModalidad()">
+              Confirmar cambio
+            </button>
+          </div>
         </div>
       </div>
     </div>
+    <div class="modal-backdrop fade show modal-confirm-backdrop"></div>
   </div>
 
   <!-- Modal de selección de modalidad -->

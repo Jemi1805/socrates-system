@@ -1516,6 +1516,8 @@ private cargarPostulanteDesdeBD() {
     // Para postulantes nuevos: asignar directamente sin confirmación
     if (this.esNuevoPostulante) {
       this.modalidad = modalidad;
+      this.nuevaModalidad = null;
+      this.ocultarModal();
       return;
     }
     // Para edición: pedir confirmación mostrando el cambio
@@ -1527,9 +1529,18 @@ private cargarPostulanteDesdeBD() {
     }, 0);
   }
 
+  onSeleccionarModalidadClick(event: Event, modalidad: ModalidadGraduacion) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    this.seleccionarModalidad(modalidad);
+  }
+
   cancelarCambioModalidad() {
     this.modalConfirmCambioVisible = false;
     this.nuevaModalidad = null;
+    this.ocultarModal();
   }
 
   confirmarCambioModalidad() {
@@ -1541,7 +1552,10 @@ private cargarPostulanteDesdeBD() {
 
     const cod = this.postulanteActual.cod_ceta || this.estudiante?.cod_ceta;
     if (cod) {
-      this.postulanteService.asignarModalidad(Number(cod), seleccionado.id).subscribe({
+      this.loadingService.showModal();
+      this.postulanteService.asignarModalidad(Number(cod), seleccionado.id)
+        .pipe(finalize(() => this.loadingService.hideModal()))
+        .subscribe({
         next: (resultado) => {
           console.log('Modalidad asignada correctamente:', resultado);
           this.modalidad = seleccionado;
