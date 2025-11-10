@@ -6,6 +6,7 @@ import { ProyectoService } from './proyecto.service';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
 import { PostulanteService } from '../postulantes/postulante.service';
 import { PdfService } from '../../../shared/services/pdf.service';
+import { LoadingService } from '../../../core/services/loading.service';
 
 interface EstudianteCtx {
   cod_ceta?: string | number;
@@ -91,6 +92,7 @@ export class RegistroTemaComponent implements OnInit {
     private postulanteService: PostulanteService,
     private pdfService: PdfService,
     private route: ActivatedRoute,
+    private loadingService: LoadingService,
   ) {}
 
   ngOnInit(): void {
@@ -105,21 +107,18 @@ export class RegistroTemaComponent implements OnInit {
       // Sembrar proyecto desde cache si existe para render inmediato
       const rawProyecto = sessionStorage.getItem('proyecto_cache');
       if (rawProyecto) {
-        const pc = JSON.parse(rawProyecto);
-        // No confiar ciegamente: solo tomar campos útiles
-        const nombreTema = pc?.nombre ?? pc?.tema ?? pc?.titulo ?? pc?.title ?? '';
-        const objetivo = pc?.objetivo ?? pc?.objetivos ?? '';
-        const estado = pc?.estado ?? '';
-        const tipo = pc?.tipo ?? '';
-        this.tema = nombreTema ? String(nombreTema) : (this.tema || '');
-        this.objetivos = objetivo ? String(objetivo) : (this.objetivos || '');
-        this.proyectoGuardado = {
-          ...(this.proyectoGuardado || {}),
-          nombre: this.tema || undefined,
-          objetivo: this.objetivos || undefined,
-          estado: estado || (this.proyectoGuardado?.estado || undefined),
-          tipo: tipo || (this.proyectoGuardado?.tipo || undefined),
-        };
+        try {
+          const pc = JSON.parse(rawProyecto);
+          const estado = pc?.estado ?? '';
+          const tipo = pc?.tipo ?? '';
+          this.proyectoGuardado = {
+            ...(this.proyectoGuardado || {}),
+            estado: estado || (this.proyectoGuardado?.estado || undefined),
+            tipo: tipo || (this.proyectoGuardado?.tipo || undefined),
+          };
+        } catch {
+          // Ignorar cache inválido
+        }
       }
     } catch {}
 
@@ -567,6 +566,7 @@ export class RegistroTemaComponent implements OnInit {
   generarFMDG1() {
     if (this.generandoFmdg) return;
     this.generandoFmdg = true;
+    this.loadingService.showModal();
     // Construir datos desde el estado actual y delegar al servicio PDF
     const data = {
       codCeta: this.codCeta,
@@ -590,14 +590,27 @@ export class RegistroTemaComponent implements OnInit {
     };
     // Permitir que Angular pinte el spinner antes de la tarea pesada
     setTimeout(() => {
+      const finalize = () => {
+        this.generandoFmdg = false;
+        this.loadingService.hideModal();
+      };
       try {
-        this.pdfService.generarFMDG1(data, { logoWidthMm: 24, logoMaxHeightMm: 24, logoFormat: 'JPEG', logoBgColor: '#FFFFFF' });
+        const result = this.pdfService.generarFMDG1(data, { logoWidthMm: 24, logoMaxHeightMm: 24, logoFormat: 'JPEG', logoBgColor: '#FFFFFF' });
+        if (result && typeof (result as Promise<void>)?.then === 'function') {
+          (result as Promise<void>).then(() => finalize()).catch((err) => {
+            console.error('Error generando FMDG-1', err);
+            this.error = 'No fue posible generar el PDF.';
+            finalize();
+          });
+          return;
+        }
       } catch (e) {
         console.error('Error generando FMDG-1', e);
         this.error = 'No fue posible generar el PDF.';
-      } finally {
-        this.generandoFmdg = false;
+        finalize();
+        return;
       }
+      finalize();
     }, 0);
   }
 

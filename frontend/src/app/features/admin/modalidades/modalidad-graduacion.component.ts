@@ -12,6 +12,7 @@ import { Postulante } from '../postulantes/postulante.model';
 import { ProyectoService } from '../proyectos/proyecto.service';
 import { LoadingService } from '../../../core/services/loading.service';
 import { SgaService, TutorDesignacionItem } from '../../../shared/services/sga.service';
+import { Estudiante as EstudianteSga } from '../../../core/services/estudiante.service';
 import { AuthService } from '../../../core/services/auth.service';
 
 interface PostulanteInscrito {
@@ -21,6 +22,12 @@ interface PostulanteInscrito {
   ap_mat: string;
   ci?: string | null;
   procedencia?: string | null;
+  celular?: string | null;
+  correo?: string | null;
+  email?: string | null;
+  fecha_nacimiento?: string | null;
+  lugar_nacimiento?: string | null;
+  pensum?: string | null;
   modo?: string | null;
   fecha_inscripcion?: string | null;
   estado?: string | null;
@@ -117,6 +124,12 @@ export class ModalidadGraduacionComponent implements OnInit {
           ap_mat: row?.ap_mat ?? row?.apellido_m ?? '',
           ci: row?.ci ?? row?.ci_est ?? null,
           procedencia: row?.procedencia ?? row?.expedido ?? null,
+          celular: row?.celular ?? row?.telf_movil ?? row?.telefono ?? row?.celular_est ?? null,
+          correo: row?.correo ?? row?.email ?? row?.email_est ?? null,
+          email: row?.email ?? row?.email_est ?? null,
+          fecha_nacimiento: row?.fecha_nacimiento ?? row?.fec_nac ?? null,
+          lugar_nacimiento: row?.lugar_nacimiento ?? row?.lugar_nac ?? null,
+          pensum: row?.pensum ?? row?.pensum_actual ?? null,
           modo: row?.modalidad_nom ?? row?.modalidad ?? null,
           fecha_inscripcion: row?.fecha_inscripcion ?? row?.created_at ?? null,
           estado: row?.estado ?? null,
@@ -133,6 +146,7 @@ export class ModalidadGraduacionComponent implements OnInit {
   private mapInscritoToEstudiante(p: PostulanteInscrito): Estudiante {
     const carreraKey = this.normalizeCarreraKey(p.carrera || null);
     const carreraLabel = this.formatCarreraLabel(carreraKey);
+    const fechaNacimiento = this.parseNullableDate(p.fecha_nacimiento);
     return {
       cod_ceta: String(p.cod_ceta),
       ap_pat: p.ap_pat || '',
@@ -140,11 +154,107 @@ export class ModalidadGraduacionComponent implements OnInit {
       nombres: p.nombres_est || '',
       ci: p.ci || '',
       procedencia: p.procedencia || '',
+      celular: p.celular || (p as any)?.telf_movil || (p as any)?.telefono || undefined,
+      correo: p.correo || p.email || undefined,
+      fecha_nacimiento: fechaNacimiento,
+      lugar_nacimiento: p.lugar_nacimiento ?? undefined,
+      pensum: p.pensum ?? undefined,
       carrera: carreraLabel,
-      fecha_nacimiento: undefined,
-      lugar_nacimiento: undefined,
-      pensum: undefined,
     };
+  }
+
+  private parseNullableDate(value?: string | null): Date | undefined {
+    if (!value) {
+      return undefined;
+    }
+    const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+    const parsed = new Date(normalized);
+    return isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+
+  private persistEstudianteContext(estudiante: Estudiante) {
+    try {
+      const raw = sessionStorage.getItem('datos_postulacion');
+      const parsed = raw ? JSON.parse(raw) : {};
+      parsed.estudiante = { ...(parsed.estudiante || {}), ...estudiante };
+      sessionStorage.setItem('datos_postulacion', JSON.stringify(parsed));
+    } catch {}
+  }
+
+  private enrichEstudianteFromSga(estudiante: Estudiante) {
+    const cod = this.normalizeCodCeta((estudiante as any)?.cod_ceta ?? (estudiante as any)?.codCeta ?? (estudiante as any)?.codigo_ceta);
+    if (!cod) {
+      return;
+    }
+    const carreraCandidate = this.normalizeCarreraKey((estudiante as any)?.carrera)
+      || this.normalizeCarreraKey(this.carreraSeleccionada)
+      || this.carreraSeleccionada;
+    const carrera = carreraCandidate || 'mecanica';
+    this.estudianteService.buscarPorCeta(cod, carrera).pipe(take(1)).subscribe({
+      next: (resp: any) => {
+        const list = this.extractEstudiantesFromSgaResponse(resp);
+        if (!list || list.length === 0) {
+          return;
+        }
+        const match = list.find((item: any) => this.normalizeCodCeta(item?.cod_ceta ?? item?.codCeta ?? item?.codigo_ceta) === cod)
+          || list[0];
+        if (!match) {
+          return;
+        }
+        const mapped = this.mapSgaEstudianteToCtx(match, estudiante);
+        this.addOrMergeEstudiante(mapped);
+        const merged = (this.estudiantes || []).find(x => this.normalizeCodCeta((x as any)?.cod_ceta ?? (x as any)?.codCeta ?? (x as any)?.codigo_ceta) === cod);
+        if (merged) {
+          this.estudiante = merged;
+          this.persistEstudianteContext(merged);
+        }
+      },
+      error: (err) => {
+        console.warn('[SGA] No se pudo enriquecer estudiante', { cod, carrera, err });
+      }
+    });
+  }
+
+  private extractEstudiantesFromSgaResponse(resp: any): any[] {
+    if (!resp) return [];
+    const firstLayer = resp?.data ?? resp;
+    if (Array.isArray(firstLayer)) return firstLayer;
+    if (firstLayer && Array.isArray(firstLayer?.data)) return firstLayer.data;
+    const secondLayer = firstLayer?.data;
+    if (secondLayer && Array.isArray(secondLayer?.data)) return secondLayer.data;
+    if (secondLayer && Array.isArray(secondLayer)) return secondLayer;
+    if (firstLayer?.success && Array.isArray(firstLayer?.data)) return firstLayer.data;
+    return [];
+  }
+
+  private mapSgaEstudianteToCtx(record: any, fallback: Estudiante | null): Estudiante {
+    const base = fallback ? { ...fallback } : ({} as Estudiante);
+    const celular = this.resolveFirstNonEmpty(
+      record?.celular,
+      record?.telefono,
+      record?.telf_movil,
+      record?.telfMovil,
+      record?.telefono_movil,
+      record?.raw?.Celular
+    );
+    const carrera = this.resolveFirstNonEmpty(record?.carrera, base.carrera);
+    const fechaNacRaw = this.resolveFirstNonEmpty(record?.fecha_nacimiento, record?.fechaNacimiento, record?.raw?.['Fecha de Nacimiento']);
+    const codCeta = this.resolveFirstNonEmpty(record?.cod_ceta, record?.codCeta, record?.codigo_ceta, base.cod_ceta);
+    const mapped: Estudiante = {
+      ...base,
+      cod_ceta: codCeta ? String(codCeta) : base.cod_ceta,
+      nombres: this.resolveFirstNonEmpty(record?.nombres, base.nombres) || base.nombres || '',
+      ap_pat: this.resolveFirstNonEmpty(record?.ap_pat, base.ap_pat) || base.ap_pat || '',
+      ap_mat: this.resolveFirstNonEmpty(record?.ap_mat, base.ap_mat) || base.ap_mat || '',
+      ci: this.resolveFirstNonEmpty(record?.ci, base.ci) || base.ci || '',
+      procedencia: this.resolveFirstNonEmpty(record?.procedencia, base.procedencia) || base.procedencia || '',
+      carrera: carrera || base.carrera || '',
+      celular: celular ? String(celular).trim() : base.celular,
+      pensum: this.resolveFirstNonEmpty(record?.pensum, base.pensum) || base.pensum,
+      fecha_nacimiento: this.parseNullableDate(fechaNacRaw) ?? base.fecha_nacimiento,
+      lugar_nacimiento: this.resolveFirstNonEmpty(record?.lugar_nacimiento, record?.lugarNacimiento, base.lugar_nacimiento) || base.lugar_nacimiento,
+    };
+    return mapped;
   }
 
   private formatCarreraLabel(key: string | null | undefined): string {
@@ -538,6 +648,9 @@ export class ModalidadGraduacionComponent implements OnInit {
       this.estudiantes = [...arr, e];
     } else {
       const merged = { ...arr[idx], ...Object.fromEntries(Object.entries(e).filter(([_, v]) => v !== undefined && v !== null && v !== '')) } as any;
+      if (!merged.celular && (e as any)?.celular) {
+        merged.celular = (e as any).celular;
+      }
       const newArr = arr.slice();
       newArr[idx] = merged;
       this.estudiantes = newArr;
@@ -866,6 +979,8 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.inscripcionActual = null;
     const cod = (estudiante as any)?.cod_ceta || (estudiante as any)?.codCeta || (estudiante as any)?.codigo_ceta;
     this.updateLastDesignationFromSession(cod);
+    this.persistEstudianteContext(estudiante);
+    this.enrichEstudianteFromSga(estudiante);
   }
 
   seleccionarEstudianteYAbrirModal(estudiante: Estudiante) {
