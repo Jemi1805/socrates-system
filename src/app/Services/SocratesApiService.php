@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Exception;
 use \InvalidArgumentException;
 
@@ -49,6 +50,137 @@ class SocratesApiService
         ]);
     }
 
+    private function normalizeDocenteCiKey(array $doc): ?string
+    {
+        $ciRaw = $doc['ci'] ?? $doc['cedula'] ?? $doc['ci_docente'] ?? $doc['cedula_doc'] ?? null;
+        if ($ciRaw === null) {
+            return null;
+        }
+
+        $ci = trim((string) $ciRaw);
+        if ($ci === '') {
+            return null;
+        }
+
+        $digits = preg_replace('/[^0-9]/', '', $ci);
+        if ($digits !== '') {
+            return $digits;
+        }
+
+        return mb_strtoupper($ci);
+    }
+
+    private function normalizeDocenteNameKey(array $doc): ?string
+    {
+        $nombre = trim((string) ($doc['nombre'] ?? $doc['nombres'] ?? ''));
+        $apPat = trim((string) ($doc['apellido_p'] ?? $doc['ap_paterno'] ?? $doc['apellidos'] ?? ''));
+        $apMat = trim((string) ($doc['apellido_m'] ?? $doc['ap_materno'] ?? ''));
+
+        $full = trim($nombre . ' ' . $apPat . ' ' . $apMat);
+        if ($full === '') {
+            return null;
+        }
+
+        $normalized = 
+            Str::of($full)
+                ->lower()
+                ->replaceMatches('/\s+/', ' ')
+                ->replaceMatches('/[^a-zñáéíóú\s]/u', '')
+                ->trim()
+                ->__toString();
+
+        return $normalized !== '' ? $normalized : null;
+    }
+
+    private function mergeDocenteData(array $base, array $incoming): array
+    {
+        $preferred = function ($primary, $fallback) {
+            if ($primary !== null && $primary !== '') {
+                return $primary;
+            }
+            return $fallback;
+        };
+
+        $result = $base;
+        $fields = [
+            'nombre', 'nombres', 'apellido_p', 'apellido_m',
+            'ap_paterno', 'ap_materno', 'apellidos', 'ci',
+            'celular', 'telefono', 'profesion', 'titulo_academico',
+            'pertinencia', 'pertinencia_acad_id'
+        ];
+
+        foreach ($fields as $field) {
+            $result[$field] = $preferred($result[$field] ?? null, $incoming[$field] ?? null);
+        }
+
+        $result['carreras'] = array_values(array_unique(array_merge(
+            $result['carreras'] ?? [],
+            $incoming['carreras'] ?? []
+        )));
+
+        return $result;
+    }
+
+    private function formatCarreraCodeFromSlugs(array $slugs): ?string
+    {
+        $normalized = array_map(function ($slug) {
+            $s = strtolower((string) $slug);
+            if (Str::contains($s, 'mec')) {
+                return 'MEA';
+            }
+            if (Str::contains($s, 'elec')) {
+                return 'EEA';
+            }
+            return null;
+        }, $slugs);
+
+        $normalized = array_values(array_filter(array_unique($normalized)));
+        if (!$normalized) {
+            return null;
+        }
+
+        if (count($normalized) > 1) {
+            sort($normalized);
+            return 'EEA/MEA';
+        }
+
+        return $normalized[0];
+    }
+
+    private function normalizeHeaderText($text): string
+    {
+        $ascii = Str::ascii((string) $text);
+        $lower = strtolower($ascii);
+        $normalized = preg_replace('/[^a-z0-9]+/', ' ', $lower);
+        if ($normalized === null) {
+            $normalized = $lower;
+        }
+        return trim($normalized);
+    }
+
+    private function findHeaderIndex(array $normalizedHeaders, array $candidates): ?int
+    {
+        foreach ($normalizedHeaders as $index => $header) {
+            if ($header === '') {
+                continue;
+            }
+            foreach ($candidates as $needle) {
+                $needle = trim((string) $needle);
+                if ($needle === '') {
+                    continue;
+                }
+                $length = strlen($needle);
+                if ($header === $needle) {
+                    return $index;
+                }
+                if ($length >= 3 && Str::contains($header, $needle)) {
+                    return $index;
+                }
+            }
+        }
+        return null;
+    }
+
     private function loadDocConfig()
     {
         if ($this->docConfig !== null) {
@@ -86,7 +218,7 @@ class SocratesApiService
             return $this->docConfig[$slug];
         }
 
-        if (isset($this->docConfig['default'])) {
+        if ($slug === 'default' && isset($this->docConfig['default'])) {
             return $this->docConfig['default'];
         }
 
@@ -891,15 +1023,128 @@ class SocratesApiService
 
     /**
      * Obtener docentes activos del SGA (legacy)
-     * @param string|null $carrera Carrera para determinar la URL del SGA
+     *
+     * Cuando $carrera es null, se consultan ambas carreras y se unifican resultados
+     * por CI/nombre, agregando la etiqueta EEA/MEA según corresponda.
+     *
+     * @param string|null $carrera
      * @return array
      */
     public function getDocentes($carrera = null)
     {
         if ($carrera) {
             $this->setCarrera($carrera);
+            return $this->buscarDocentesLegacy();
         }
-        return $this->buscarDocentesLegacy();
+
+        $slugs = ['mecanica', 'electricidad'];
+        $aggregated = [];
+        $nameIndex = [];
+
+        $previousUrl = $this->currentUrl;
+        $previousSlug = $this->currentCarreraSlug;
+
+        foreach ($slugs as $slug) {
+            $normalizedSlug = $this->normalizeCarreraSlug($slug);
+            $forcedUrl = $this->baseUrls[$normalizedSlug] ?? $this->baseUrls['default'];
+            $this->currentUrl = $forcedUrl;
+            $this->currentCarreraSlug = $normalizedSlug;
+            $result = $this->buscarDocentesLegacy();
+            if (!is_array($result) || empty($result['success'])) {
+                continue;
+            }
+
+            $docs = isset($result['data']) && is_array($result['data']) ? $result['data'] : [];
+            Log::info('Docentes SGA parseados', [
+                'slug' => $slug,
+                'current_url' => $this->currentUrl,
+                'total' => count($docs),
+            ]);
+            foreach ($docs as $doc) {
+                if (!is_array($doc)) {
+                    continue;
+                }
+
+                $fullAscii = Str::upper(Str::ascii(trim(($doc['nombre'] ?? '') . ' ' . ($doc['apellido_p'] ?? '') . ' ' . ($doc['apellido_m'] ?? ''))));
+                if (Str::contains($fullAscii, 'CASTANETA')) {
+                    Log::info('Docente Pedro detectado en slug', [
+                        'slug' => $slug,
+                        'doc' => $doc,
+                    ]);
+                }
+
+                $ciKey = $this->normalizeDocenteCiKey($doc);
+                $nameKey = $this->normalizeDocenteNameKey($doc);
+
+                if ($ciKey === null && $nameKey === null) {
+                    continue;
+                }
+
+                $aggregateKey = $ciKey ?? ('name:' . $nameKey);
+
+                if (!isset($aggregated[$aggregateKey])) {
+                    $aggregated[$aggregateKey] = $doc;
+                    $aggregated[$aggregateKey]['carreras'] = [];
+                } else {
+                    $aggregated[$aggregateKey] = $this->mergeDocenteData($aggregated[$aggregateKey], $doc);
+                }
+
+                $aggregated[$aggregateKey]['carreras'][] = $slug;
+                $aggregated[$aggregateKey]['carreras'] = array_values(array_unique($aggregated[$aggregateKey]['carreras']));
+                $carreraCode = $this->formatCarreraCodeFromSlugs($aggregated[$aggregateKey]['carreras']);
+                $aggregated[$aggregateKey]['cod_carrera'] = $carreraCode;
+                $aggregated[$aggregateKey]['carrera_label'] = $carreraCode;
+
+                if ($ciKey !== null) {
+                    $nameIndex[$nameKey] = $aggregateKey;
+                } elseif ($nameKey !== null && isset($nameIndex[$nameKey])) {
+                    $aggregated[$nameIndex[$nameKey]] = $this->mergeDocenteData($aggregated[$nameIndex[$nameKey]], $aggregated[$aggregateKey]);
+                    unset($aggregated[$aggregateKey]);
+                }
+            }
+        }
+
+        // Restaurar URL por defecto
+        $this->currentUrl = $previousUrl;
+        $this->currentCarreraSlug = $previousSlug;
+
+        $summary = [
+            'MEA' => 0,
+            'EEA' => 0,
+            'EEA/MEA' => 0,
+            'NULL' => 0,
+        ];
+        $samples = [
+            'MEA' => null,
+            'EEA' => null,
+            'EEA/MEA' => null,
+            'NULL' => null,
+        ];
+
+        foreach ($aggregated as $item) {
+            $code = $item['cod_carrera'] ?? null;
+            $key = $code ?: 'NULL';
+            if (!isset($summary[$key])) {
+                $summary[$key] = 0;
+                $samples[$key] = null;
+            }
+            $summary[$key]++;
+            if ($samples[$key] === null) {
+                $samples[$key] = array_intersect_key($item, array_flip([
+                    'nombre', 'apellido_p', 'apellido_m', 'ci', 'cod_carrera', 'carrera_label', 'carreras'
+                ]));
+            }
+        }
+
+        Log::info('Docentes unificados por carrera', [
+            'resumen' => $summary,
+            'muestra' => array_filter($samples)
+        ]);
+
+        return [
+            'success' => true,
+            'data' => array_values($aggregated),
+        ];
     }
 
     /**
@@ -1143,34 +1388,99 @@ class SocratesApiService
         if ($table) { $tables = [$table]; }
         else { $tables = iterator_to_array($xpath->query('//table')); }
 
+        static $headersLogged = false;
+
         foreach ($tables as $tbl) {
             $rows = $xpath->query('.//tr', $tbl);
             if ($rows->length === 0) { continue; }
 
             // Detectar encabezados
             $headers = [];
+            $normalizedHeaders = [];
             $headerRowIndex = -1;
             for ($r = 0; $r < $rows->length; $r++) {
                 $ths = $xpath->query('.//th', $rows->item($r));
                 if ($ths->length > 0) {
                     $headerRowIndex = $r;
-                    foreach ($ths as $th) { $headers[] = trim($th->textContent); }
+                    foreach ($ths as $th) {
+                        $text = trim($th->textContent);
+                        $headers[] = $text;
+                        $normalizedHeaders[] = $this->normalizeHeaderText($text);
+                    }
                     break;
                 }
             }
 
+            if ($headerRowIndex === -1) {
+                // Fallback: usar la primera fila como encabezado aproximado
+                $firstRowTds = $xpath->query('.//td', $rows->item(0));
+                if ($firstRowTds->length > 0) {
+                    $headerRowIndex = 0;
+                    for ($i = 0; $i < $firstRowTds->length; $i++) {
+                        $text = trim($firstRowTds->item($i)->textContent);
+                        $headers[] = $text;
+                        $normalizedHeaders[] = $this->normalizeHeaderText($text);
+                    }
+                }
+            }
+
+            if (empty($normalizedHeaders)) {
+                continue;
+            }
+
+            if (!$headersLogged) {
+                Log::info('Docentes SGA headers detectados', [
+                    'headers' => $headers,
+                    'normalized' => $normalizedHeaders,
+                ]);
+                $headersLogged = true;
+            }
+
             // Validar que parezca la tabla de docentes
             $headerText = strtolower(implode(' ', $headers));
-            $looksLike = (strpos($headerText, 'nombres') !== false && strpos($headerText, 'paterno') !== false && strpos($headerText, 'materno') !== false)
-                      || (strpos($headerText, 'cédula') !== false && strpos($headerText, 'profesion') !== false) && (strpos($headerText, 'celular') !== false);
+            $looksLike = (strpos($headerText, 'nombres') !== false && strpos($headerText, 'paterno') !== false)
+                      || (strpos($headerText, 'cédula') !== false && strpos($headerText, 'ci') !== false)
+                      || (strpos($headerText, 'profesion') !== false && strpos($headerText, 'celular') !== false)
+                      || (strpos($headerText, 'docente') !== false && strpos($headerText, 'nombre') !== false);
             if (!$looksLike && !$table) { continue; }
 
+            $indexNumero = $this->findHeaderIndex($normalizedHeaders, ['n', 'numero', 'no', 'nro']);
+            $indexNombre = $this->findHeaderIndex($normalizedHeaders, ['nombres', 'nombre']);
+            $indexApPat = $this->findHeaderIndex($normalizedHeaders, ['ap paterno', 'apellido paterno', 'ap pater', 'ap pater']);
+            $indexApMat = $this->findHeaderIndex($normalizedHeaders, ['ap materno', 'apellido materno', 'ap mater']);
+            $indexCi = $this->findHeaderIndex($normalizedHeaders, ['cedula', 'ci', 'cedula de identidad', 'c i']);
+            $indexProfesion = $this->findHeaderIndex($normalizedHeaders, ['profesion', 'profesion titulo', 'titulo']);
+            $indexNombreCorto = $this->findHeaderIndex($normalizedHeaders, ['nombre corto', 'nom corto']);
+            $indexCelular = $this->findHeaderIndex($normalizedHeaders, ['celular', 'telefono', 'teléfono', 'telef']);
+            $indexCorreo = $this->findHeaderIndex($normalizedHeaders, ['correo', 'email', 'e mail']);
+            $indexCarrera = $this->findHeaderIndex($normalizedHeaders, ['carrera']);
+
             $startRow = ($headerRowIndex > -1) ? $headerRowIndex + 1 : 1;
+            $offset = 0;
+            if ($rows->length > $startRow) {
+                $firstDataCells = $xpath->query('.//td', $rows->item($startRow));
+                if ($firstDataCells->length > 0) {
+                    $firstCellText = trim($firstDataCells->item(0)->textContent);
+                    if ($firstCellText !== '' && preg_match('/^[0-9]+$/', $firstCellText)) {
+                        $offset = 1;
+                    }
+                }
+            }
+
+            $fallbackMap = [
+                'nombre' => $offset + 0,
+                'ap_pat' => $offset + 1,
+                'ap_mat' => $offset + 2,
+                'ci' => $offset + 3,
+                'profesion' => $offset + 4,
+                'nombre_corto' => $offset + 5,
+                'celular' => $offset + 6,
+            ];
+
             for ($i = $startRow; $i < $rows->length; $i++) {
                 $tds = $xpath->query('.//td', $rows->item($i));
                 if ($tds->length === 0) { continue; }
 
-                // Manejar fila de "No existen datos..."
                 $firstTxt = trim($tds->item(0)->textContent);
                 if (stripos($firstTxt, 'No existen datos') !== false) { break; }
 

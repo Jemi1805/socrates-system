@@ -18,9 +18,9 @@ import { firstValueFrom, forkJoin } from 'rxjs';
 export class TutoresHomeComponent implements OnInit {
   // Importar Docentes (SGA)
   showImport = false;
-  carreraSeleccionada: 'mecanica' | 'electricidad' | null = null;
   docentes: Docente[] = [];
   loadingDocentes = false;
+  docentesLoaded = false;
   errorDocentes: string | null = null;
   // Selección múltiple por checkbox (clave: ci)
   selectedCis: Set<string> = new Set<string>();
@@ -29,11 +29,12 @@ export class TutoresHomeComponent implements OnInit {
   editingDocente: Partial<Docente> | null = null;
   isCreateMode: boolean = false;
   // Controles del modal
-  modalCarreraCode: string | null = null; // 'MEA' | 'EEA'
+  modalCarreraCode: 'MEA' | 'EEA' | 'EEA/MEA' | null = null; // selección de carrera en modal
   modalGestion: string | null = null;     // 1/YYYY o 2/YYYY (solo visual)
   editingCiOriginal: string | null = null; // para permitir cambio de CI
   showFieldErrors: boolean = false;        // activa estilos is-invalid
-  // Pertinencias académicas filtradas por carrera
+  // Pertinencias académicas
+  allPertinencias: Pertinencia[] = [];
   pertinencias: Pertinencia[] = [];
   // Selección múltiple de pertinencias en el modal
   selectedPertIds: number[] = [];
@@ -70,7 +71,7 @@ export class TutoresHomeComponent implements OnInit {
   // Filtro de gestión para el panel de "Tutores registrados"
   gestionFiltro: string | null = this.gestionActual;
   // Filtro de carrera (MEA/EEA) para el panel de "Tutores registrados"
-  carreraFiltroCode: string | null = null;
+  carreraFiltroCode: 'MEA' | 'EEA' | 'EEA/MEA' | null = null;
   skipFirstPertFocus = false;
   // Tutores designados
   showDesignados: boolean = false;
@@ -104,8 +105,8 @@ export class TutoresHomeComponent implements OnInit {
   constructor(private sga: SgaService, private router: Router, private pdfService: PdfService, private auth: AuthService) {}
 
   ngOnInit(): void {
-    this.loadPertinencias();
     this.loadTutorTipos();
+    this.loadAllPertinencias();
   }
 
   toggleDesignados() {
@@ -821,34 +822,118 @@ export class TutoresHomeComponent implements OnInit {
     return miss;
   }
 
-  onCarreraChange(_: any) {
-    this.loadPertinencias();
-    if (this.editingDocente) {
-      this.editingDocente.pertinencia_acad_id = null;
-    }
-    // Si se está mostrando la lista de tutores, recargar con el nuevo filtro
-    if (this.showRegistrados) {
-      this.loadTutores();
-    }
-  }
-
-  private loadPertinencias() {
-    if (!this.carreraSeleccionada) {
-      this.pertinencias = [];
-      return;
-    }
-    this.sga.getPertinencias(this.carreraSeleccionada).subscribe({
+  private loadAllPertinencias() {
+    this.sga.getPertinencias().subscribe({
       next: (resp) => {
-        if (resp?.success) {
-          this.pertinencias = resp.data || [];
-        } else {
-          this.pertinencias = [];
-        }
+        this.allPertinencias = Array.isArray(resp?.data) ? resp.data : [];
+        this.applyPertinenciaFilter(this.modalCarreraCode);
       },
       error: () => {
+        this.allPertinencias = [];
         this.pertinencias = [];
       }
     });
+  }
+
+  private applyPertinenciaFilter(code: 'MEA' | 'EEA' | 'EEA/MEA' | null) {
+    if (!code) {
+      this.pertinencias = [];
+      return;
+    }
+    const allowed = code === 'EEA/MEA' ? ['EEA', 'MEA'] : [code];
+    this.pertinencias = this.allPertinencias.filter((p) => {
+      const carrera = (p.cod_carrera || '').toUpperCase();
+      if (!carrera) return true;
+      return allowed.includes(carrera as 'MEA' | 'EEA');
+    });
+  }
+
+  isCarreraModalValida(code: 'MEA' | 'EEA' | 'EEA/MEA' | null): boolean {
+    return code === 'MEA' || code === 'EEA' || code === 'EEA/MEA';
+  }
+
+  private normalizeCarreraCode(value: string | null | undefined): 'MEA' | 'EEA' | 'EEA/MEA' | null {
+    if (!value) return null;
+    const trimmed = value.toString().trim();
+    if (!trimmed) return null;
+    const normalized = trimmed
+      .normalize('NFD')
+      .replace(/\p{Diacritic}+/gu, '')
+      .toUpperCase();
+
+    const hasMea = /MEA|MECANICA/.test(normalized);
+    const hasEea = /EEA|ELECTRICIDAD/.test(normalized);
+
+    if (hasMea && hasEea) return 'EEA/MEA';
+    if (hasEea) return 'EEA';
+    if (hasMea) return 'MEA';
+
+    if (normalized.includes('/')) {
+      const parts = normalized.split('/');
+      const mapped = parts.map(p => this.normalizeCarreraCode(p as string)).filter(Boolean) as Array<'MEA' | 'EEA' | 'EEA/MEA'>;
+      if (mapped.includes('EEA/MEA')) return 'EEA/MEA';
+      const hasBoth = mapped.includes('EEA') && mapped.includes('MEA');
+      if (hasBoth) return 'EEA/MEA';
+      return mapped[0] ?? null;
+    }
+
+    return null;
+  }
+
+  private buildCarreraInfo(
+    codeA?: string | null,
+    labelA?: string | null,
+    listA?: string[] | null,
+    codeB?: string | null,
+    labelB?: string | null,
+    listB?: string[] | null
+  ): { code: 'MEA' | 'EEA' | 'EEA/MEA' | null; list: Array<'MEA' | 'EEA'> } {
+    const codes = new Set<'MEA' | 'EEA'>();
+
+    const collectString = (input?: string | null) => {
+      const normalized = this.normalizeCarreraCode(input);
+      if (!normalized) return;
+      if (normalized === 'EEA/MEA') {
+        codes.add('EEA');
+        codes.add('MEA');
+      } else {
+        codes.add(normalized);
+      }
+    };
+
+    const collectList = (list?: string[] | null) => {
+      if (!Array.isArray(list)) return;
+      list.forEach(item => collectString(item));
+    };
+
+    collectString(codeA);
+    collectString(labelA);
+    collectList(listA);
+    collectString(codeB);
+    collectString(labelB);
+    collectList(listB);
+
+    if (!codes.size) {
+      return { code: null, list: [] };
+    }
+
+    const list = Array.from(codes.values()).sort() as Array<'EEA' | 'MEA'>;
+    if (codes.size > 1) {
+      return { code: 'EEA/MEA', list };
+    }
+
+    const single = list[0];
+    return { code: single, list };
+  }
+
+  private resolveCarreraPrincipal(entry: Partial<Docente> | null | undefined): 'MEA' | 'EEA' | 'EEA/MEA' | null {
+    if (!entry) return null;
+    const info = this.buildCarreraInfo(
+      (entry as any).cod_carrera,
+      (entry as any).carrera_label,
+      (entry as any).carreras
+    );
+    return info.code;
   }
 
   toggleImportar() {
@@ -858,6 +943,9 @@ export class TutoresHomeComponent implements OnInit {
       // Mostrar Importar -> ocultar panel de registrados
       this.showRegistrados = false;
       this.showDesignados = false;
+      if (!this.docentesLoaded && !this.loadingDocentes) {
+        this.buscarDocentes();
+      }
     } else {
       // Limpia estado al ocultar
       this.errorDocentes = null;
@@ -865,20 +953,14 @@ export class TutoresHomeComponent implements OnInit {
   }
 
   buscarDocentes() {
-    if (!this.carreraSeleccionada) {
-      this.errorDocentes = 'Seleccione la carrera';
-      return;
-    }
     this.errorDocentes = null;
     this.loadingDocentes = true;
+    this.docentesLoaded = false;
     this.docentes = [];
-    const params: any = { };
-    // Para calcular el estado "Registrado", no filtramos por carrera, solo por gestión
-    params.gestion = this.gestionActual;
     forkJoin({
-      sga: this.sga.getDocentes(this.carreraSeleccionada),
-      // Traer SOLO los locales de la carrera seleccionada
-      local: this.sga.getDocentesLocales(this.carreraSeleccionada),
+      sga: this.sga.getDocentes(),
+      // Traer snapshot local de tutores (todas las carreras)
+      local: this.sga.getDocentesLocales(),
       // Dos consultas de tutores: gestión actual, alterna y sin filtro (cualquier gestión)
       reg: this.sga.getTutores({ gestion: this.gestionActual }),
       regAlt: this.sga.getTutores({ gestion: this.gestionAlternaActual }),
@@ -913,6 +995,11 @@ export class TutoresHomeComponent implements OnInit {
             const d = raw as Docente;
             const key = normCi((d as any).ci);
             if (!key) continue;
+            const carreraInfo = this.buildCarreraInfo(
+              (d as any).cod_carrera,
+              (d as any).carrera_label,
+              (d as any).carreras
+            );
             const item = {
               nombre: (d as any).nombre || '',
               apellido_p: (d as any).apellido_p || '',
@@ -925,6 +1012,9 @@ export class TutoresHomeComponent implements OnInit {
               pertinencia_acad_id: (d as any).pertinencia_acad_id ?? null,
               tipo_tutor_id: (d as any).tipo_tutor_id ?? null,
               tipo_tutor: (d as any).tipo_tutor || null,
+              cod_carrera: carreraInfo.code,
+              carrera_label: carreraInfo.code,
+              carreras: carreraInfo.list,
             } as Docente;
             map.set(key, item);
             sgaNameIndex.set(fullNameKey(item), key);
@@ -990,6 +1080,30 @@ export class TutoresHomeComponent implements OnInit {
               ci: pickCi,
               tipo_tutor_id: (ld as any).tipo_tutor_id ?? (prev as any).tipo_tutor_id ?? null,
               tipo_tutor: (ld as any).tipo_tutor ?? (prev as any).tipo_tutor ?? null,
+              cod_carrera: this.buildCarreraInfo(
+                (prev as any).cod_carrera,
+                (prev as any).carrera_label,
+                (prev as any).carreras,
+                (ld as any).cod_carrera,
+                (ld as any).carrera_label,
+                (ld as any).carreras
+              ).code,
+              carrera_label: this.buildCarreraInfo(
+                (prev as any).cod_carrera,
+                (prev as any).carrera_label,
+                (prev as any).carreras,
+                (ld as any).cod_carrera,
+                (ld as any).carrera_label,
+                (ld as any).carreras
+              ).code,
+              carreras: this.buildCarreraInfo(
+                (prev as any).cod_carrera,
+                (prev as any).carrera_label,
+                (prev as any).carreras,
+                (ld as any).cod_carrera,
+                (ld as any).carrera_label,
+                (ld as any).carreras
+              ).list,
             } as Docente;
             // Guardar de regreso en el mismo slot del map que se esté usando (por CI local o por CI SGA si hicimos merge por nombre)
             if (map.has(key)) {
@@ -1085,11 +1199,13 @@ export class TutoresHomeComponent implements OnInit {
         for (const d of this.docentes) {
           this.setTipoSeleccionado(d.ci, (d as any).tipo_tutor_id ?? null);
         }
+        this.docentesLoaded = true;
       },
       error: (err: unknown) => {
         this.loadingDocentes = false;
         const message = err instanceof Error ? err.message : 'Error al cargar docentes';
         this.errorDocentes = message;
+        this.docentesLoaded = false;
       }
     });
   }
@@ -1112,8 +1228,7 @@ export class TutoresHomeComponent implements OnInit {
     this.editingCiOriginal = (doc.ci || '').toString().trim() || null;
     this.showFieldErrors = false;
     // Inicializar carrera/gestión del modal
-    const codSel = this.carreraSeleccionadaCodigo;
-    this.modalCarreraCode = (codSel === 'MEA' || codSel === 'EEA') ? codSel : 'MEA';
+    this.modalCarreraCode = this.resolveCarreraPrincipal(doc);
     this.modalGestion = this.gestionActual;
     // cargar pertinencias para la carrera del modal
     this.onModalCarreraChange(this.modalCarreraCode);
@@ -1151,13 +1266,6 @@ export class TutoresHomeComponent implements OnInit {
     this.selectedTipoTutorId = null;
     this.editingDocente!.titulo_academico = null;
     this.modalEditarDocenteVisible = true;
-  }
-
-  // Código de carrera (MEA/EEA) para UI
-  get carreraSeleccionadaCodigo(): string {
-    if (this.carreraSeleccionada === 'mecanica') return 'MEA';
-    if (this.carreraSeleccionada === 'electricidad') return 'EEA';
-    return '—';
   }
 
   cerrarModalEditarDocente() {
@@ -1276,7 +1384,7 @@ export class TutoresHomeComponent implements OnInit {
       return;
     }
     this.bulkSaving = true;
-    const codCarr = (this.carreraSeleccionada && this.carreraSeleccionadaCodigo !== '—') ? this.carreraSeleccionadaCodigo : undefined;
+    const firstCarrera = this.resolveCarreraPrincipal(seleccionados[0]);
     const items = seleccionados.map(d => ({
       ci: (d.ci || '').toString().trim(),
       nombre: d.nombre || '',
@@ -1286,7 +1394,7 @@ export class TutoresHomeComponent implements OnInit {
       profesion: d.profesion || '',
       titulo: d.profesion || '',
       titulo_academico: (d as any).titulo_academico ?? null,
-      cod_carrera: codCarr,
+      cod_carrera: this.resolveCarreraPrincipal(d) ?? firstCarrera ?? undefined,
       pertinencia_acad_id: (d as any).pertinencia_acad_id ?? null,
       pertinencia_acad_ids: (d as any).pertinencia_ids,
       pertinencia: (Array.isArray((d as any).pertinencias) && (d as any).pertinencias.length)
@@ -1331,11 +1439,6 @@ export class TutoresHomeComponent implements OnInit {
     if (this.showRegistrados) {
       // Mostrar Registrados -> ocultar panel de importar
       this.showImport = false;
-      // Inicializar carrera por defecto al abrir el panel
-      if (!this.carreraFiltroCode || this.carreraFiltroCode === '—') {
-        const codSel = this.carreraSeleccionadaCodigo;
-        this.carreraFiltroCode = (codSel === 'MEA' || codSel === 'EEA') ? codSel : 'MEA';
-      }
       if (!this.tutorTipos.length) this.loadTutorTipos();
       this.loadTutores();
     }
@@ -1346,8 +1449,7 @@ export class TutoresHomeComponent implements OnInit {
     this.errorTutores = null;
     this.tutores = [];
     const params: any = {};
-    const codigo = this.carreraFiltroCode || (this.carreraSeleccionadaCodigo !== '—' ? this.carreraSeleccionadaCodigo : undefined);
-    if (codigo) params.carrera = codigo;
+    if (this.carreraFiltroCode) params.carrera = this.carreraFiltroCode;
     this.sga.getTutores(params).subscribe({
       next: (resp) => {
         this.loadingTutores = false;

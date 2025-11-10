@@ -59,10 +59,11 @@
             <div class="col-md-6" *ngIf="isCreateMode">
               <label class="form-label">Carrera <span class="text-danger">*</span></label>
               <select class="form-select" [(ngModel)]="modalCarreraCode" (ngModelChange)="onModalCarreraChange($event)" [required]="isCreateMode"
-                      [ngClass]="{'is-invalid': showFieldErrors && !(modalCarreraCode==='MEA' || modalCarreraCode==='EEA')}">
+                      [ngClass]="{'is-invalid': showFieldErrors && !isCarreraModalValida(modalCarreraCode)}">
                 <option [ngValue]="null" disabled>Seleccione carrera</option>
                 <option [ngValue]="'MEA'">MEA - Mecánica Automotriz</option>
                 <option [ngValue]="'EEA'">EEA - Electricidad y Electrónica</option>
+                <option [ngValue]="'EEA/MEA'">EEA/MEA - Ambas carreras</option>
               </select>
               <div class="invalid-feedback">Seleccione la carrera</div>
             </div>
@@ -318,8 +319,10 @@
               <div class="d-flex align-items-center gap-2">
                 <span class="text-muted small">Carrera</span>
                 <select class="form-select form-select-sm w-auto" [(ngModel)]="carreraFiltroCode" (ngModelChange)="onCarreraFiltroChange($event)">
+                  <option [ngValue]="null">Todas</option>
                   <option [ngValue]="'MEA'">MEA</option>
                   <option [ngValue]="'EEA'">EEA</option>
+                  <option [ngValue]="'EEA/MEA'">EEA/MEA</option>
                 </select>
               </div>
             </div>
@@ -339,9 +342,7 @@
             <table class="table table-sm table-striped align-middle">
               <thead class="table-dark">
                 <tr>
-                  <th>Nombres</th>
-                  <th>Apellido Paterno</th>
-                  <th>Apellido Materno</th>
+                  <th>Nombre completo</th>
                   <th>CI</th>
                   <th>Celular</th>
                   <th>Título(s)</th>
@@ -353,9 +354,7 @@
               </thead>
               <tbody>
                 <tr *ngFor="let t of tutores">
-                  <td>{{ t.nombre }}</td>
-                  <td>{{ t.apellido_p || '-' }}</td>
-                  <td>{{ t.apellido_m || '-' }}</td>
+                  <td>{{ t.apellido_p || '-' }} {{ t.nombre }} {{ t.apellido_m || '-' }}</td>
                   <td>{{ t.ci }}</td>
                   <td>{{ t.celular || '-' }}</td>
                   <td>{{ t.titulo || '-' }}</td>
@@ -457,25 +456,12 @@
               Importar Docentes (SGA)
             </h5>
 
-            <div class="alert alert-info py-2">
-              Los datos se obtienen del SGA. Selecciona la carrera y presiona "Buscar" para listar docentes.
-            </div>
-
-            <div class="row g-2 align-items-end mb-2">
-              <div class="col-12 col-sm-6 col-md-5">
-                <label class="form-label mb-1">Carrera</label>
-                <select class="form-select" [(ngModel)]="carreraSeleccionada" (ngModelChange)="onCarreraChange($event)">
-                  <option [ngValue]="null" disabled>Seleccione la carrera</option>
-                  <option value="mecanica">Mecánica Automotriz</option>
-                  <option value="electricidad">Electricidad y Electrónica Automotriz</option>
-                </select>
-              </div>
-              <div class="col-12 col-sm-auto">
-                <button class="btn btn-primary" (click)="buscarDocentes()" [disabled]="loadingDocentes">
-                  <i class="bi bi-search"></i>
-                  {{ loadingDocentes ? 'Buscando...' : 'Buscar' }}
-                </button>
-              </div>
+            <div class="alert alert-info py-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">
+              <span>Los docentes se listan de ambas carreras (MEA y EEA). Si un docente pertenece a ambas, se mostrará con la etiqueta "EEA/MEA".</span>
+              <button class="btn btn-outline-primary btn-sm" (click)="buscarDocentes()" [disabled]="loadingDocentes">
+                <i class="bi" [ngClass]="loadingDocentes ? 'bi-arrow-repeat spin' : 'bi-arrow-clockwise'"></i>
+                {{ loadingDocentes ? 'Actualizando...' : 'Refrescar' }}
+              </button>
             </div>
 
             <div *ngIf="bulkError" class="alert alert-danger py-2">{{ bulkError }}</div>
@@ -487,12 +473,11 @@
               <table class="table table-sm table-striped align-middle">
                 <thead class="table-dark">
                   <tr>
-                    <th>Nombres</th>
-                    <th>Apellido Paterno</th>
-                    <th>Apellido Materno</th>
+                    <th>Nombre Completo</th>
                     <th>CI</th>
                     <th>Celular</th>
                     <th>Título(s)</th>
+                    <th>Carrera</th>
                     <th>Pertinencia Académica</th>
                     <th>Tipo de Tutor</th>
                     <th>Estado</th>
@@ -501,12 +486,11 @@
                 </thead>
                 <tbody>
                   <tr *ngFor="let d of docentes">
-                    <td>{{ d.nombre }}</td>
-                    <td>{{ d.apellido_p }}</td>
-                    <td>{{ d.apellido_m }}</td>
+                    <td>{{ d.apellido_p }} {{ d.apellido_m }} {{ d.nombre }}</td>
                     <td>{{ d.ci }}</td>
                     <td>{{ d.celular }}</td>
                     <td>{{ d.profesion || '-' }}</td>
+                    <td>{{ d.carrera_label || d.cod_carrera || '-' }}</td>
                     <td>
                       <ul class="mb-0 ps-3" *ngIf="d.pertinencias && d.pertinencias.length; else pertTexto">
                         <li *ngFor="let p of d.pertinencias">{{ p }}</li>
@@ -546,7 +530,7 @@
             </div>
 
             <div *ngIf="!loadingDocentes && !docentes.length && !errorDocentes" class="text-muted small">
-              Sin resultados. Realiza una búsqueda.
+              Sin resultados disponibles.
             </div>
           </div>
         </div>

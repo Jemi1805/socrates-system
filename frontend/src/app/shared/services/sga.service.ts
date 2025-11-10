@@ -97,6 +97,9 @@ export interface Docente {
   activo?: boolean;
   tutor_reg_id?: number;
   tutor_activo?: boolean;
+  cod_carrera?: string | null;
+  carrera_label?: string | null;
+  carreras?: string[];
 }
 
 export interface Pertinencia {
@@ -344,23 +347,15 @@ export class SgaService {
   }
 
   // --- DOCENTES (SGA legacy) ---
-  getDocentes(carrera?: string): Observable<ApiResponse<Docente[]>> {
-    let params = new HttpParams();
-    if (carrera) {
-      params = params.set('carrera', carrera);
-    }
-    return this.http.get<ApiResponse<Docente[]>>(`${this.baseUrl}/docentes`, { params })
+  getDocentes(): Observable<ApiResponse<Docente[]>> {
+    return this.http.get<ApiResponse<Docente[]>>(`${this.baseUrl}/docentes`)
       .pipe(catchError(this.handleError));
   }
 
   // --- DOCENTES (Local BD) ---
-  getDocentesLocales(carrera?: string): Observable<ApiResponse<Docente[]>> {
+  getDocentesLocales(): Observable<ApiResponse<Docente[]>> {
     // Usar tutores locales como fuente y mapear a forma Docente para el flujo de importación
-    let params = new HttpParams();
-    if (carrera) {
-      params = params.set('carrera', carrera);
-    }
-    return this.http.get<ApiResponse<TutorReg[]>>(`${environment.apiUrl}/tutores`, { params }).pipe(
+    return this.http.get<ApiResponse<TutorReg[]>>(`${environment.apiUrl}/tutores`).pipe(
       map((resp) => {
         const list = (resp?.data || []).map(t => ({
           nombre: t.nombre,
@@ -377,6 +372,9 @@ export class SgaService {
           tipo_tutor_id: t.tipo_tutor_id ?? null,
           tipo_tutor: t.tipo_tutor,
           activo: t.activo ?? false,
+          cod_carrera: (t as any).cod_carrera ?? null,
+          carrera_label: (t as any).cod_carrera ?? null,
+          carreras: ((t as any).cod_carrera ? [(t as any).cod_carrera] : []),
         }) as Docente);
         return { success: true, data: list } as ApiResponse<Docente[]>;
       }),
