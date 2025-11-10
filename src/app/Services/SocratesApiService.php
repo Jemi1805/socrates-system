@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Exception;
@@ -13,6 +14,14 @@ class SocratesApiService
     private $apiKey;
     private $token;
     private $currentUrl;
+    private $sessionCookies = [];
+    private $docTemplates = [
+        'COMINT' => 'Comunicacion interna.docx',
+        'MEM' => 'Comunicacion memorandum.docx'
+    ];
+    private $sgaConfig = null;
+    private $docConfig = null;
+    private $currentCarreraSlug = 'default';
 
     public function __construct()
     {
@@ -27,7 +36,8 @@ class SocratesApiService
         ];
         
         // URL por defecto
-        $this->currentUrl = $this->baseUrls['default'];
+        $this->currentUrl = $this->resolveBaseUrlForSlug('default');
+        $this->currentCarreraSlug = 'default';
         $this->apiKey = env('SGA_API_KEY', 'SOCRATES_SGA_API_KEY_2025');
         
         // Registrar las URLs configuradas para debugging
@@ -38,25 +48,269 @@ class SocratesApiService
             'current' => $this->currentUrl
         ]);
     }
+
+    private function loadDocConfig()
+    {
+        if ($this->docConfig !== null) {
+            return;
+        }
+
+        $this->docConfig = [];
+        $config = $this->getSgaConfig();
+
+        if ($config && isset($config->doc_config) && trim((string) $config->doc_config) !== '') {
+            $decoded = json_decode($config->doc_config, true);
+            if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+                Log::warning('SGA doc_config inválido, se ignorará', [
+                    'error' => json_last_error_msg(),
+                ]);
+                return;
+            }
+
+            foreach ($decoded as $slug => $settings) {
+                if (!is_array($settings)) {
+                    continue;
+                }
+
+                $normalizedSlug = $this->normalizeCarreraSlug($slug);
+                $this->docConfig[$normalizedSlug] = array_change_key_case($settings, CASE_LOWER);
+            }
+        }
+    }
+
+    private function getDocConfigSettings($slug)
+    {
+        $this->loadDocConfig();
+
+        if (isset($this->docConfig[$slug])) {
+            return $this->docConfig[$slug];
+        }
+
+        if (isset($this->docConfig['default'])) {
+            return $this->docConfig['default'];
+        }
+
+        return [];
+    }
+
+    private function resolveBaseUrlForSlug($slug)
+    {
+        $this->loadDocConfig();
+
+        if (isset($this->docConfig[$slug]['base_url'])) {
+            $candidate = trim((string) $this->docConfig[$slug]['base_url']);
+            if ($candidate !== '') {
+                return rtrim($candidate, '/') . '/';
+            }
+        }
+
+        if (isset($this->baseUrls[$slug])) {
+            return $this->baseUrls[$slug];
+        }
+
+        return $this->baseUrls['default'];
+    }
+
+    /**
+     * @param string|null $slug
+     * @return string
+     */
+    public function resolveTargetCarreraSlug($slug)
+    {
+        $normalized = $this->normalizeCarreraSlug($slug ?: 'default');
+        $settings = $this->getDocConfigSettings($normalized);
+
+        if (isset($settings['target']) && is_array($settings['target'])) {
+            $target = array_change_key_case($settings['target'], CASE_LOWER);
+            if (!empty($target['slug'])) {
+                return $this->normalizeCarreraSlug($target['slug']);
+            }
+        }
+
+        if (!empty($settings['target_slug'])) {
+            return $this->normalizeCarreraSlug($settings['target_slug']);
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param string|null $slug
+     * @return string
+     */
+    public function resolveContextCarreraSlug($slug)
+    {
+        $normalized = $this->normalizeCarreraSlug($slug ?: 'default');
+        $settings = $this->getDocConfigSettings($normalized);
+
+        if (isset($settings['context']) && is_array($settings['context'])) {
+            $context = array_change_key_case($settings['context'], CASE_LOWER);
+            if (!empty($context['slug'])) {
+                return $this->normalizeCarreraSlug($context['slug']);
+            }
+        }
+
+        if (!empty($settings['context_slug'])) {
+            return $this->normalizeCarreraSlug($settings['context_slug']);
+        }
+
+        return $normalized;
+    }
+
+    private function extractConfiguredParams($settings, $section = null)
+    {
+        $allowedKeys = ['cod_pensum', 'gestion', 'cod_carrera', 'cod_grupo'];
+        $source = $settings;
+
+        if ($section !== null && isset($settings[$section]) && is_array($settings[$section])) {
+            $source = array_change_key_case($settings[$section], CASE_LOWER);
+        }
+
+        $result = [];
+        foreach ($allowedKeys as $key) {
+            if (isset($source[$key]) && $source[$key] !== '') {
+                $result[$key] = $source[$key];
+            }
+        }
+
+        return $result;
+    }
+
+    private function collectExplicitEmptyKeys($settings, $section = null)
+    {
+        $allowedKeys = ['cod_pensum', 'gestion', 'cod_carrera', 'cod_grupo'];
+        $source = $settings;
+
+        if ($section !== null && isset($settings[$section]) && is_array($settings[$section])) {
+            $source = array_change_key_case($settings[$section], CASE_LOWER);
+        }
+
+        $empties = [];
+        foreach ($allowedKeys as $key) {
+            if (array_key_exists($key, $source)) {
+                $value = $source[$key];
+                if ($value === null || (is_string($value) && trim($value) === '')) {
+                    $empties[$key] = true;
+                }
+            }
+        }
+
+        return $empties;
+    }
+
+    private function normalizeCarreraSlug($value)
+    {
+        $slug = strtolower(trim((string) $value));
+
+        if (in_array($slug, ['mecanica', 'mecánica', 'automotriz'], true)) {
+            return 'mecanica';
+        }
+
+        if (in_array($slug, ['electricidad', 'electrónica', 'electronica'], true)) {
+            return 'electricidad';
+        }
+
+        return 'default';
+    }
+
+    private function normalizeCarreraCodigoFromName($name)
+    {
+        if (!$name) {
+            return null;
+        }
+
+        $normalized = mb_strtolower(trim($name), 'UTF-8');
+        if ($normalized === '') {
+            return null;
+        }
+
+        if (strpos($normalized, 'mec') !== false) {
+            return 'MEA';
+        }
+
+        if (strpos($normalized, 'elect') !== false) {
+            return 'EEA';
+        }
+
+        $exact = DB::table('carrera')
+            ->whereRaw('LOWER(nombre_carrera) = ?', [$normalized])
+            ->value('cod_carrera');
+
+        if ($exact) {
+            return $exact;
+        }
+
+        $like = DB::table('carrera')
+            ->where('nombre_carrera', 'LIKE', '%' . $name . '%')
+            ->value('cod_carrera');
+
+        return $like ?: null;
+    }
+
+    private function mapCarreraSlugFromCodigo($code)
+    {
+        if (!$code) {
+            return null;
+        }
+
+        $upper = strtoupper(trim($code));
+        if ($upper === 'MEA') {
+            return 'mecanica';
+        }
+        if ($upper === 'EEA') {
+            return 'electricidad';
+        }
+
+        return null;
+    }
+
+    private function loadSgaConfig()
+    {
+        if ($this->sgaConfig !== null) {
+            return;
+        }
+
+        try {
+            $config = DB::table('sga_config')->orderBy('id', 'desc')->first();
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo cargar configuración SGA', ['error' => $e->getMessage()]);
+            $config = null;
+        }
+
+        $this->sgaConfig = $config ?: false;
+    }
+
+    public function getSgaConfig()
+    {
+        $this->loadSgaConfig();
+        return $this->sgaConfig;
+    }
+
+    private function getConfigValue($key, $default = null)
+    {
+        $config = $this->getSgaConfig();
+        if ($config && isset($config->$key) && $config->$key !== '') {
+            return $config->$key;
+        }
+        return $default;
+    }
+
+    public function getAbreviaturaBase()
+    {
+        $base = $this->getConfigValue('abreviatura', 'CETA/DA/');
+        return rtrim($base, '/') . '/';
+    }
     
     /**
      * Establecer la carrera para determinar la URL a usar
      */
     public function setCarrera($carrera)
     {
-        $carrera = strtolower($carrera);
-        
-        if ($carrera == 'mecanica' || $carrera == 'mecánica' || $carrera == 'automotriz') {
-            $this->currentUrl = $this->baseUrls['mecanica'];
-            return true;
-        } elseif ($carrera == 'electricidad' || $carrera == 'electrónica' || $carrera == 'electronica') {
-            $this->currentUrl = $this->baseUrls['electricidad'];
-            return true;
-        } else {
-            // Si no se especifica o no coincide, usar la URL por defecto
-            $this->currentUrl = $this->baseUrls['default'];
-            return false;
-        }
+        $slug = $this->normalizeCarreraSlug($carrera);
+        $this->currentUrl = $this->resolveBaseUrlForSlug($slug);
+        $this->currentCarreraSlug = $slug;
+
+        return $slug !== 'default';
     }
     
     /**
@@ -106,6 +360,91 @@ class SocratesApiService
             Log::error('Excepción en autenticación SGA', ['error' => $e->getMessage()]);
             return null;
         }
+    }
+
+    public function loginWeb($username, $password)
+    {
+        $attempts = [
+            [
+                'endpoint' => 'login/verify',
+                'fields' => [
+                    'username' => $username,
+                    'password' => $password,
+                ],
+            ],
+            [
+                'endpoint' => 'login',
+                'fields' => [
+                    'n_user' => $username,
+                    'contrasenia' => $password,
+                ],
+            ],
+            [
+                'endpoint' => 'index.php/login/verify',
+                'fields' => [
+                    'username' => $username,
+                    'password' => $password,
+                ],
+            ],
+            [
+                'endpoint' => 'index.php/login',
+                'fields' => [
+                    'n_user' => $username,
+                    'contrasenia' => $password,
+                ],
+            ],
+            [
+                'endpoint' => 'index.php/main/login/verify',
+                'fields' => [
+                    'username' => $username,
+                    'password' => $password,
+                ],
+            ],
+            [
+                'endpoint' => 'index.php/main/login',
+                'fields' => [
+                    'n_user' => $username,
+                    'contrasenia' => $password,
+                ],
+            ],
+        ];
+
+        foreach ($attempts as $attempt) {
+            $endpoint = $attempt['endpoint'];
+            $url = rtrim($this->currentUrl, '/') . '/' . ltrim($endpoint, '/');
+            try {
+                $response = Http::asForm()
+                    ->withOptions(['allow_redirects' => false])
+                    ->post($url, $attempt['fields']);
+
+                if (in_array($response->status(), [302, 303]) && ($response->headers()['Set-Cookie'] ?? null)) {
+                    $this->sessionCookies = $response->headers()['Set-Cookie'];
+                    Log::info('Login web SGA exitoso', ['endpoint' => $endpoint]);
+                    return ['success' => true, 'cookies' => $this->sessionCookies];
+                }
+
+                // Si el endpoint existe pero las credenciales fallan, no tiene sentido probar los demás
+                if ($response->status() !== 404) {
+                    return [
+                        'success' => false,
+                        'message' => 'Credenciales inválidas o respuesta inesperada',
+                        'status' => $response->status(),
+                        'endpoint' => $endpoint,
+                        'body' => method_exists($response, 'body') ? $response->body() : null,
+                    ];
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Error intentando login SGA', [
+                    'endpoint' => $endpoint,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return [
+            'success' => false,
+            'message' => 'No se pudo encontrar un endpoint válido para login/verify',
+        ];
     }
 
     /**
@@ -185,13 +524,29 @@ class SocratesApiService
             ]);
 
             // Configuración mejorada para la solicitud HTTP
-            $response = Http::asForm()
+            $cookieHeader = '';
+            if (!empty($this->sessionCookies)) {
+                $cookieHeader = implode('; ', array_map(function ($cookieLine) {
+                    return explode(';', $cookieLine)[0];
+                }, $this->sessionCookies));
+            }
+
+            $httpClient = Http::asForm()
                 ->timeout(15) // Timeout aumentado
                 ->withOptions([
                     'allow_redirects' => true, // Seguir redirecciones automáticamente
                     'http_errors' => false, // No lanzar excepción por errores HTTP
                     'connect_timeout' => 5 // Timeout de conexión
-                ])
+                ]);
+
+            $headers = [
+                'Referer' => $this->currentUrl . 'titulacion/serviciostitulacion'
+            ];
+            if ($cookieHeader !== '') {
+                $headers['Cookie'] = $cookieHeader;
+            }
+
+            $response = $httpClient->withHeaders($headers)
                 ->post($requestUrl, $params);
 
             Log::info('Respuesta del SGA', [
@@ -267,6 +622,89 @@ class SocratesApiService
                 'message' => 'Error de conexión: ' . $e->getMessage()
             ];
         }
+    }
+
+    public function fetchCorrelativoContext($codCeta, $carrera = null)
+    {
+        $codCeta = trim((string)$codCeta);
+        if ($codCeta === '') {
+            return [
+                'success' => false,
+                'message' => 'cod_ceta requerido'
+            ];
+        }
+
+        if ($carrera) {
+            $this->setCarrera($carrera);
+        }
+
+        $sessionResult = $this->ensureWebSession();
+        if (empty($sessionResult['success'])) {
+            return [
+                'success' => false,
+                'message' => $sessionResult['message'] ?? 'No se pudo iniciar sesión en el SGA'
+            ];
+        }
+
+        $result = $this->buscarEstudiantesPorCodigo($codCeta);
+        if (empty($result['success']) || empty($result['data'])) {
+            return [
+                'success' => false,
+                'message' => $result['message'] ?? 'No se encontraron datos en el SGA'
+            ];
+        }
+
+        $rows = $result['data'];
+        $matched = null;
+        foreach ($rows as $row) {
+            $candidate = isset($row['cod_ceta']) ? trim((string)$row['cod_ceta']) : '';
+            if ($candidate !== '' && $candidate === $codCeta) {
+                $matched = $row;
+                break;
+            }
+        }
+
+        if ($matched === null) {
+            $matched = $rows[0];
+        }
+
+        $context = [
+            'cod_ceta' => isset($matched['cod_ceta']) ? trim((string)$matched['cod_ceta']) : $codCeta,
+        ];
+
+        if (!empty($matched['pensum'])) {
+            $context['cod_pensum'] = trim($matched['pensum']);
+        }
+
+        if (!empty($matched['carrera'])) {
+            $context['carrera_nombre'] = trim($matched['carrera']);
+            $code = $this->normalizeCarreraCodigoFromName($matched['carrera']);
+            if ($code) {
+                $context['cod_carrera'] = $code;
+                $slug = $this->mapCarreraSlugFromCodigo($code);
+                if ($slug) {
+                    $context['carrera_slug'] = $slug;
+                }
+            }
+        }
+
+        if (empty($context['gestion']) && isset($matched['raw']) && is_array($matched['raw'])) {
+            foreach ($matched['raw'] as $key => $value) {
+                $normKey = mb_strtolower((string)$key, 'UTF-8');
+                if (strpos($normKey, 'gest') !== false) {
+                    $candidate = trim((string)$value);
+                    if ($candidate !== '') {
+                        $context['gestion'] = $candidate;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return [
+            'success' => true,
+            'data' => $context
+        ];
     }
 
     /**
@@ -482,10 +920,12 @@ class SocratesApiService
 
             $response = Http::withHeaders($headers);
 
+            $url = rtrim($this->currentUrl, '/') . '/' . ltrim($endpoint, '/');
+
             if ($method === 'GET') {
-                $response = $response->get($this->baseUrl . $endpoint, $params);
+                $response = $response->get($url, $params);
             } else {
-                $response = $response->post($this->baseUrl . $endpoint, $params);
+                $response = $response->post($url, $params);
             }
 
             if ($response->successful()) {
@@ -876,6 +1316,372 @@ class SocratesApiService
             $this->setCarrera($carrera);
         }
         return $this->buscarPagosMaterialExtraPorCodigo($codCeta);
+    }
+
+    /**
+     * Obtener correlativo de documento desde el SGA usando la función mget_correlativo_abreviatura.
+     */
+    public function getCorrelativoAbreviatura($abreviatura, $idTipoDocumento, $anio, $carrera = null, array $overrides = [])
+    {
+        if (!$abreviatura || !$idTipoDocumento || !$anio) {
+            return [
+                'success' => false,
+                'message' => 'Parámetros incompletos para solicitar correlativo',
+            ];
+        }
+
+        $targetSlug = null;
+        if ($carrera) {
+            $targetSlug = $this->normalizeCarreraSlug($carrera);
+        }
+
+        if (!$targetSlug && isset($overrides['target_slug']) && $overrides['target_slug'] !== '') {
+            $targetSlug = $this->normalizeCarreraSlug($overrides['target_slug']);
+        }
+
+        $docConfigSlug = null;
+        if (isset($overrides['doc_config_slug']) && $overrides['doc_config_slug'] !== '') {
+            $docConfigSlug = $this->normalizeCarreraSlug($overrides['doc_config_slug']);
+        }
+
+        if (!$targetSlug && $docConfigSlug) {
+            $resolvedSlug = $this->resolveTargetCarreraSlug($docConfigSlug);
+            if ($resolvedSlug) {
+                $targetSlug = $resolvedSlug;
+            }
+        }
+
+        $finalTargetSlug = $targetSlug ?: $docConfigSlug;
+        if ($finalTargetSlug) {
+            $this->setCarrera($finalTargetSlug);
+        }
+
+        $endpoint = 'titulacion/serviciostitulacion/mget_correlativo_abreviatura';
+        $baseUrl = rtrim($this->currentUrl, '/');
+        if (substr($baseUrl, -9) !== 'index.php') {
+            $baseUrl .= '/index.php';
+        }
+
+        $requestUrl = $baseUrl . '/' . $endpoint;
+        $params = [
+            'abreviatura' => $abreviatura,
+            'id_tipo_documento' => $idTipoDocumento,
+            'anio' => $anio,
+        ];
+
+        $optionalKeys = ['cod_pensum', 'gestion', 'cod_grupo', 'cod_carrera'];
+        foreach ($optionalKeys as $key) {
+            if (isset($overrides[$key]) && $overrides[$key] !== null && $overrides[$key] !== '') {
+                $params[$key] = (string) $overrides[$key];
+            }
+        }
+
+        $sessionResult = $this->ensureWebSession();
+        if (empty($sessionResult['success'])) {
+            Log::warning('No se pudo establecer sesión SGA antes de solicitar correlativo', [
+                'reason' => $sessionResult['message'] ?? 'unknown'
+            ]);
+            return [
+                'success' => false,
+                'message' => $sessionResult['message'] ?? 'No se pudo iniciar sesión en el SGA',
+            ];
+        }
+
+        $cookieHeader = implode('; ', array_map(function ($cookieLine) {
+            return explode(';', $cookieLine)[0];
+        }, $this->sessionCookies));
+
+        Log::info('Solicitando correlativo al SGA', [
+            'url' => $requestUrl,
+            'params' => $params,
+        ]);
+
+        try {
+            $response = Http::asForm()
+                ->timeout(15)
+                ->withOptions([
+                    'allow_redirects' => true,
+                    'http_errors' => false,
+                    'connect_timeout' => 5,
+                ])
+                ->withHeaders([
+                    'Cookie' => $cookieHeader,
+                    'Referer' => $this->currentUrl . 'titulacion/serviciostitulacion'
+                ])
+                ->post($requestUrl, $params);
+
+            Log::info('Respuesta SGA correlativo', [
+                'status' => $response->status(),
+                'headers' => $response->headers(),
+                'body_preview' => substr($response->body(), 0, 200),
+            ]);
+
+            if (!$response->successful()) {
+                return [
+                    'success' => false,
+                    'message' => 'Error en la consulta al SGA: ' . $response->status(),
+                    'status' => $response->status(),
+                ];
+            }
+
+            $raw = trim($response->body());
+            if (stripos($raw, 'PHP Error') !== false || stripos($raw, 'Undefined index') !== false) {
+                return [
+                    'success' => false,
+                    'message' => 'El SGA devolvió errores internos al solicitar el correlativo',
+                    'body' => substr($raw, 0, 500),
+                ];
+            }
+            $json = json_decode($raw, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return [
+                    'success' => true,
+                    'data' => $json,
+                ];
+            }
+
+            if (is_numeric($raw)) {
+                return [
+                    'success' => true,
+                    'data' => ['numero' => (int)$raw],
+                ];
+            }
+
+            return [
+                'success' => true,
+                'data' => ['raw' => $raw],
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Error solicitando correlativo al SGA', [
+                'error' => $e->getMessage(),
+                'params' => $params,
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Error de conexión: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    public function ensureWebSession($username = null, $password = null)
+    {
+        if (!empty($this->sessionCookies)) {
+            return ['success' => true, 'cookies' => $this->sessionCookies];
+        }
+
+        $username = $username ?: $this->getConfigValue('web_user', env('SGA_WEB_USER'));
+        $password = $password ?: $this->getConfigValue('web_password', env('SGA_WEB_PASSWORD'));
+
+        if (!$username || !$password) {
+            return [
+                'success' => false,
+                'message' => 'Credenciales SGA_WEB_* no configuradas',
+            ];
+        }
+
+        return $this->loginWeb($username, $password);
+    }
+
+    public function getCargoDetalle($usuarioId)
+    {
+        $endpoint = 'index.php/documentos/generar_documentos/get_cargo_usuario';
+        $requestUrl = $this->currentUrl . $endpoint;
+
+        if (empty($this->sessionCookies)) {
+            $sessionResult = $this->ensureWebSession();
+            if (empty($sessionResult['success'])) {
+                return $sessionResult;
+            }
+        }
+
+        $cookieHeader = implode('; ', array_map(function ($cookieLine) {
+            return explode(';', $cookieLine)[0];
+        }, $this->sessionCookies));
+
+        try {
+            $response = Http::asForm()
+                ->withHeaders([
+                    'Cookie' => $cookieHeader,
+                    'Referer' => $this->currentUrl . 'documentos/generar_documentos',
+                ])
+                ->post($requestUrl, [
+                    'usuario' => $usuarioId,
+                ]);
+
+            if ($response->successful()) {
+                $json = $response->json();
+                return ['success' => true, 'data' => $json];
+            }
+
+            return [
+                'success' => false,
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'message' => 'No se pudo obtener cargo del usuario',
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Error obteniendo cargo usuario SGA', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Error de conexión: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    public function buildDocumentoPayload(array $params)
+    {
+        $docType = strtoupper($params['codigo_tipo_documento']);
+        $template = $this->docTemplates[$docType] ?? $params['archivo'] ?? null;
+
+        if (!$template) {
+            return [
+                'success' => false,
+                'message' => 'Plantilla no configurada para tipo ' . $docType,
+            ];
+        }
+
+        $payload = [
+            'carpeta' => $docType,
+            'file' => $template,
+            'emite' => $params['emite'],
+            'nombre_emite' => $params['nombre_emite'],
+            'cargo_emite' => $params['cargo_emite'],
+            'id_cargo_emite' => $params['id_cargo_emite'],
+            'formato_referencia' => $params['formato_referencia'] ?? 'false',
+            'genero' => $params['genero'] ?? 'M',
+            'tiene_via' => $params['tiene_via'] ?? 'false',
+            'via_nombre' => $params['via_nombre'] ?? '',
+            'via_cargo' => $params['via_cargo'] ?? '',
+            'nombre_recibe' => $params['nombre_recibe'] ?? '',
+            'id_cargo_recibe' => $params['id_cargo_recibe'] ?? '',
+            'cargo_recibe' => $params['cargo_recibe'] ?? '',
+            'institucion' => $params['institucion'] ?? '',
+            'asunto' => $params['asunto'] ?? '',
+        ];
+
+        return ['success' => true, 'data' => $payload];
+    }
+
+    /**
+     * Obtener comunicaciones internas filtrando por asunto.
+     */
+    public function getComunicacionesInternas(array $params = [])
+    {
+        $endpoint = 'api/socrates/comunicaciones_internas';
+        $requestUrl = $this->currentUrl . $endpoint;
+
+        $query = [];
+        if (!empty($params['asunto'])) {
+            $query['asunto'] = $params['asunto'];
+        }
+        if (!empty($params['estado'])) {
+            $query['estado'] = $params['estado'];
+        }
+        if (!empty($params['limit'])) {
+            $query['limit'] = $params['limit'];
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'X-API-Key' => $this->apiKey,
+                'Accept' => 'application/json',
+            ])->get($requestUrl, $query);
+
+            if ($response->successful()) {
+                $json = $response->json();
+                if (is_array($json)) {
+                    return ['success' => true, 'data' => $json];
+                }
+                return ['success' => false, 'message' => 'Respuesta inesperada del SGA'];
+            }
+
+            Log::warning('SGA comunicacion interna no exitosa', [
+                'status' => $response->status(),
+                'url' => $requestUrl,
+                'query' => $query,
+                'body' => $response->body(),
+            ]);
+
+            return [
+                'success' => false,
+                'status' => $response->status(),
+                'message' => 'Error en la consulta al SGA',
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Error solicitando comunicaciones internas al SGA', [
+                'error' => $e->getMessage(),
+                'url' => $requestUrl,
+                'query' => $query,
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Error de conexión: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    public function crearDocumento(array $payload)
+    {
+        $endpoint = 'index.php/documentos/generar_documentos/descargar_documento';
+        $requestUrl = $this->currentUrl . $endpoint;
+
+        if (empty($this->sessionCookies)) {
+            return [
+                'success' => false,
+                'message' => 'Sesión SGA no iniciada',
+            ];
+        }
+
+        $cookieHeader = implode('; ', array_map(function ($cookieLine) {
+            return explode(';', $cookieLine)[0];
+        }, $this->sessionCookies));
+
+        try {
+            $response = Http::asForm()
+                ->withHeaders([
+                    'Cookie' => $cookieHeader,
+                    'Referer' => $this->currentUrl . 'documentos/generar_documentos',
+                ])
+                ->post($requestUrl, $payload);
+
+            if ($response->successful() || in_array($response->status(), [200, 302])) {
+                return [
+                    'success' => true,
+                    'body' => $response->body(),
+                    'status' => $response->status(),
+                ];
+            }
+
+            Log::warning('SGA crearDocumento no exitoso', [
+                'status' => $response->status(),
+                'url' => $requestUrl,
+                'payload' => $payload,
+                'response' => substr($response->body(), 0, 200)
+            ]);
+
+            return [
+                'success' => false,
+                'status' => $response->status(),
+                'message' => 'Error al generar documento en SGA',
+                'body' => $response->body(),
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Error llamando a crearDocumento en SGA', [
+                'error' => $e->getMessage(),
+                'url' => $requestUrl,
+                'payload' => $payload,
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Error de conexión: ' . $e->getMessage(),
+            ];
+        }
     }
 
     /**

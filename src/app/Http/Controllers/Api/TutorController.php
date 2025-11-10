@@ -7,20 +7,22 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 use App\Models\Tutor;
 use App\Models\PertinenciaAcad;
 use App\Models\TipoTutor;
 use App\Models\DesignacionTutor;
+use App\Services\SocratesApiService;
 
 class TutorController extends Controller
 {
-    private const DOC_INTRO_TEXT = 'En cumplimiento al Reglamento de Modalidades de Graduación de Institutos Técnicos y Tecnológicos de Carácter Fiscal, de Convenio y Privado aprobado por la Resolución Ministerial Nº 0487/2023 del 14 de junio de 2023 y del Reglamento Interno de Modalidades de Graduación del Instituto “CETA”, la Dirección Académica del Instituto, lo designa como Tutor para Defensas de Grado de los siguientes estudiantes:';
-    private const DOC_PARA_CARGO = 'DOCENTE TÉCNICO';
-    private const DOC_DE_NOMBRE = 'Ing. Bradley Jaillita Burgoa';
-    private const DOC_DE_CARGO = 'DIRECTOR ACADÉMICO';
-    private const DOC_ASUNTO = 'DESIGNACIÓN COMO TUTOR PARA PROYECTOS DE DEFENSA DE GRADO';
-    private const DOC_PIE_NOTAS = ['BJB', 'ML', 'CC: REG/DA'];
+    protected static $docIntroText = 'En cumplimiento al Reglamento de Modalidades de Graduación de Institutos Técnicos y Tecnológicos de Carácter Fiscal, de Convenio y Privado aprobado por la Resolución Ministerial Nº 0487/2023 del 14 de junio de 2023 y del Reglamento Interno de Modalidades de Graduación del Instituto “CETA”, la Dirección Académica del Instituto, lo designa como Tutor para Defensas de Grado de los siguientes estudiantes:';
+    protected static $docParaCargo = 'DOCENTE TÉCNICO';
+    protected static $docDeNombre = 'Ing. Bradley Jaillita Burgoa';
+    protected static $docDeCargo = 'DIRECTOR ACADÉMICO';
+    protected static $docAsunto = 'DESIGNACIÓN COMO TUTOR PARA PROYECTOS DE DEFENSA DE GRADO';
+    protected static $docPieNotas = ['BJB', 'CC: REC/DA'];
     /**
      * Listar tutores registrados.
      * Filtros opcionales: ?carrera=MEA|EEA|Nombre
@@ -93,6 +95,7 @@ class TutorController extends Controller
     {
         $convocatoriaId = $request->query('convocatoria_id');
         $search = trim((string)$request->query('search', ''));
+        $codCeta = $request->query('cod_ceta');
 
         $query = DesignacionTutor::query()
             ->leftJoin('tutores', 'designacion_tutor.tutor_id', '=', 'tutores.id')
@@ -108,10 +111,14 @@ class TutorController extends Controller
                 'designacion_tutor.cod_ceta',
                 'designacion_tutor.proyecto_id',
                 'designacion_tutor.fecha_designacion',
+                'designacion_tutor.created_at as designacion_created_at',
+                'designacion_tutor.area as designacion_area',
                 'designacion_tutor.convocatoria_id',
                 'designacion_tutor.convocatoria_nom as designacion_convocatoria_nom',
                 'designacion_tutor.estudiante_nombre as designacion_estudiante_nom',
                 'designacion_tutor.tutor_nombre as designacion_tutor_nom',
+                'convocatorias.fecha_inicio as convocatoria_fecha_inicio',
+                'convocatorias.fecha_fin as convocatoria_fecha_fin',
                 'doc_designaciones.doc_tipo as doc_doc_tipo',
                 'doc_designaciones.year as doc_year',
                 'doc_designaciones.correlativo as doc_correlativo',
@@ -122,6 +129,8 @@ class TutorController extends Controller
                 'doc_designaciones.de_cargo as doc_de_cargo',
                 'doc_designaciones.asunto as doc_asunto',
                 'doc_designaciones.introduccion as doc_introduccion',
+                'doc_designaciones.cronograma_inicio as doc_cronograma_inicio',
+                'doc_designaciones.cronograma_fin as doc_cronograma_fin',
                 'doc_designaciones.pie_notas as doc_pie_notas',
                 'doc_designaciones.tutor_nombre as doc_tutor_nombre',
                 'doc_designaciones.tutor_titulo as doc_tutor_titulo',
@@ -156,6 +165,10 @@ class TutorController extends Controller
             $query->where('designacion_tutor.convocatoria_id', (int)$convocatoriaId);
         }
 
+        if ($codCeta !== null && $codCeta !== '') {
+            $query->where('designacion_tutor.cod_ceta', is_numeric($codCeta) ? (int)$codCeta : $codCeta);
+        }
+
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
                 $like = "%{$search}%";
@@ -184,6 +197,57 @@ class TutorController extends Controller
                 continue;
             }
 
+            $fechaDesignacionRaw = null;
+            if (isset($row->designacion_created_at) && $row->designacion_created_at !== null) {
+                $fechaDesignacionRaw = $row->designacion_created_at;
+            } elseif (isset($row->fecha_designacion) && $row->fecha_designacion !== null) {
+                $fechaDesignacionRaw = $row->fecha_designacion;
+            }
+            $fechaDesignacion = null;
+            if ($fechaDesignacionRaw) {
+                try {
+                    $fechaDesignacion = Carbon::parse($fechaDesignacionRaw)->toIso8601String();
+                } catch (\Throwable $e) {
+                    $fechaDesignacion = (string) $fechaDesignacionRaw;
+                }
+            }
+
+            $convocatoriaInicioIso = null;
+            if (isset($row->convocatoria_fecha_inicio) && $row->convocatoria_fecha_inicio) {
+                try {
+                    $convocatoriaInicioIso = Carbon::parse($row->convocatoria_fecha_inicio)->toIso8601String();
+                } catch (\Throwable $e) {
+                    $convocatoriaInicioIso = (string) $row->convocatoria_fecha_inicio;
+                }
+            }
+
+            $convocatoriaFinIso = null;
+            if (isset($row->convocatoria_fecha_fin) && $row->convocatoria_fecha_fin) {
+                try {
+                    $convocatoriaFinIso = Carbon::parse($row->convocatoria_fecha_fin)->toIso8601String();
+                } catch (\Throwable $e) {
+                    $convocatoriaFinIso = (string) $row->convocatoria_fecha_fin;
+                }
+            }
+
+            $cronogramaInicioIso = null;
+            if (isset($row->doc_cronograma_inicio) && $row->doc_cronograma_inicio) {
+                try {
+                    $cronogramaInicioIso = Carbon::parse($row->doc_cronograma_inicio)->toIso8601String();
+                } catch (\Throwable $e) {
+                    $cronogramaInicioIso = (string) $row->doc_cronograma_inicio;
+                }
+            }
+
+            $cronogramaFinIso = null;
+            if (isset($row->doc_cronograma_fin) && $row->doc_cronograma_fin) {
+                try {
+                    $cronogramaFinIso = Carbon::parse($row->doc_cronograma_fin)->toIso8601String();
+                } catch (\Throwable $e) {
+                    $cronogramaFinIso = (string) $row->doc_cronograma_fin;
+                }
+            }
+
             if (!isset($grouped[$tutorId])) {
                 $fullTutorName = $row->designacion_tutor_nom
                     ?: trim(implode(' ', array_filter([$row->tutor_nombre, $row->tutor_apellido_p, $row->tutor_apellido_m])));
@@ -195,9 +259,10 @@ class TutorController extends Controller
                     $row->convocatoria_anio
                 );
 
-                $numeroDocumento = $this->normalizeNumero($row->doc_correlativo ?? null);
-                $pieNotas = $this->decodeJsonColumn($row->doc_pie_notas ?? null) ?: self::DOC_PIE_NOTAS;
-                $estResumen = $this->decodeJsonColumn($row->doc_estudiantes_resumen ?? null);
+                $numeroDocumento = $this->normalizeNumero(isset($row->doc_correlativo) ? $row->doc_correlativo : null);
+                $pieNotasDecoded = $this->decodeJsonColumn(isset($row->doc_pie_notas) ? $row->doc_pie_notas : null);
+                $pieNotas = $pieNotasDecoded ? $pieNotasDecoded : static::$docPieNotas;
+                $estResumen = $this->decodeJsonColumn(isset($row->doc_estudiantes_resumen) ? $row->doc_estudiantes_resumen : null);
                 $grouped[$tutorId] = [
                     'tutor_id' => $tutorId,
                     'tutor_ci' => $row->tutor_ci,
@@ -209,26 +274,55 @@ class TutorController extends Controller
                     'carrera_nombre' => $row->carrera_nombre,
                     'tipo_tutor_id' => $row->tipo_tutor_id ? (int)$row->tipo_tutor_id : null,
                     'tipo_tutor_nombre' => $row->tipo_tutor_nombre,
-                    'convocatoria_id' => $row->convocatoria_id ? (int)$row->convocatoria_id : null,
+                    'convocatoria_id' => $row->convocatoria_id ? (int) $row->convocatoria_id : null,
                     'convocatoria_label' => $convLabel,
+                    'convocatoria_fecha_inicio' => $convocatoriaInicioIso,
+                    'convocatoria_fecha_fin' => $convocatoriaFinIso,
                     'designacion_id' => $row->designacion_id ? (int)$row->designacion_id : null,
                     'doc_tipo' => $row->doc_doc_tipo,
                     'doc_year' => $row->doc_year,
                     'numero_documento' => $numeroDocumento,
                     'cite' => $row->doc_cite,
-                    'area' => $row->area ?? null,
+                    'area' => isset($row->designacion_area) ? $row->designacion_area : null,
                     'doc_para_nombre' => $row->doc_para_nombre,
-                    'doc_para_cargo' => $row->doc_para_cargo ?: self::DOC_PARA_CARGO,
-                    'doc_de_nombre' => $row->doc_de_nombre ?: self::DOC_DE_NOMBRE,
-                    'doc_de_cargo' => $row->doc_de_cargo ?: self::DOC_DE_CARGO,
-                    'doc_asunto' => $row->doc_asunto ?: self::DOC_ASUNTO,
-                    'doc_introduccion' => $row->doc_introduccion ?: self::DOC_INTRO_TEXT,
+                    'doc_para_cargo' => $row->doc_para_cargo ? $row->doc_para_cargo : static::$docParaCargo,
+                    'doc_de_nombre' => $row->doc_de_nombre ? $row->doc_de_nombre : static::$docDeNombre,
+                    'doc_de_cargo' => $row->doc_de_cargo ? $row->doc_de_cargo : static::$docDeCargo,
+                    'doc_asunto' => $row->doc_asunto ? $row->doc_asunto : static::$docAsunto,
+                    'doc_introduccion' => $row->doc_introduccion ? $row->doc_introduccion : static::$docIntroText,
+                    'cronograma_inicio' => $cronogramaInicioIso,
+                    'cronograma_fin' => $cronogramaFinIso,
                     'doc_pie_notas' => $pieNotas,
                     'doc_tutor_nombre' => $row->doc_tutor_nombre,
                     'doc_tutor_titulo' => $row->doc_tutor_titulo,
                     'doc_estudiantes_resumen' => $estResumen,
+                    'fecha_designacion' => $fechaDesignacion,
                     'estudiantes' => [],
                 ];
+            }
+
+            if (!$grouped[$tutorId]['area'] && isset($row->designacion_area) && $row->designacion_area) {
+                $grouped[$tutorId]['area'] = $row->designacion_area;
+            }
+
+            if (!$grouped[$tutorId]['fecha_designacion'] && $fechaDesignacion) {
+                $grouped[$tutorId]['fecha_designacion'] = $fechaDesignacion;
+            }
+
+            if (!$grouped[$tutorId]['convocatoria_fecha_inicio'] && $convocatoriaInicioIso) {
+                $grouped[$tutorId]['convocatoria_fecha_inicio'] = $convocatoriaInicioIso;
+            }
+
+            if (!$grouped[$tutorId]['convocatoria_fecha_fin'] && $convocatoriaFinIso) {
+                $grouped[$tutorId]['convocatoria_fecha_fin'] = $convocatoriaFinIso;
+            }
+
+            if (!$grouped[$tutorId]['cronograma_inicio'] && $cronogramaInicioIso) {
+                $grouped[$tutorId]['cronograma_inicio'] = $cronogramaInicioIso;
+            }
+
+            if (!$grouped[$tutorId]['cronograma_fin'] && $cronogramaFinIso) {
+                $grouped[$tutorId]['cronograma_fin'] = $cronogramaFinIso;
             }
 
             $estudianteNombre = $row->designacion_estudiante_nom ?: $row->postulante_nombre_completo;
@@ -238,8 +332,8 @@ class TutorController extends Controller
                 'estudiante_nombre' => $estudianteNombre,
                 'proyecto_id' => $row->proyecto_id,
                 'proyecto_nombre' => $row->proyecto_nombre,
-                'fecha_designacion' => $row->fecha_designacion,
-                'area' => $row->area ?? null,
+                'fecha_designacion' => $fechaDesignacion,
+                'area' => isset($row->designacion_area) ? $row->designacion_area : null,
             ];
         }
 
@@ -306,9 +400,20 @@ class TutorController extends Controller
     private function buildCite($docType, $year, $numero)
     {
         $yearStr = str_pad((string) $year, 4, '0', STR_PAD_LEFT);
-        return $docType === 'MEM'
-            ? sprintf('CETA/DA/MEM/%s/%s', $yearStr, $numero)
-            : sprintf('CETA/DA/COMINT/%s/%s', $yearStr, $numero);
+        $abreviatura = 'CETA/DA/';
+        try {
+            $sgaService = app(SocratesApiService::class);
+            if (method_exists($sgaService, 'getAbreviaturaBase')) {
+                $abreviatura = $sgaService->getAbreviaturaBase();
+            }
+        } catch (\Throwable $e) {
+            // Ignorar y usar valor por defecto
+        }
+
+        $base = rtrim($abreviatura, '/') . '/';
+        $segmento = $docType === 'MEM' ? 'MEM' : 'COMINT';
+
+        return sprintf('%s%s/%s/%s', $base, $segmento, $yearStr, $numero);
     }
 
     private function normalizeNumero($correlativo)
@@ -339,15 +444,24 @@ class TutorController extends Controller
 
     private function ensureDocDesignacion($row, $tutorNombreResolved, $estudianteNombreResolved)
     {
-        $docType = $this->resolveDocumentoTipo($row->tipo_tutor_nombre ?? null);
-        $year = $this->extractYear($row->fecha_designacion ?? null);
+        $docType = $this->resolveDocumentoTipo(isset($row->tipo_tutor_nombre) ? $row->tipo_tutor_nombre : null);
+        $year = $this->extractYear(isset($row->fecha_designacion) ? $row->fecha_designacion : null);
+        $currentYear = Carbon::now()->year;
+        if ($year !== $currentYear) {
+            $year = $currentYear;
+        }
 
-        $paraNombre = $tutorNombreResolved ?: ($row->tutor_nombre ?? null);
+        $paraNombre = $tutorNombreResolved ?: (isset($row->tutor_nombre) ? $row->tutor_nombre : null);
         $paraNombre = $paraNombre ? trim(preg_replace('/\s+/', ' ', $paraNombre)) : null;
+        $paraCargo = isset($row->doc_para_cargo) && $row->doc_para_cargo
+            ? $row->doc_para_cargo
+            : static::$docParaCargo;
         $tutorTitulo = null;
         if (!empty($row->tutor_titulo_base)) {
             $tutorTitulo = trim((string) $row->tutor_titulo_base);
         }
+
+        $carreraSlug = $this->resolveCarreraSlugForRow($row);
 
         $doc = DB::table('doc_designaciones')
             ->where('designacion_tutor_id', $row->id)
@@ -356,12 +470,142 @@ class TutorController extends Controller
 
         $now = Carbon::now();
 
-        $estudiantesResumen = $doc && $doc->estudiantes_resumen
-            ? $this->decodeJsonColumn($doc->estudiantes_resumen)
-            : $this->buildEstudiantesResumen($row->id);
+        $contextResumen = $this->buildEstudiantesResumenForContext(
+            (int) $row->tutor_id,
+            isset($row->convocatoria_id) && $row->convocatoria_id !== null ? (int) $row->convocatoria_id : null,
+            $year
+        );
+        if (!$contextResumen) {
+            $contextResumen = [];
+        }
+
+        $estudiantesResumen = $contextResumen;
+        $resumenJson = !empty($contextResumen) ? json_encode($contextResumen) : null;
+
+        $sharedDoc = $this->findExistingDocForContext($row, $docType, $year, (int) $row->id);
+
+        Log::info('Ensuring doc designacion', [
+            'designacion_id' => $row->id,
+            'doc_tipo' => $docType,
+            'year' => $year,
+            'existing_doc' => (bool) $doc,
+        ]);
+
+        if ($sharedDoc) {
+            $ownerId = (int) $sharedDoc->owner_designacion_id;
+            $sharedDocRow = DB::table('doc_designaciones')
+                ->where('designacion_tutor_id', $ownerId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($sharedDocRow) {
+                $sharedResumenDecoded = $this->decodeJsonColumn(isset($sharedDocRow->estudiantes_resumen) ? $sharedDocRow->estudiantes_resumen : null);
+                $sharedResumen = $sharedResumenDecoded ? $sharedResumenDecoded : [];
+                if ($resumenJson && $this->hasResumenChanged($sharedResumen, $estudiantesResumen)) {
+                    DB::table('doc_designaciones')
+                        ->where('designacion_tutor_id', $ownerId)
+                        ->update([
+                            'estudiantes_resumen' => $resumenJson,
+                            'updated_at' => $now,
+                        ]);
+                    $sharedDocRow->estudiantes_resumen = $resumenJson;
+                }
+
+                if (!$doc) {
+                    DB::table('doc_designaciones')->insert([
+                        'designacion_tutor_id' => $row->id,
+                        'doc_tipo' => $sharedDocRow->doc_tipo,
+                        'year' => $sharedDocRow->year,
+                        'correlativo' => $sharedDocRow->correlativo,
+                        'cite' => $sharedDocRow->cite,
+                        'para_nombre' => $sharedDocRow->para_nombre,
+                        'para_cargo' => $sharedDocRow->para_cargo,
+                        'de_nombre' => $sharedDocRow->de_nombre,
+                        'de_cargo' => $sharedDocRow->de_cargo,
+                        'asunto' => $sharedDocRow->asunto,
+                        'introduccion' => $sharedDocRow->introduccion,
+                        'cronograma_inicio' => $sharedDocRow->cronograma_inicio,
+                        'cronograma_fin' => $sharedDocRow->cronograma_fin,
+                        'cierre' => $sharedDocRow->cierre,
+                        'pie_notas' => $sharedDocRow->pie_notas,
+                        'tutor_nombre' => $sharedDocRow->tutor_nombre,
+                        'tutor_titulo' => $sharedDocRow->tutor_titulo,
+                        'estudiantes_resumen' => $resumenJson,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+
+                    $doc = DB::table('doc_designaciones')
+                        ->where('designacion_tutor_id', $row->id)
+                        ->first();
+                } else {
+                    $needsUpdate = [];
+                    if ((int) $doc->correlativo !== (int) $sharedDocRow->correlativo) {
+                        $needsUpdate['correlativo'] = (int) $sharedDocRow->correlativo;
+                    }
+                    if ((string) $doc->cite !== (string) $sharedDocRow->cite) {
+                        $needsUpdate['cite'] = $sharedDocRow->cite;
+                    }
+
+                    $docResumenDecoded = $this->decodeJsonColumn(isset($doc->estudiantes_resumen) ? $doc->estudiantes_resumen : null);
+                    $docResumen = $docResumenDecoded ? $docResumenDecoded : [];
+                    if ($resumenJson && $this->hasResumenChanged($docResumen, $estudiantesResumen)) {
+                        $needsUpdate['estudiantes_resumen'] = $resumenJson;
+                    }
+
+                    if (!empty($needsUpdate)) {
+                        $needsUpdate['updated_at'] = $now;
+                        DB::table('doc_designaciones')
+                            ->where('designacion_tutor_id', $row->id)
+                            ->update($needsUpdate);
+
+                        $doc = DB::table('doc_designaciones')
+                            ->where('designacion_tutor_id', $row->id)
+                            ->first();
+                    }
+                }
+
+                $correlativoBase = isset($doc->correlativo) ? $doc->correlativo : (isset($sharedDocRow->correlativo) ? $sharedDocRow->correlativo : null);
+                $numeroStr = $this->normalizeNumero($correlativoBase);
+                $docPieNotasDecoded = $this->decodeJsonColumn(isset($doc->pie_notas) ? $doc->pie_notas : null);
+                $doc->pie_notas = $docPieNotasDecoded ? $docPieNotasDecoded : static::$docPieNotas;
+                $doc->estudiantes_resumen = $estudiantesResumen;
+
+                return [$doc, $numeroStr, $doc->cite];
+            }
+        }
 
         if (!$doc) {
-            [$numeroInt, $numeroStr, $cite] = $this->nextSequence($docType, $year);
+            $sequenceResult = $this->fetchSequenceFromSga($docType, $year, $row, $carreraSlug);
+            if ($sequenceResult['source'] !== 'sga') {
+                throw new \RuntimeException('No se pudo obtener correlativo del SGA para el documento.');
+            }
+
+            $numeroInt = $sequenceResult['numeroInt'];
+            $numeroStr = $sequenceResult['numeroStr'];
+            $cite = $sequenceResult['cite'];
+
+            $sgaDocument = $this->createSgaDocumentForDesignation(
+                $docType,
+                $year,
+                $numeroStr,
+                $paraNombre,
+                $paraCargo,
+                $carreraSlug
+            );
+            if (is_array($sgaDocument)) {
+                if (!empty($sgaDocument['correlativo'])) {
+                    $numeroInt = (int) $sgaDocument['correlativo'];
+                    $numeroStr = $this->normalizeNumero($numeroInt);
+                }
+                if (!empty($sgaDocument['cite'])) {
+                    $cite = $sgaDocument['cite'];
+                }
+            }
+
+            if (!$numeroStr) {
+                $numeroStr = $this->normalizeNumero($numeroInt);
+            }
 
             DB::table('doc_designaciones')->insert([
                 'designacion_tutor_id' => $row->id,
@@ -370,18 +614,18 @@ class TutorController extends Controller
                 'correlativo' => $numeroInt,
                 'cite' => $cite,
                 'para_nombre' => $paraNombre,
-                'para_cargo' => self::DOC_PARA_CARGO,
-                'de_nombre' => self::DOC_DE_NOMBRE,
-                'de_cargo' => self::DOC_DE_CARGO,
-                'asunto' => self::DOC_ASUNTO,
-                'introduccion' => self::DOC_INTRO_TEXT,
-                'cronograma_inicio' => $row->cronograma_inicio ?? null,
-                'cronograma_fin' => $row->cronograma_fin ?? null,
+                'para_cargo' => $paraCargo,
+                'de_nombre' => static::$docDeNombre,
+                'de_cargo' => static::$docDeCargo,
+                'asunto' => static::$docAsunto,
+                'introduccion' => static::$docIntroText,
+                'cronograma_inicio' => isset($row->cronograma_inicio) ? $row->cronograma_inicio : null,
+                'cronograma_fin' => isset($row->cronograma_fin) ? $row->cronograma_fin : null,
                 'cierre' => null,
-                'pie_notas' => json_encode(self::DOC_PIE_NOTAS),
+                'pie_notas' => json_encode(static::$docPieNotas),
                 'tutor_nombre' => $tutorNombreResolved ?: $paraNombre,
                 'tutor_titulo' => $tutorTitulo,
-                'estudiantes_resumen' => $estudiantesResumen ? json_encode($estudiantesResumen) : null,
+                'estudiantes_resumen' => $resumenJson,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
@@ -401,12 +645,12 @@ class TutorController extends Controller
                 'correlativo' => $numeroInt,
                 'cite' => $cite,
                 'para_nombre' => $paraNombre,
-                'para_cargo' => self::DOC_PARA_CARGO,
-                'de_nombre' => self::DOC_DE_NOMBRE,
-                'de_cargo' => self::DOC_DE_CARGO,
-                'asunto' => self::DOC_ASUNTO,
-                'introduccion' => self::DOC_INTRO_TEXT,
-                'pie_notas' => self::DOC_PIE_NOTAS,
+                'para_cargo' => $paraCargo,
+                'de_nombre' => static::$docDeNombre,
+                'de_cargo' => static::$docDeCargo,
+                'asunto' => static::$docAsunto,
+                'introduccion' => static::$docIntroText,
+                'pie_notas' => static::$docPieNotas,
                 'tutor_nombre' => $tutorNombreResolved ?: $paraNombre,
                 'tutor_titulo' => $tutorTitulo,
                 'estudiantes_resumen' => $estudiantesResumen,
@@ -415,12 +659,20 @@ class TutorController extends Controller
             return [$doc, $numeroStr, $cite];
         }
 
-        $numeroStr = $this->normalizeNumero($doc->correlativo ?? null);
-        $citeExisting = is_string($doc->cite ?? null) ? trim($doc->cite) : '';
+        $numeroStr = $this->normalizeNumero(isset($doc->correlativo) ? $doc->correlativo : null);
+        $citeExistingRaw = isset($doc->cite) ? $doc->cite : null;
+        $citeExisting = is_string($citeExistingRaw) ? trim($citeExistingRaw) : '';
         $citeHasPlaceholder = $citeExisting === '' || strpos($citeExisting, '___') !== false;
 
         if (!$numeroStr) {
-            [$numeroInt, $numeroStr, $citeGenerated] = $this->nextSequence($docType, $year);
+            $sequenceResult = $this->fetchSequenceFromSga($docType, $year, $row, $carreraSlug);
+            if ($sequenceResult['source'] !== 'sga') {
+                throw new \RuntimeException('No se pudo obtener correlativo del SGA para actualizar el documento.');
+            }
+
+            $numeroInt = $sequenceResult['numeroInt'];
+            $numeroStr = $sequenceResult['numeroStr'];
+            $citeGenerated = $sequenceResult['cite'];
             DB::table('doc_designaciones')
                 ->where('designacion_tutor_id', $row->id)
                 ->update([
@@ -433,13 +685,41 @@ class TutorController extends Controller
                 ->where('designacion_tutor_id', $row->id)
                 ->first();
 
-            $numeroStr = $this->normalizeNumero($doc->correlativo ?? null);
-            $citeExisting = is_string($doc->cite ?? null) ? trim($doc->cite) : '';
+            $numeroStr = $this->normalizeNumero(isset($doc->correlativo) ? $doc->correlativo : null);
+            $citeExistingRaw = isset($doc->cite) ? $doc->cite : null;
+            $citeExisting = is_string($citeExistingRaw) ? trim($citeExistingRaw) : '';
             $citeHasPlaceholder = $citeExisting === '' || strpos($citeExisting, '___') !== false;
         }
 
+        if ($citeHasPlaceholder) {
+            $sgaDocument = $this->createSgaDocumentForDesignation(
+                $docType,
+                $year,
+                $numeroStr,
+                $paraNombre,
+                $paraCargo,
+                $carreraSlug
+            );
+            if (is_array($sgaDocument)) {
+                if (!empty($sgaDocument['correlativo'])) {
+                    $numeroInt = (int) $sgaDocument['correlativo'];
+                    $numeroStr = $this->normalizeNumero($numeroInt);
+                    DB::table('doc_designaciones')
+                        ->where('designacion_tutor_id', $row->id)
+                        ->update([
+                            'correlativo' => $numeroInt,
+                            'updated_at' => $now,
+                        ]);
+                }
+                if (!empty($sgaDocument['cite'])) {
+                    $citeExisting = $sgaDocument['cite'];
+                    $citeHasPlaceholder = false;
+                }
+            }
+        }
+
         $cite = $citeHasPlaceholder
-            ? $this->buildCite($docType, $year, $numeroStr ?? '')
+            ? $this->buildCite($docType, $year, $numeroStr ? $numeroStr : '')
             : $citeExisting;
 
         $updateData = [];
@@ -449,17 +729,22 @@ class TutorController extends Controller
         if (!$doc->para_nombre && $paraNombre) {
             $updateData['para_nombre'] = $paraNombre;
         }
+        if (!$doc->para_cargo && $paraCargo) {
+            $updateData['para_cargo'] = $paraCargo;
+        }
         if (!$doc->tutor_nombre && $tutorNombreResolved) {
             $updateData['tutor_nombre'] = $tutorNombreResolved;
         }
         if (!$doc->tutor_titulo && $tutorTitulo) {
             $updateData['tutor_titulo'] = $tutorTitulo;
         }
-        if (!$doc->estudiantes_resumen && $estudiantesResumen) {
-            $updateData['estudiantes_resumen'] = json_encode($estudiantesResumen);
+        $docResumenActualDecoded = $this->decodeJsonColumn(isset($doc->estudiantes_resumen) ? $doc->estudiantes_resumen : null);
+        $docResumenActual = $docResumenActualDecoded ? $docResumenActualDecoded : [];
+        if ($resumenJson && $this->hasResumenChanged($docResumenActual, $estudiantesResumen)) {
+            $updateData['estudiantes_resumen'] = $resumenJson;
         }
         if (!$doc->pie_notas) {
-            $updateData['pie_notas'] = json_encode(self::DOC_PIE_NOTAS);
+            $updateData['pie_notas'] = json_encode(static::$docPieNotas);
         }
 
         if (!empty($updateData)) {
@@ -474,56 +759,568 @@ class TutorController extends Controller
         DB::table('doc_designacion_secuencias')->updateOrInsert(
             ['doc_tipo' => $docType, 'year' => $year],
             [
-                'last_correlativo' => $doc->correlativo ?? ($numeroStr ? (int) ltrim($numeroStr, '0') : null),
+                'last_correlativo' => isset($doc->correlativo)
+                    ? $doc->correlativo
+                    : ($numeroStr ? (int) ltrim($numeroStr, '0') : null),
                 'updated_at' => $now,
                 'created_at' => $now,
             ]
         );
 
-        $doc->pie_notas = $this->decodeJsonColumn($doc->pie_notas ?? null) ?: self::DOC_PIE_NOTAS;
-        $doc->estudiantes_resumen = $this->decodeJsonColumn($doc->estudiantes_resumen ?? null);
+        $docPieNotasDecoded = $this->decodeJsonColumn(isset($doc->pie_notas) ? $doc->pie_notas : null);
+        $doc->pie_notas = $docPieNotasDecoded ? $docPieNotasDecoded : static::$docPieNotas;
+        $doc->estudiantes_resumen = $estudiantesResumen;
 
         return [$doc, $numeroStr, $cite];
     }
 
     private function buildEstudiantesResumen($designacionId)
     {
-        $rows = DB::table('designacion_tutor as dt')
-            ->where('dt.id', $designacionId)
+        $designacion = DB::table('designacion_tutor')
+            ->where('id', $designacionId)
+            ->first(['tutor_id', 'convocatoria_id', 'fecha_designacion', 'created_at']);
+
+        if (!$designacion || empty($designacion->tutor_id)) {
+            return null;
+        }
+
+        $year = null;
+        if (!empty($designacion->fecha_designacion)) {
+            try {
+                $year = Carbon::parse($designacion->fecha_designacion)->year;
+            } catch (\Throwable $e) {
+                // Ignorar y continuar con created_at
+            }
+        }
+
+        if ($year === null && !empty($designacion->created_at)) {
+            try {
+                $year = Carbon::parse($designacion->created_at)->year;
+            } catch (\Throwable $e) {
+                // Ignorar si no se puede parsear
+            }
+        }
+
+        return $this->buildEstudiantesResumenForContext(
+            (int) $designacion->tutor_id,
+            $designacion->convocatoria_id ? (int) $designacion->convocatoria_id : null,
+            $year
+        );
+    }
+
+    private function buildEstudiantesResumenForContext(int $tutorId, ?int $convocatoriaId, ?int $year)
+    {
+        $query = DB::table('designacion_tutor as dt')
+            ->where('dt.tutor_id', $tutorId)
             ->join('postulantes as p', 'dt.cod_ceta', '=', 'p.cod_ceta')
             ->select(
-                'p.cod_ceta',
+                'dt.id as designacion_id',
+                'dt.cod_ceta',
                 DB::raw("TRIM(CONCAT(IFNULL(p.ap_pat,''),' ',IFNULL(p.ap_mat,''),' ',IFNULL(p.nombres_est,''))) AS nombre"),
-                'dt.proyecto_id'
-            )
-            ->get();
+                'dt.proyecto_id',
+                'dt.convocatoria_id',
+                'dt.fecha_designacion',
+                'dt.created_at'
+            );
+
+        if ($convocatoriaId) {
+            $query->where('dt.convocatoria_id', $convocatoriaId);
+        } elseif ($year) {
+            $query->where(function ($q) use ($year) {
+                $q->whereYear('dt.fecha_designacion', $year)
+                    ->orWhere(function ($sub) use ($year) {
+                        $sub->whereNull('dt.fecha_designacion')
+                            ->whereYear('dt.created_at', $year);
+                    });
+            });
+        }
+
+        $rows = $query->orderBy('dt.created_at')->get();
 
         if ($rows->isEmpty()) {
             return null;
         }
 
-        $list = $rows->map(function ($item) {
+        return $rows->map(function ($item) {
             return [
+                'designacion_id' => (int) $item->designacion_id,
                 'cod_ceta' => $item->cod_ceta,
                 'nombre' => $item->nombre,
-                'proyecto_id' => $item->proyecto_id,
+                'proyecto_id' => $item->proyecto_id !== null ? (int) $item->proyecto_id : null,
             ];
         })->toArray();
-
-        return $list;
     }
 
-    private function nextSequence($docType, $year)
+    private function hasResumenChanged(array $existing, array $candidate): bool
+    {
+        $normalize = function (array $items): array {
+            $normalized = array_map(function ($row) {
+                return [
+                    'cod_ceta' => isset($row['cod_ceta']) ? (string) $row['cod_ceta'] : '',
+                    'nombre' => isset($row['nombre']) ? trim((string) $row['nombre']) : '',
+                    'proyecto_id' => array_key_exists('proyecto_id', $row) && $row['proyecto_id'] !== null
+                        ? (string) $row['proyecto_id']
+                        : '',
+                ];
+            }, $items);
+
+            usort($normalized, function ($a, $b) {
+                return strcmp($a['cod_ceta'] . '|' . $a['proyecto_id'], $b['cod_ceta'] . '|' . $b['proyecto_id']);
+            });
+
+            return $normalized;
+        };
+
+        return $normalize($existing) !== $normalize($candidate);
+    }
+
+    private function findExistingDocForContext($designacionRow, string $docType, int $year, int $currentDesignacionId)
+    {
+        $tutorId = isset($designacionRow->tutor_id) ? (int) $designacionRow->tutor_id : 0;
+        if ($tutorId <= 0) {
+            return null;
+        }
+
+        $query = DB::table('doc_designaciones as dd')
+            ->join('designacion_tutor as dt', 'dd.designacion_tutor_id', '=', 'dt.id')
+            ->where('dt.tutor_id', $tutorId)
+            ->where('dd.doc_tipo', $docType)
+            ->where('dd.year', $year)
+            ->where('dd.designacion_tutor_id', '<>', $currentDesignacionId)
+            ->orderBy('dd.created_at')
+            ->orderBy('dd.id');
+
+        if (!empty($designacionRow->convocatoria_id)) {
+            $query->where('dt.convocatoria_id', $designacionRow->convocatoria_id);
+        } else {
+            if (!empty($designacionRow->fecha_designacion)) {
+                try {
+                    $fecha = Carbon::parse($designacionRow->fecha_designacion);
+                    $query->whereYear('dt.fecha_designacion', $fecha->year);
+                } catch (\Throwable $e) {
+                    $query->whereYear('dt.created_at', $year);
+                }
+            } else {
+                $query->whereYear('dt.created_at', $year);
+            }
+        }
+
+        $row = $query->first([
+            'dd.designacion_tutor_id as owner_designacion_id',
+            'dd.id as doc_id',
+            'dd.cite',
+            'dd.correlativo'
+        ]);
+
+        return $row ?: null;
+    }
+
+    private function createSgaDocumentForDesignation($docType, $year, $numeroStr, $paraNombre, $paraCargo, $carreraSlug = null)
+    {
+        try {
+            $sgaService = app(SocratesApiService::class);
+        } catch (\Throwable $e) {
+            Log::warning('SGA service no disponible para crear documento', ['error' => $e->getMessage()]);
+            return null;
+        }
+
+        if (!method_exists($sgaService, 'ensureWebSession') || !method_exists($sgaService, 'buildDocumentoPayload') || !method_exists($sgaService, 'crearDocumento')) {
+            Log::warning('SocratesApiService no soporta creación de documentos');
+            return null;
+        }
+
+        if ($carreraSlug) {
+            try {
+                $sgaService->setCarrera($carreraSlug);
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo aplicar carrera para documento SGA', [
+                    'carrera' => $carreraSlug,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $config = method_exists($sgaService, 'getSgaConfig') ? $sgaService->getSgaConfig() : null;
+        if (!$config) {
+            Log::warning('No existe configuración SGA en base de datos');
+            return null;
+        }
+
+        $sessionResult = $sgaService->ensureWebSession(
+            isset($config->web_user) ? $config->web_user : null,
+            isset($config->web_password) ? $config->web_password : null
+        );
+        if (empty($sessionResult['success'])) {
+            Log::warning('No se pudo iniciar sesión web en el SGA', [
+                'message' => isset($sessionResult['message']) ? $sessionResult['message'] : null,
+            ]);
+            return null;
+        }
+
+        $emisorId = isset($config->emisor_id) ? $config->emisor_id : null;
+        if (!$emisorId) {
+            Log::warning('Configuración SGA sin emisor_id');
+            return null;
+        }
+
+        $abreviaturaBase = $config->abreviatura ?: 'CETA/DA/';
+        $cargoId = isset($config->cargo_id) ? $config->cargo_id : 3;
+        $cargoNombre = isset($config->cargo_nombre) && $config->cargo_nombre !== '' ? $config->cargo_nombre : static::$docDeCargo;
+        $genero = isset($config->emisor_genero) && $config->emisor_genero !== '' ? $config->emisor_genero : 'M';
+        $institucion = isset($config->institucion) ? $config->institucion : '';
+
+        $abreviatura = rtrim($abreviaturaBase, '/') . '/';
+        $codigoDocumento = strtoupper($docType);
+        $numeroStr = $numeroStr ?: '000';
+
+        $idCargoEmite = $cargoId . '|' . $cargoNombre . '|' . $abreviatura;
+
+        $payloadParams = [
+            'codigo_tipo_documento' => $codigoDocumento,
+            'emite' => $emisorId,
+            'nombre_emite' => static::$docDeNombre,
+            'cargo_emite' => static::$docDeCargo,
+            'id_cargo_emite' => $idCargoEmite,
+            'genero' => $genero,
+            'tiene_via' => 'false',
+            'via_nombre' => '',
+            'via_cargo' => '',
+            'nombre_recibe' => $paraNombre ?: '',
+            'id_cargo_recibe' => '',
+            'cargo_recibe' => $paraCargo ?: '',
+            'institucion' => $institucion,
+            'asunto' => static::$docAsunto,
+        ];
+
+        $payloadResult = $sgaService->buildDocumentoPayload($payloadParams);
+        if (empty($payloadResult['success'])) {
+            Log::warning('No se pudo construir payload para documento SGA', [
+                'message' => isset($payloadResult['message']) ? $payloadResult['message'] : null,
+            ]);
+            return null;
+        }
+
+        $createResult = $sgaService->crearDocumento($payloadResult['data']);
+        if (empty($createResult['success'])) {
+            Log::warning('Fallo al crear documento en SGA', [
+                'status' => isset($createResult['status']) ? $createResult['status'] : null,
+                'message' => isset($createResult['message']) ? $createResult['message'] : null,
+            ]);
+            return null;
+        }
+
+        $parsed = $this->parseSgaDocumentResponse($createResult['body'], $abreviatura, $codigoDocumento, $year);
+        if ($parsed) {
+            if (!empty($parsed['cite'])) {
+                return $parsed;
+            }
+
+            if ($numeroStr && empty($parsed['correlativo'])) {
+                $parsed['correlativo'] = (int) ltrim($numeroStr, '0');
+            }
+
+            if (!empty($parsed['correlativo']) || !empty($parsed['url'])) {
+                $parsedCorrelativoValue = isset($parsed['correlativo']) ? $parsed['correlativo'] : null;
+                $parsedCorrelativoStr = $this->normalizeNumero($parsedCorrelativoValue);
+                $parsed['cite'] = $this->buildCite($docType, $year, $numeroStr ? $numeroStr : $parsedCorrelativoStr);
+                return $parsed;
+            }
+        }
+
+        $cite = $abreviatura . $codigoDocumento . '/' . $year . '/' . $numeroStr;
+        return [
+            'cite' => $cite,
+            'correlativo' => $numeroStr ? (int) ltrim($numeroStr, '0') : null,
+        ];
+    }
+
+    private function resolveDocTypeForSga($docType)
+    {
+        try {
+            $sgaService = app(SocratesApiService::class);
+            if (method_exists($sgaService, 'getAbreviaturaBase')) {
+                return $sgaService->getAbreviaturaBase();
+            }
+        } catch (\Throwable $e) {
+            // Ignorar y usar valor por defecto
+        }
+
+        return 'CETA/DA/';
+    }
+
+    private function fetchSequenceFromSga($docType, $year, $designacionRow = null, ?string $carreraSlug = null)
     {
         $now = Carbon::now();
-        $baseNumero = 0;
+        $abreviatura = $this->resolveDocTypeForSga($docType);
+        $idTipoDocumento = $docType === 'MEM' ? 2 : 4;
 
+        Log::info('Solicitando correlativo en SGA', [
+            'doc_type' => $docType,
+            'year' => $year,
+            'abreviatura' => $abreviatura,
+            'id_tipo_documento' => $idTipoDocumento,
+        ]);
+
+        try {
+            $socratesApi = app(SocratesApiService::class);
+        } catch (\Throwable $e) {
+            Log::warning('Socrates API service no disponible para correlativo', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->buildSequenceResult(
+                $this->fallbackSequence($docType, $year, $now),
+                null,
+                'fallback'
+            );
+        }
+
+        $codCeta = null;
+        $carreraHint = null;
+        if ($designacionRow) {
+            $codCeta = isset($designacionRow->cod_ceta) ? $designacionRow->cod_ceta : null;
+            $carreraHint = isset($designacionRow->cod_carrera) ? $designacionRow->cod_carrera : null;
+        }
+
+        $docConfigSlug = $carreraSlug ? $carreraSlug : null;
+        $contextSlug = $socratesApi->resolveContextCarreraSlug($docConfigSlug);
+        $targetSlug = $socratesApi->resolveTargetCarreraSlug($docConfigSlug);
+
+        $overrides = $this->resolveSgaCorrelativoOverrides($codCeta, $carreraHint, $contextSlug);
+        if ($contextSlug && !isset($overrides['carrera'])) {
+            $overrides['carrera'] = $contextSlug;
+        }
+        if ($docConfigSlug) {
+            $overrides['doc_config_slug'] = $docConfigSlug;
+        }
+        if ($targetSlug && !isset($overrides['target_slug'])) {
+            $overrides['target_slug'] = $targetSlug;
+        }
+
+        $finalTargetSlug = $overrides['target_slug'] ?? $targetSlug;
+
+        $response = $socratesApi->getCorrelativoAbreviatura(
+            $abreviatura,
+            $idTipoDocumento,
+            $year,
+            $finalTargetSlug,
+            $overrides
+        );
+
+        Log::info('Respuesta correlativo SGA', [
+            'success' => isset($response['success']) ? $response['success'] : null,
+            'data' => isset($response['data']) ? $response['data'] : null,
+        ]);
+
+        if (!empty($response['success']) && isset($response['data'])) {
+            $data = $response['data'];
+            $numero = null;
+            if (is_array($data) && isset($data['numero'])) {
+                $numero = (int) $data['numero'];
+            } elseif (is_array($data) && isset($data['raw']) && is_numeric($data['raw'])) {
+                $numero = (int) $data['raw'];
+            } elseif (is_numeric($data)) {
+                $numero = (int) $data;
+            }
+
+            if ($numero && $numero > 0) {
+                $normalized = $this->normalizeNumero($numero);
+                $cite = $this->buildCite($docType, $year, $normalized);
+
+                DB::table('doc_designacion_secuencias')->updateOrInsert(
+                    ['doc_tipo' => $docType, 'year' => $year],
+                    [
+                        'last_correlativo' => $numero,
+                        'updated_at' => $now,
+                        'created_at' => $now,
+                    ]
+                );
+
+                return $this->buildSequenceResult([
+                    $numero,
+                    $normalized,
+                    $cite,
+                ], $cite, 'sga');
+            }
+        }
+
+        return $this->buildSequenceResult(
+            $this->fallbackSequence($docType, $year, $now),
+            null,
+            'fallback'
+        );
+    }
+
+    private function resolveSgaCorrelativoOverrides($codCeta = null, $carreraHint = null, $contextSlug = null): array
+    {
+        $overrides = [];
+
+        $normalizedContext = $contextSlug ? strtolower(trim($contextSlug)) : null;
+
+        $normalizedHint = null;
+        if ($carreraHint) {
+            $mapped = $this->mapCarreraFromCodigo($carreraHint);
+            if ($mapped) {
+                $normalizedHint = strtolower($mapped);
+            }
+        }
+
+        if ($normalizedContext === 'electricidad' || $normalizedHint === 'electricidad') {
+            $overrides['target_slug'] = 'mecanica';
+        }
+
+        return $overrides;
+    }
+
+    private function resolveSgaConfigParameter($config, string $column, ?string $envKey = null): ?string
+    {
+        if ($config && Schema::hasTable('sga_config') && Schema::hasColumn('sga_config', $column)) {
+            $value = isset($config->$column) ? $config->$column : null;
+            if ($value !== null && $value !== '') {
+                return trim((string) $value);
+            }
+        }
+
+        if ($envKey) {
+            $envValue = env($envKey);
+            if ($envValue !== null && $envValue !== '') {
+                return trim((string) $envValue);
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveCarreraSlugForRow($row): ?string
+    {
+        if (!$row) {
+            return null;
+        }
+
+        if (isset($row->cod_carrera) && $row->cod_carrera !== null && $row->cod_carrera !== '') {
+            $mapped = $this->mapCarreraFromCodigo($row->cod_carrera);
+            if ($mapped) {
+                return $mapped;
+            }
+        }
+
+        if (isset($row->carrera_nombre) && $row->carrera_nombre) {
+            $normalized = $this->normalizeCarreraCodigo($row->carrera_nombre);
+            if ($normalized) {
+                $mapped = $this->mapCarreraFromCodigo($normalized);
+                if ($mapped) {
+                    return $mapped;
+                }
+            }
+        }
+
+        if (isset($row->area) && $row->area) {
+            $normalized = $this->normalizeCarreraCodigo($row->area);
+            if ($normalized) {
+                $mapped = $this->mapCarreraFromCodigo($normalized);
+                if ($mapped) {
+                    return $mapped;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function mapCarreraFromCodigo($cod): ?string
+    {
+        if ($cod === null) {
+            return null;
+        }
+
+        $upper = strtoupper(trim((string) $cod));
+        if ($upper === 'MEA') {
+            return 'mecanica';
+        }
+        if ($upper === 'EEA') {
+            return 'electricidad';
+        }
+
+        return null;
+    }
+
+    private function normalizeCarreraCodigo($raw)
+    {
+        if (!$raw) {
+            return null;
+        }
+
+        $val = strtoupper(trim($raw));
+        if (in_array($val, ['MEA', 'EEA'], true)) {
+            return $val;
+        }
+
+        $norm = mb_strtolower($raw, 'UTF-8');
+        if (strpos($norm, 'mec') !== false) {
+            return 'MEA';
+        }
+        if (strpos($norm, 'elect') !== false) {
+            return 'EEA';
+        }
+
+        $candidate = DB::table('carrera')
+            ->whereRaw('LOWER(nombre_carrera) = ?', [mb_strtolower($raw, 'UTF-8')])
+            ->value('cod_carrera');
+        if ($candidate) {
+            return $candidate;
+        }
+
+        $likeCandidate = DB::table('carrera')
+            ->select('cod_carrera')
+            ->where('nombre_carrera', 'LIKE', '%' . $raw . '%')
+            ->limit(1)
+            ->value('cod_carrera');
+
+        return $likeCandidate ?: null;
+    }
+
+    private function normalizeCodGrupo($raw)
+    {
+        if ($raw === null) {
+            return null;
+        }
+
+        $value = trim((string) $raw);
+        if ($value === '') {
+            return null;
+        }
+
+        $upper = strtoupper($value);
+
+        if (is_numeric($upper)) {
+            return ltrim($upper, '0');
+        }
+
+        $map = [
+            '1ER' => '1',
+            '1RO' => '1',
+            'PRIMERO' => '1',
+            'SEGUNDO' => '2',
+            '2DO' => '2',
+            'TERCERO' => '3',
+            '3RO' => '3',
+        ];
+        if (isset($map[$upper])) {
+            return $map[$upper];
+        }
+
+        return $upper;
+    }
+
+    private function fallbackSequence($docType, $year, Carbon $now)
+    {
         $sequenceRow = DB::table('doc_designacion_secuencias')
             ->where('doc_tipo', $docType)
             ->where('year', $year)
             ->lockForUpdate()
             ->first();
 
+        $baseNumero = 0;
         if ($sequenceRow && isset($sequenceRow->last_correlativo)) {
             $baseNumero = max(0, (int) $sequenceRow->last_correlativo);
         } else {
@@ -534,11 +1331,7 @@ class TutorController extends Controller
             $baseNumero = max(0, (int) $maxNumero);
         }
 
-        $numero = $baseNumero + 1;
-        if ($numero <= 0) {
-            $numero = 1;
-        }
-
+        $numero = max(1, $baseNumero + 1);
         $normalized = $this->normalizeNumero($numero);
         $cite = $this->buildCite($docType, $year, $normalized);
 
@@ -552,6 +1345,70 @@ class TutorController extends Controller
         );
 
         return [$numero, $normalized, $cite];
+    }
+
+    private function buildSequenceResult(array $sequence, ?string $cite, string $source): array
+    {
+        return [
+            'numeroInt' => $sequence[0],
+            'numeroStr' => $sequence[1],
+            'cite' => $sequence[2],
+            'source' => $source,
+        ];
+    }
+
+    private function parseSgaDocumentResponse($body, $abreviatura, $codigoDocumento, $year)
+    {
+        if (!$body) {
+            return null;
+        }
+
+        $url = trim((string) $body);
+        if ($url === '') {
+            return null;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH);
+        if (!$path) {
+            $path = $url;
+        }
+
+        $basename = basename($path);
+        if (!$basename) {
+            return null;
+        }
+
+        $segments = explode('_', $basename);
+        $codePart = $segments[0];
+        if (!$codePart) {
+            return null;
+        }
+
+        $code = str_replace('-', '/', $codePart);
+        $parts = explode('/', $code);
+        if (count($parts) < 5) {
+            // Intentar reconstruir con abreviatura + docType
+            $normalizedNumber = end($parts);
+            $cite = rtrim($abreviatura, '/') . '/' . $codigoDocumento . '/' . $year;
+            if ($normalizedNumber) {
+                $cite .= '/' . $normalizedNumber;
+            }
+            return [
+                'cite' => $cite,
+                'correlativo' => $normalizedNumber ? (int) ltrim($normalizedNumber, '0') : null,
+                'url' => $url,
+            ];
+        }
+
+        $correlativoPart = $parts[count($parts) - 1];
+        $correlativoInt = (int) ltrim($correlativoPart, '0');
+        $cite = implode('/', $parts);
+
+        return [
+            'cite' => $cite,
+            'correlativo' => $correlativoInt > 0 ? $correlativoInt : null,
+            'url' => $url,
+        ];
     }
     /**
      * Registrar/actualizar tutores en lote (directamente en tabla tutores).
@@ -878,11 +1735,14 @@ class TutorController extends Controller
                 ->leftJoin('tutores as t', 'dt.tutor_id', '=', 't.id')
                 ->leftJoin('tipo_tutor as tt', 't.tipo_tutor_id', '=', 'tt.id')
                 ->leftJoin('proyecto', 'dt.proyecto_id', '=', 'proyecto.id')
+                ->leftJoin('convocatorias as conv', 'dt.convocatoria_id', '=', 'conv.id')
                 ->select(
                     'dt.*',
                     'tt.nombre as tipo_tutor_nombre',
                     't.titulo as tutor_titulo_base',
-                    'proyecto.nombre as proyecto_nombre'
+                    'proyecto.nombre as proyecto_nombre',
+                    'conv.fecha_inicio as convocatoria_fecha_inicio',
+                    'conv.fecha_fin as convocatoria_fecha_fin'
                 )
                 ->where('dt.tutor_id', $data['tutor_id'])
                 ->where('dt.cod_ceta', $data['cod_ceta'])
@@ -892,7 +1752,12 @@ class TutorController extends Controller
                 throw new \RuntimeException('No se pudo recuperar la designación recién creada.');
             }
 
-            [$docRecord, $numeroDocumento, $cite] = $this->ensureDocDesignacion($baseRow, $tutNombre ?? '', $estNombre ?? '');
+            $docRecordResult = $this->ensureDocDesignacion(
+                $baseRow,
+                $tutNombre ? $tutNombre : '',
+                $estNombre ? $estNombre : ''
+            );
+            [$docRecord, $numeroDocumento, $cite] = $docRecordResult;
 
             DB::commit();
 
@@ -900,6 +1765,7 @@ class TutorController extends Controller
                 ->leftJoin('tutores as t', 'dt.tutor_id', '=', 't.id')
                 ->leftJoin('tipo_tutor as tt', 't.tipo_tutor_id', '=', 'tt.id')
                 ->leftJoin('doc_designaciones as dd', 'dd.designacion_tutor_id', '=', 'dt.id')
+                ->leftJoin('convocatorias as conv', 'dt.convocatoria_id', '=', 'conv.id')
                 ->select(
                     'dt.*',
                     'tt.nombre as tipo_tutor_nombre',
@@ -919,23 +1785,65 @@ class TutorController extends Controller
                     'dd.pie_notas as doc_pie_notas',
                     'dd.tutor_nombre as doc_tutor_nombre',
                     'dd.tutor_titulo as doc_tutor_titulo',
-                    'dd.estudiantes_resumen as doc_estudiantes_resumen'
+                    'dd.estudiantes_resumen as doc_estudiantes_resumen',
+                    'conv.fecha_inicio as convocatoria_fecha_inicio',
+                    'conv.fecha_fin as convocatoria_fecha_fin'
                 )
                 ->where('dt.tutor_id', $data['tutor_id'])
                 ->where('dt.cod_ceta', $data['cod_ceta'])
                 ->first();
 
             if ($row) {
-                $row->designacion_id = $row->id ?? null;
-                $row->numero_documento = $this->normalizeNumero($row->doc_correlativo ?? null) ?? $numeroDocumento;
-                $row->cite = $row->doc_cite ?? $cite;
-                $row->doc_para_cargo = $row->doc_para_cargo ?: self::DOC_PARA_CARGO;
-                $row->doc_de_nombre = $row->doc_de_nombre ?: self::DOC_DE_NOMBRE;
-                $row->doc_de_cargo = $row->doc_de_cargo ?: self::DOC_DE_CARGO;
-                $row->doc_asunto = $row->doc_asunto ?: self::DOC_ASUNTO;
-                $row->doc_introduccion = $row->doc_introduccion ?: self::DOC_INTRO_TEXT;
-                $row->doc_pie_notas = $this->decodeJsonColumn($row->doc_pie_notas ?? null) ?: self::DOC_PIE_NOTAS;
-                $row->doc_estudiantes_resumen = $this->decodeJsonColumn($row->doc_estudiantes_resumen ?? null);
+                $convocatoriaInicioIso = null;
+                if (isset($row->convocatoria_fecha_inicio) && $row->convocatoria_fecha_inicio) {
+                    try {
+                        $convocatoriaInicioIso = Carbon::parse($row->convocatoria_fecha_inicio)->toIso8601String();
+                    } catch (\Throwable $e) {
+                        $convocatoriaInicioIso = (string) $row->convocatoria_fecha_inicio;
+                    }
+                }
+
+                $convocatoriaFinIso = null;
+                if (isset($row->convocatoria_fecha_fin) && $row->convocatoria_fecha_fin) {
+                    try {
+                        $convocatoriaFinIso = Carbon::parse($row->convocatoria_fecha_fin)->toIso8601String();
+                    } catch (\Throwable $e) {
+                        $convocatoriaFinIso = (string) $row->convocatoria_fecha_fin;
+                    }
+                }
+
+                $cronogramaInicioIso = null;
+                if (isset($row->doc_cronograma_inicio) && $row->doc_cronograma_inicio) {
+                    try {
+                        $cronogramaInicioIso = Carbon::parse($row->doc_cronograma_inicio)->toIso8601String();
+                    } catch (\Throwable $e) {
+                        $cronogramaInicioIso = (string) $row->doc_cronograma_inicio;
+                    }
+                }
+
+                $cronogramaFinIso = null;
+                if (isset($row->doc_cronograma_fin) && $row->doc_cronograma_fin) {
+                    try {
+                        $cronogramaFinIso = Carbon::parse($row->doc_cronograma_fin)->toIso8601String();
+                    } catch (\Throwable $e) {
+                        $cronogramaFinIso = (string) $row->doc_cronograma_fin;
+                    }
+                }
+
+                $row->designacion_id = isset($row->id) ? $row->id : null;
+                $row->numero_documento = $this->normalizeNumero(isset($row->doc_correlativo) ? $row->doc_correlativo : null);
+                if (!$row->numero_documento) {
+                    $row->numero_documento = $numeroDocumento;
+                }
+                $row->cite = isset($row->doc_cite) ? $row->doc_cite : $cite;
+                $row->doc_para_cargo = $row->doc_para_cargo ?: static::$docParaCargo;
+                $row->doc_de_nombre = $row->doc_de_nombre ?: static::$docDeNombre;
+                $row->doc_de_cargo = $row->doc_de_cargo ?: static::$docDeCargo;
+                $row->doc_asunto = $row->doc_asunto ?: static::$docAsunto;
+                $row->doc_introduccion = $row->doc_introduccion ?: static::$docIntroText;
+                $rowDocPieNotasDecoded = $this->decodeJsonColumn(isset($row->doc_pie_notas) ? $row->doc_pie_notas : null);
+                $row->doc_pie_notas = $rowDocPieNotasDecoded ? $rowDocPieNotasDecoded : static::$docPieNotas;
+                $row->doc_estudiantes_resumen = $this->decodeJsonColumn(isset($row->doc_estudiantes_resumen) ? $row->doc_estudiantes_resumen : null);
                 if (!$row->doc_para_nombre && isset($docRecord->para_nombre)) {
                     $row->doc_para_nombre = $docRecord->para_nombre;
                 }
@@ -954,6 +1862,10 @@ class TutorController extends Controller
                 if (!$row->doc_introduccion && isset($docRecord->introduccion)) {
                     $row->doc_introduccion = $docRecord->introduccion;
                 }
+                $row->convocatoria_fecha_inicio = $convocatoriaInicioIso;
+                $row->convocatoria_fecha_fin = $convocatoriaFinIso;
+                $row->cronograma_inicio = $cronogramaInicioIso;
+                $row->cronograma_fin = $cronogramaFinIso;
                 if (!$row->doc_tutor_nombre && isset($docRecord->tutor_nombre)) {
                     $row->doc_tutor_nombre = $docRecord->tutor_nombre;
                 }

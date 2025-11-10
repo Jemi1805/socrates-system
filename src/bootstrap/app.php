@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Forzar el grupo API SIN autenticación global
         $middleware->api([
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            \Illuminate\Http\Middleware\HandleCors::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
