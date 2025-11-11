@@ -1,5 +1,5 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
-import { Observable, of } from 'rxjs';
+import { Observable, of, firstValueFrom } from 'rxjs';
 import { tap, catchError, finalize, map, switchMap, take } from 'rxjs/operators';
 
 import { CommonModule, formatDate } from '@angular/common';
@@ -14,6 +14,7 @@ import { LoadingService } from '../../../core/services/loading.service';
 import { SgaService, TutorDesignacionItem } from '../../../shared/services/sga.service';
 import { Estudiante as EstudianteSga } from '../../../core/services/estudiante.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { PdfService, TutorDesignacionEstudiante } from '../../../shared/services/pdf.service';
 
 interface PostulanteInscrito {
   cod_ceta: number;
@@ -90,7 +91,7 @@ export class ModalidadGraduacionComponent implements OnInit {
   // Proyecto/Tema actual si existe
   proyectoActual: { id?: number; nombre?: string; estado?: string; objetivo?: string; tipo?: string; created_at?: string } | null = null;
   // Última designación de tutor (si existe)
-  lastDesignation: { tutor_nombre?: string; area?: string; convocatoria_nom?: string; fecha_designacion?: string; tutor?: { nombre_completo?: string } | null } | null = null;
+  lastDesignation: any = null;
 
   // Validaciones
   private readonly CETA_REGEX = /^\d{9}$/; // exactamente 9 dígitos
@@ -103,12 +104,153 @@ export class ModalidadGraduacionComponent implements OnInit {
     private sgaService: SgaService,
     private cdr: ChangeDetectorRef,
     private proyectoService: ProyectoService,
-    private loadingService: LoadingService
+    private loadingService: LoadingService,
+    private auth: AuthService,
+    private pdfService: PdfService
   ) {}
 
   ngOnInit() {
     this.cargarModalidades();
     this.cargarPostulantesInscritos();
+  }
+
+  private formatNombreApellidosPrimero(
+    apellidoP?: string | null,
+    apellidoM?: string | null,
+    nombres?: string | null,
+    fallback?: string | null
+  ): string {
+    const parts = [apellidoP, apellidoM, nombres]
+      .map(value => (value || '').toString().trim())
+      .filter(segment => segment.length > 0);
+    const result = parts.length ? parts.join(' ') : (fallback || '');
+    return result ? this.capitalizarPalabras(result) : '';
+  }
+
+  private estudianteNombre(est?: any): string {
+    const src: any = est ?? this.estudiante ?? {};
+    const nombres = src?.nombres || src?.nombres_est || '';
+    const apPat = src?.ap_pat || src?.apellido_p || '';
+    const apMat = src?.ap_mat || src?.apellido_m || '';
+    const full = [apPat, apMat, nombres].map(v => (v || '').toString().trim()).filter(Boolean).join(' ').trim();
+    if (full) {
+      return this.capitalizarPalabras(full);
+    }
+    const cod = this.getEstudianteCodCeta(src);
+    return cod || '';
+  }
+
+  private resolveEstudianteModalidad(est: any, modalidadGeneral?: string | null): string | undefined {
+    const candidates: Array<any> = [
+      est?.modalidad,
+      est?.modalidad_nombre,
+      est?.modalidad_nom,
+      est?.modalidadNombre,
+      est?.modalidadGraduacion,
+      est?.modalidadGraduacionNombre,
+      est?.tipo,
+      est?.tema?.modalidad,
+      est?.tema?.modalidad_nombre,
+      est?.tema?.modalidadNom,
+      est?.tema_registro?.modalidad,
+      est?.tema_registro?.modalidad_nombre,
+      est?.proyecto?.modalidad,
+      est?.proyecto?.modalidad_nombre,
+      modalidadGeneral,
+    ];
+    for (const value of candidates) {
+      if (typeof value === 'string' && value.trim().length) {
+        return value.trim();
+      }
+    }
+    return undefined;
+  }
+
+  private lastDesignationEstudiantes(): any[] | null {
+    const designation: any = this.lastDesignation || null;
+    if (!designation) return null;
+
+    if (Array.isArray(designation.estudiantes) && designation.estudiantes.length) {
+      return designation.estudiantes;
+    }
+
+    if (designation.doc_estudiantes_resumen) {
+      const resumen = designation.doc_estudiantes_resumen;
+      if (Array.isArray(resumen) && resumen.length) {
+        return resumen;
+      }
+      if (typeof resumen === 'string') {
+        try {
+          const parsed = JSON.parse(resumen);
+          if (Array.isArray(parsed) && parsed.length) {
+            return parsed;
+          }
+        } catch {}
+      }
+    }
+
+    const candidateKeys = ['detalles', 'detalle', 'estudiantes_asignados', 'postulantes', 'lista_estudiantes'];
+    for (const key of candidateKeys) {
+      const value = (designation as any)[key];
+      if (Array.isArray(value) && value.length) {
+        return value;
+      }
+    }
+
+    if (designation.estudiante_nombre) {
+      return [{
+        estudiante_nombre: designation.estudiante_nombre,
+        carrera: designation.carrera_nombre,
+        modalidad: designation.modalidad || designation.modalidad_nombre,
+        area: designation.area,
+        proyecto_nombre: designation.proyecto_nombre,
+        fecha_designacion: designation.fecha_designacion,
+      }];
+    }
+
+    return null;
+  }
+
+  hasLastDesignationDocument(): boolean {
+    const designation: any = this.lastDesignation;
+    if (!designation) {
+      return false;
+    }
+
+    const resumenes = [
+      designation.doc_estudiantes_resumen,
+      designation.estudiantes_resumen,
+      designation.estudiantes
+    ];
+
+    for (const resumen of resumenes) {
+      if (!resumen) {
+        continue;
+      }
+      if (Array.isArray(resumen)) {
+        if (resumen.length > 0) {
+          return true;
+        }
+        continue;
+      }
+      if (typeof resumen === 'string') {
+        try {
+          const parsed = JSON.parse(resumen);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return true;
+          }
+        } catch {}
+      }
+    }
+
+    const correlativo = designation.numero_documento
+      || designation.numeroDocumento
+      || designation.doc_correlativo
+      || designation.correlativo
+      || designation.docNumero;
+    const cite = designation.cite || designation.doc_cite;
+
+    return Boolean(correlativo || cite);
   }
 
   cargarPostulantesInscritos() {
@@ -1018,6 +1160,211 @@ export class ModalidadGraduacionComponent implements OnInit {
     const e: any = this.estudiante as any;
     const v = e?.cod_ceta ?? e?.codCeta ?? e?.codigo_ceta;
     return v != null ? String(v) : null;
+  }
+
+  private getModalidadDescripcion(): string {
+    if (this.inscripcionActual?.nombre) {
+      return this.inscripcionActual.nombre;
+    }
+    if (this.modalidadSeleccionada?.nombre) {
+      return this.modalidadSeleccionada.nombre;
+    }
+    const est: any = this.estudiante;
+    const modalidadFromEst = est?.modalidad || est?.modalidad_nombre || est?.modo;
+    if (typeof modalidadFromEst === 'string' && modalidadFromEst.trim().length) {
+      return modalidadFromEst.trim();
+    }
+    return 'Proyecto de Grado';
+  }
+
+  private resolvePdfTutorNombre(designation: any): string {
+    const tutor = designation?.tutor || {};
+    const nombreFallback = designation?.tutor_nombre || tutor?.nombre_completo || 'Tutor designado';
+    return this.formatNombreApellidosPrimero(
+      tutor?.apellido_p,
+      tutor?.apellido_m,
+      tutor?.nombre,
+      nombreFallback
+    ) || nombreFallback;
+  }
+
+  private resolvePdfTutorTipo(designation: any): string | undefined {
+    return designation?.tipo_tutor_nombre || designation?.tutor_tipo || designation?.tutor?.tipo_tutor || undefined;
+  }
+
+  private resolvePdfTutorCi(designation: any): string | undefined {
+    return designation?.tutor_ci || designation?.tutor?.ci || undefined;
+  }
+
+  private resolvePdfTutorCelular(designation: any): string | undefined {
+    return designation?.tutor_celular || designation?.tutor?.celular || undefined;
+  }
+
+  private resolvePdfTutorTitulo(designation: any): string | undefined {
+    return designation?.doc_tutor_titulo || designation?.tutor_titulo || 'DOCENTE TÉCNICO';
+  }
+
+  private resolvePdfTutorTituloAcademico(designation: any): string | undefined {
+    return designation?.tutor_titulo_academico || designation?.tutor?.titulo_academico || undefined;
+  }
+
+  private resolvePdfEstudiantes(
+    designation: any,
+    fallbackArea?: string | null,
+    fallbackTema?: string | null,
+    modalidadGeneral?: string | null
+  ): TutorDesignacionEstudiante[] | undefined {
+    const listadoBase = (() => {
+      if (Array.isArray(designation?.estudiantes) && designation.estudiantes.length) {
+        return designation.estudiantes;
+      }
+      if (Array.isArray(designation?.doc_estudiantes_resumen) && designation.doc_estudiantes_resumen.length) {
+        return designation.doc_estudiantes_resumen;
+      }
+      if (typeof designation?.doc_estudiantes_resumen === 'string') {
+        try {
+          const parsed = JSON.parse(designation.doc_estudiantes_resumen);
+          if (Array.isArray(parsed) && parsed.length) {
+            return parsed;
+          }
+        } catch {}
+      }
+      return this.lastDesignationEstudiantes();
+    })();
+
+    if (!listadoBase || !listadoBase.length) {
+      return undefined;
+    }
+
+    return listadoBase.map((est: any) => {
+      const nombre = this.formatNombreApellidosPrimero(
+        est?.apellido_p ?? est?.ap_pat,
+        est?.apellido_m ?? est?.ap_mat,
+        est?.nombres ?? est?.nombre,
+        est?.estudiante_nombre ?? this.estudianteNombre(est)
+      ) || this.estudianteNombre(est);
+
+      return {
+        nombre,
+        codigo: est?.cod_ceta ? String(est.cod_ceta) : undefined,
+        carrera: est?.carrera || this.estudiante?.carrera || designation?.carrera_nombre || undefined,
+        modalidad: this.resolveEstudianteModalidad(est, modalidadGeneral) || modalidadGeneral || undefined,
+        area: est?.area || fallbackArea || undefined,
+        tema: est?.proyecto_nombre || est?.tema || fallbackTema || undefined,
+        fechaDesignacion: est?.fecha_designacion || designation?.fecha_designacion || undefined,
+      };
+    });
+  }
+
+  private mapDocEstudiantesToPdf(
+    docEstudiantes: any[] | null | undefined,
+    docData: any | null,
+    designation: any,
+    modalidadGeneral: string
+  ): TutorDesignacionEstudiante[] | undefined {
+    if (!Array.isArray(docEstudiantes) || !docEstudiantes.length) {
+      return undefined;
+    }
+
+    const fallbackArea = (docData && (docData.area || docData.designacion_area)) || designation?.area || null;
+    const fallbackTema = (docData && docData.proyecto_nombre) || this.proyectoActual?.nombre || null;
+    const fallbackCarrera = (docData && (docData.carrera_nombre || docData.carrera)) || designation?.carrera_nombre || this.estudiante?.carrera || undefined;
+    const fallbackFecha = (docData && docData.fecha_designacion) || designation?.fecha_designacion || undefined;
+
+    return docEstudiantes.map((item: any) => {
+      const rawNombre = item?.estudiante_nombre || item?.nombre || this.estudianteNombre(item);
+      const nombre = rawNombre ? this.capitalizarPalabras(String(rawNombre)) : this.estudianteNombre(item);
+      return {
+        nombre,
+        codigo: item?.cod_ceta ? String(item.cod_ceta) : undefined,
+        carrera: item?.carrera || fallbackCarrera,
+        modalidad: item?.modalidad || modalidadGeneral,
+        area: item?.area || fallbackArea || undefined,
+        tema: item?.proyecto_nombre || fallbackTema || undefined,
+        fechaDesignacion: item?.fecha_designacion || fallbackFecha,
+      };
+    });
+  }
+
+  async descargarDocumentoDesignacion() {
+    if (!this.lastDesignation) {
+      alert('No se encontró una designación previa para este postulante.');
+      return;
+    }
+    const designation = this.lastDesignation;
+    const correlativoRaw = designation?.numero_documento
+      || designation?.numeroDocumento
+      || designation?.doc_correlativo
+      || designation?.correlativo
+      || null;
+    let docData: any | null = null;
+
+    if (correlativoRaw) {
+      try {
+        const resp = await firstValueFrom(this.sgaService.getDocDesignacionesByCorrelativo(correlativoRaw));
+        if (resp && resp.success && resp.data) {
+          docData = resp.data;
+        }
+      } catch (error) {
+        console.error('Error al obtener documento por correlativo:', error);
+      }
+    }
+
+    const context = docData || designation;
+    const tutorNombre = this.resolvePdfTutorNombre(designation);
+    const user = this.auth.getUser();
+    const userNombre = designation?.user_name
+      || user?.nombre_usuario
+      || [user?.nombre, user?.apellido_p, user?.apellido_m].filter(Boolean).join(' ').trim()
+      || user?.email
+      || undefined;
+    const modalidadGeneral = this.getModalidadDescripcion();
+
+    let estudiantes = this.mapDocEstudiantesToPdf(
+      docData?.estudiantes,
+      docData,
+      designation,
+      modalidadGeneral
+    );
+
+    if (!estudiantes || !estudiantes.length) {
+      estudiantes = this.resolvePdfEstudiantes(
+        designation,
+        (docData && (docData.area || docData.designacion_area)) || designation?.area || null,
+        (docData && docData.proyecto_nombre) || this.proyectoActual?.nombre || null,
+        modalidadGeneral
+      );
+    }
+
+    const fechaDocumentoRaw = (docData && docData.fecha_designacion) || designation?.fecha_designacion;
+    const fechaDocumento = fechaDocumentoRaw ? new Date(fechaDocumentoRaw) : new Date();
+    this.pdfService.generarDesignacionTutorPdf({
+      tutorNombre: docData?.tutor_nombre || tutorNombre,
+      tutorTipo: docData?.tipo_tutor_nombre || this.resolvePdfTutorTipo(designation),
+      tutorCi: docData?.tutor_ci || this.resolvePdfTutorCi(designation),
+      tutorCelular: docData?.tutor_celular || this.resolvePdfTutorCelular(designation),
+      tutorTitulo: docData?.tutor_titulo || this.resolvePdfTutorTitulo(designation),
+      tutorTituloAcademico: docData?.tutor_titulo_academico || this.resolvePdfTutorTituloAcademico(designation),
+      area: docData?.area || designation?.area || undefined,
+      carrera: docData?.carrera_nombre || this.estudiante?.carrera || designation?.carrera_nombre || undefined,
+      convocatoria: docData?.convocatoria_nombre || designation?.convocatoria_nom || undefined,
+      convocatoriaFechaInicio: docData?.convocatoria_fecha_inicio || designation?.convocatoria_fecha_inicio || undefined,
+      convocatoriaFechaFin: docData?.convocatoria_fecha_fin || designation?.convocatoria_fecha_fin || undefined,
+      cronogramaInicio: docData?.cronograma_inicio || docData?.convocatoria_fecha_inicio || designation?.cronograma_inicio || designation?.convocatoria_fecha_inicio || fechaDocumento,
+      cronogramaFin: docData?.cronograma_fin || docData?.convocatoria_fecha_fin || designation?.cronograma_fin || designation?.convocatoria_fecha_fin || fechaDocumento,
+      numeroDocumento: docData?.correlativo || designation?.numero_documento || undefined,
+      cite: docData?.cite || designation?.cite || undefined,
+      fecha: fechaDocumento,
+      lugar: 'Cochabamba',
+      elaboradoPor: userNombre,
+      cargoElaborador: docData?.elaborado_por || 'Responsable de Modalidad de Graduación',
+      estudiantes,
+    }, {
+      fileName: `designacion-${(docData?.correlativo || correlativoRaw || tutorNombre).toString().replace(/\s+/g, '-').toLowerCase()}.pdf`
+    }).catch((error: unknown) => {
+      console.error('Error al generar PDF de designación:', error);
+      alert('No se pudo descargar el documento de designación.');
+    });
   }
 
   continuarConModalidad() {

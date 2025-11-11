@@ -196,11 +196,39 @@ export class TutoresHomeComponent implements OnInit {
     };
   }
 
-  isStudentSelected(tutorId: number, codCeta: number): boolean {
-    return this.getSelectedStudentSet(tutorId).has(codCeta);
+  isDocumentoGenerado(est?: { documento_generado?: unknown; fecha_designacion?: unknown } | null): boolean {
+    if (!est) {
+      return false;
+    }
+
+    if (typeof est.documento_generado !== 'undefined') {
+      return Boolean(est.documento_generado);
+    }
+
+    if (est.fecha_designacion === null || est.fecha_designacion === undefined) {
+      return false;
+    }
+
+    const fecha = est.fecha_designacion;
+    if (fecha instanceof Date) {
+      return Number.isFinite(fecha.getTime());
+    }
+    if (typeof fecha === 'string') {
+      return fecha.trim().length > 0;
+    }
+    if (typeof fecha === 'number') {
+      return Number.isFinite(fecha);
+    }
+    return Boolean(fecha);
   }
 
-  private buildDesignacionPayload(tutor: TutorDesignacionItem, estudiante: any, userName?: string, userId?: number): any {
+  private buildDesignacionPayload(
+    tutor: TutorDesignacionItem,
+    estudiante: any,
+    userName?: string,
+    userId?: number,
+    selectedCodCetas?: number[]
+  ): any {
     const codCeta = Number(estudiante?.cod_ceta ?? 0);
     const payload: any = {
       tutor_id: Number(tutor.tutor_id),
@@ -238,6 +266,10 @@ export class TutoresHomeComponent implements OnInit {
       payload.user_id = userId;
     }
 
+    if (selectedCodCetas && selectedCodCetas.length) {
+      payload.seleccionados_cod_ceta = selectedCodCetas.map((value) => Number(value));
+    }
+
     return payload;
   }
 
@@ -270,6 +302,13 @@ export class TutoresHomeComponent implements OnInit {
   }
 
   toggleStudentSelection(tutorId: number, codCeta: number, checked: boolean) {
+    const tutor = this.designados.find(t => t.tutor_id === tutorId);
+    const estudiante = tutor?.estudiantes?.find(est => Number(est.cod_ceta) === Number(codCeta));
+    if (estudiante && this.isDocumentoGenerado(estudiante)) {
+      const set = this.getSelectedStudentSet(tutorId);
+      set.delete(codCeta);
+      return;
+    }
     const set = this.getSelectedStudentSet(tutorId);
     if (checked) {
       set.add(codCeta);
@@ -282,12 +321,36 @@ export class TutoresHomeComponent implements OnInit {
     const set = this.getSelectedStudentSet(tutor.tutor_id);
     set.clear();
     if (checked) {
-      (tutor.estudiantes || []).forEach(est => set.add(est.cod_ceta));
+      (tutor.estudiantes || []).forEach(est => {
+        if (!this.isDocumentoGenerado(est)) {
+          set.add(est.cod_ceta);
+        }
+      });
     }
   }
 
   hasSelectedStudents(tutor: TutorDesignacionItem): boolean {
     return this.getSelectedStudentSet(tutor.tutor_id).size > 0;
+  }
+
+  hasSelectableStudents(tutor: TutorDesignacionItem): boolean {
+    if (!tutor.estudiantes || !tutor.estudiantes.length) {
+      return false;
+    }
+    return tutor.estudiantes.some(est => !this.isDocumentoGenerado(est));
+  }
+
+  isAllStudentsSelected(tutor: TutorDesignacionItem): boolean {
+    if (!this.hasSelectableStudents(tutor)) {
+      return false;
+    }
+    const set = this.getSelectedStudentSet(tutor.tutor_id);
+    const totalSelectable = (tutor.estudiantes || []).filter(est => !this.isDocumentoGenerado(est)).length;
+    return totalSelectable > 0 && set.size === totalSelectable;
+  }
+
+  isStudentSelected(tutorId: number, codCeta: number): boolean {
+    return this.getSelectedStudentSet(tutorId).has(codCeta);
   }
 
   openConfirmModal(tutor: TutorDesignacionItem) {
@@ -331,6 +394,7 @@ export class TutoresHomeComponent implements OnInit {
       if (!estudiantesSeleccionados.length) {
         return;
       }
+      const selectedCodCetas = Array.from(selectedSet.values());
       const user = this.auth.getUser();
       const userNombre = user?.nombre_usuario
         || [user?.nombre, user?.apellido_p, user?.apellido_m].filter(Boolean).join(' ').trim()
@@ -341,7 +405,13 @@ export class TutoresHomeComponent implements OnInit {
       const responseDataByCod = new Map<number, any>();
 
       for (const est of estudiantesSeleccionados) {
-        const payload = this.buildDesignacionPayload(tutor, est, userNombre, resolvedUserId ?? undefined);
+        const payload = this.buildDesignacionPayload(
+          tutor,
+          est,
+          userNombre,
+          resolvedUserId ?? undefined,
+          selectedCodCetas
+        );
         try {
           const resp = await firstValueFrom(this.sga.designarTutor(payload));
           if (!resp?.success) {
@@ -387,11 +457,20 @@ export class TutoresHomeComponent implements OnInit {
         || (primaryData?.fecha_designacion ? new Date(primaryData.fecha_designacion) : new Date());
 
       // Actualizar información local de estudiantes (fecha de designación)
-      for (const [cod, data] of responseDataByCod.entries()) {
-        const match = (tutor.estudiantes || []).find(est => Number(est.cod_ceta) === cod);
-        if (match && data?.fecha_designacion) {
-          match.fecha_designacion = data.fecha_designacion;
+      for (const est of estudiantesSeleccionados) {
+        const cod = Number(est.cod_ceta);
+        const match = (tutor.estudiantes || []).find(item => Number(item.cod_ceta) === cod);
+        if (!match) {
+          continue;
         }
+        const data = responseDataByCod.get(cod);
+        const fechaDesignacion = data?.fecha_designacion
+          ? new Date(data.fecha_designacion)
+          : fechaDocumento;
+        match.fecha_designacion = fechaDesignacion instanceof Date && Number.isFinite(fechaDesignacion.getTime())
+          ? fechaDesignacion.toISOString()
+          : fechaDocumento.toISOString();
+        match.documento_generado = true;
       }
 
       await this.pdfService.generarDesignacionTutorPdf({

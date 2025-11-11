@@ -159,6 +159,9 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:tutores.leer');
     Route::get('tutores/designaciones', [TutorController::class, 'designaciones'])
         ->middleware('permission:tutores.leer');
+    Route::get('tutores/doc-designaciones/{correlativo}', [TutorController::class, 'docDesignacionesByCorrelativo'])
+        ->where(['correlativo' => '[0-9A-Za-z\-]+'])
+        ->middleware('permission:tutores.leer');
     // Tutores: catálogo de tipos
     Route::get('tutores/tipos', [TutorController::class, 'tipos'])
         ->middleware('permission:tutores.leer');

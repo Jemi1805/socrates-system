@@ -23,6 +23,251 @@ class TutorController extends Controller
     protected static $docDeCargo = 'DIRECTOR ACADÉMICO';
     protected static $docAsunto = 'DESIGNACIÓN COMO TUTOR PARA PROYECTOS DE DEFENSA DE GRADO';
     protected static $docPieNotas = ['BJB', 'CC: REC/DA'];
+
+    public function docDesignacionesByCorrelativo($correlativo)
+    {
+        $normalized = $this->normalizeNumero($correlativo);
+        if (!$normalized) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Correlativo inválido',
+                'data' => [],
+            ], 400);
+        }
+
+        $docs = DB::table('doc_designaciones as dd')
+            ->join('designacion_tutor as dt', 'dd.designacion_tutor_id', '=', 'dt.id')
+            ->leftJoin('tutores as t', 'dt.tutor_id', '=', 't.id')
+            ->leftJoin('tipo_tutor', 't.tipo_tutor_id', '=', 'tipo_tutor.id')
+            ->leftJoin('convocatorias as c', 'dt.convocatoria_id', '=', 'c.id')
+            ->leftJoin('postulantes as p', 'dt.cod_ceta', '=', 'p.cod_ceta')
+            ->leftJoin('proyecto as pr', 'dt.proyecto_id', '=', 'pr.id')
+            ->select([
+                'dd.id as doc_id',
+                'dd.doc_tipo',
+                'dd.year',
+                'dd.correlativo',
+                'dd.cite',
+                'dd.para_nombre',
+                'dd.para_cargo',
+                'dd.de_nombre',
+                'dd.de_cargo',
+                'dd.asunto',
+                'dd.introduccion',
+                'dd.cronograma_inicio',
+                'dd.cronograma_fin',
+                'dd.cierre',
+                'dd.pie_notas',
+                'dd.tutor_nombre as doc_tutor_nombre',
+                'dd.tutor_titulo as doc_tutor_titulo',
+                'dd.estudiantes_resumen',
+                'dd.created_at as doc_created_at',
+                'dd.updated_at as doc_updated_at',
+                'dt.id as designacion_id',
+                'dt.tutor_id',
+                'dt.cod_ceta',
+                'dt.proyecto_id',
+                'dt.fecha_designacion',
+                'dt.area as designacion_area',
+                'dt.convocatoria_id',
+                'dt.convocatoria_nom as designacion_convocatoria_nom',
+                'dt.estudiante_nombre as designacion_estudiante_nom',
+                'dt.tutor_nombre as designacion_tutor_nom',
+                't.nombre as tutor_nombre',
+                't.apellido_p as tutor_apellido_p',
+                't.apellido_m as tutor_apellido_m',
+                't.celular as tutor_celular',
+                't.ci as tutor_ci',
+                't.titulo as tutor_titulo',
+                't.titulo_academico as tutor_titulo_academico',
+                't.cod_carrera',
+                'tipo_tutor.id as tipo_tutor_id',
+                'tipo_tutor.nombre as tipo_tutor_nombre',
+                'c.nombre as convocatoria_nombre',
+                'c.numero_convocatoria as convocatoria_numero',
+                'c.anio as convocatoria_anio',
+                'c.fecha_inicio as convocatoria_fecha_inicio',
+                'c.fecha_fin as convocatoria_fecha_fin',
+                'p.nombres_est as postulante_nombres',
+                'p.ap_pat as postulante_ap_pat',
+                'p.ap_mat as postulante_ap_mat',
+                DB::raw("TRIM(CONCAT(IFNULL(p.ap_pat,''),' ',IFNULL(p.ap_mat,''),' ',IFNULL(p.nombres_est,''))) AS postulante_nombre_completo"),
+                'pr.nombre as proyecto_nombre',
+            ])
+            ->where('dd.correlativo', (int) $normalized)
+            ->orderBy('dd.id')
+            ->get();
+
+        if ($docs->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+            ]);
+        }
+
+        $first = $docs->first();
+
+        $tutorNombreResolved = trim(implode(' ', array_filter([
+            $first->doc_tutor_nombre,
+            $first->tutor_nombre,
+            $first->tutor_apellido_p,
+            $first->tutor_apellido_m,
+        ])));
+        $tutorNombreResolved = $tutorNombreResolved ?: null;
+
+        $estudiantes = [];
+        foreach ($docs as $row) {
+            $resumen = $this->decodeJsonColumn($row->estudiantes_resumen);
+            if (is_array($resumen) && !empty($resumen)) {
+                foreach ($resumen as $est) {
+                    $estudiantes[] = $est;
+                }
+            } else {
+                $estudiantes[] = [
+                    'cod_ceta' => $row->cod_ceta,
+                    'estudiante_nombre' => $row->designacion_estudiante_nom ?: $row->postulante_nombre_completo,
+                    'carrera' => $row->cod_carrera,
+                    'modalidad' => $row->designacion_convocatoria_nom,
+                    'area' => $row->designacion_area,
+                    'proyecto_nombre' => $row->proyecto_nombre,
+                    'fecha_designacion' => $row->fecha_designacion,
+                ];
+            }
+        }
+
+        $response = [
+            'success' => true,
+            'data' => [
+                'correlativo' => $normalized,
+                'doc_tipo' => $first->doc_tipo,
+                'year' => $first->year,
+                'cite' => $first->cite,
+                'tutor_nombre' => $tutorNombreResolved,
+                'tutor_ci' => $first->tutor_ci,
+                'tutor_celular' => $first->tutor_celular,
+                'tutor_titulo' => $first->tutor_titulo ?: $first->doc_tutor_titulo,
+                'tutor_titulo_academico' => $first->tutor_titulo_academico,
+                'tipo_tutor_nombre' => $first->tipo_tutor_nombre,
+                'convocatoria_id' => $first->convocatoria_id,
+                'convocatoria_nombre' => $first->convocatoria_nombre,
+                'convocatoria_numero' => $first->convocatoria_numero,
+                'convocatoria_anio' => $first->convocatoria_anio,
+                'convocatoria_fecha_inicio' => $first->convocatoria_fecha_inicio,
+                'convocatoria_fecha_fin' => $first->convocatoria_fecha_fin,
+                'estudiantes' => $this->mergeEstudiantesResumen($estudiantes),
+                'pie_notas' => $this->decodeJsonColumn($first->pie_notas) ?: static::$docPieNotas,
+                'para_nombre' => $first->para_nombre ?: $tutorNombreResolved,
+                'para_cargo' => $first->para_cargo ?: static::$docParaCargo,
+                'de_nombre' => $first->de_nombre ?: static::$docDeNombre,
+                'de_cargo' => $first->de_cargo ?: static::$docDeCargo,
+                'asunto' => $first->asunto ?: static::$docAsunto,
+                'introduccion' => $first->introduccion ?: static::$docIntroText,
+                'cronograma_inicio' => $first->cronograma_inicio,
+                'cronograma_fin' => $first->cronograma_fin,
+            ],
+        ];
+
+        return response()->json($response);
+    }
+
+    private function mergeEstudiantesResumen(array $entries)
+    {
+        $result = [];
+        $seen = [];
+
+        foreach ($entries as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $codCeta = isset($row['cod_ceta']) ? (string) $row['cod_ceta'] : '';
+            $proyecto = isset($row['proyecto_id']) ? (string) $row['proyecto_id'] : '';
+            $key = $codCeta . '|' . $proyecto;
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+
+            $nombre = isset($row['nombre']) ? $row['nombre'] : (isset($row['estudiante_nombre']) ? $row['estudiante_nombre'] : '');
+            $estudianteNombre = isset($row['estudiante_nombre']) ? $row['estudiante_nombre'] : (isset($row['nombre']) ? $row['nombre'] : '');
+            $carrera = isset($row['carrera']) ? $row['carrera'] : (isset($row['cod_carrera']) ? $row['cod_carrera'] : null);
+            $modalidad = isset($row['modalidad']) ? $row['modalidad'] : null;
+            $area = isset($row['area']) ? $row['area'] : null;
+            $proyectoNombre = isset($row['proyecto_nombre']) ? $row['proyecto_nombre'] : null;
+            $proyectoId = isset($row['proyecto_id']) ? $row['proyecto_id'] : null;
+            $fechaDesignacion = isset($row['fecha_designacion']) ? $row['fecha_designacion'] : null;
+
+            $result[] = [
+                'cod_ceta' => $codCeta,
+                'nombre' => $nombre,
+                'estudiante_nombre' => $estudianteNombre,
+                'carrera' => $carrera,
+                'modalidad' => $modalidad,
+                'area' => $area,
+                'proyecto_nombre' => $proyectoNombre,
+                'proyecto_id' => $proyectoId,
+                'fecha_designacion' => $fechaDesignacion,
+            ];
+        }
+
+        return $result;
+    }
+
+    private function resumenContieneEstudiante($resumen, $codCeta)
+    {
+        if ($codCeta === null || $codCeta === '') {
+            return false;
+        }
+
+        if ($resumen === null) {
+            return false;
+        }
+
+        if (!is_array($resumen)) {
+            $resumen = $this->decodeJsonColumn($resumen);
+        }
+
+        if (!is_array($resumen) || empty($resumen)) {
+            return false;
+        }
+
+        $target = trim((string) $codCeta);
+        if ($target === '') {
+            return false;
+        }
+
+        foreach ($resumen as $entry) {
+            $candidate = null;
+            if (is_array($entry)) {
+                if (isset($entry['cod_ceta'])) {
+                    $candidate = $entry['cod_ceta'];
+                } elseif (isset($entry['codCeta'])) {
+                    $candidate = $entry['codCeta'];
+                }
+            } elseif (is_object($entry)) {
+                if (isset($entry->cod_ceta)) {
+                    $candidate = $entry->cod_ceta;
+                } elseif (isset($entry->codCeta)) {
+                    $candidate = $entry->codCeta;
+                }
+            } else {
+                $candidate = $entry;
+            }
+
+            if ($candidate === null) {
+                continue;
+            }
+
+            $candidateStr = trim((string) $candidate);
+            if ($candidateStr !== '' && strcmp($candidateStr, $target) === 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
     /**
      * Listar tutores registrados.
      * Filtros opcionales: ?carrera=MEA|EEA|Nombre
@@ -212,6 +457,8 @@ class TutorController extends Controller
                 }
             }
 
+            $docResumenRow = $this->decodeJsonColumn(isset($row->doc_estudiantes_resumen) ? $row->doc_estudiantes_resumen : null);
+
             $convocatoriaInicioIso = null;
             if (isset($row->convocatoria_fecha_inicio) && $row->convocatoria_fecha_inicio) {
                 try {
@@ -262,7 +509,6 @@ class TutorController extends Controller
                 $numeroDocumento = $this->normalizeNumero(isset($row->doc_correlativo) ? $row->doc_correlativo : null);
                 $pieNotasDecoded = $this->decodeJsonColumn(isset($row->doc_pie_notas) ? $row->doc_pie_notas : null);
                 $pieNotas = $pieNotasDecoded ? $pieNotasDecoded : static::$docPieNotas;
-                $estResumen = $this->decodeJsonColumn(isset($row->doc_estudiantes_resumen) ? $row->doc_estudiantes_resumen : null);
                 $grouped[$tutorId] = [
                     'tutor_id' => $tutorId,
                     'tutor_ci' => $row->tutor_ci,
@@ -295,10 +541,25 @@ class TutorController extends Controller
                     'doc_pie_notas' => $pieNotas,
                     'doc_tutor_nombre' => $row->doc_tutor_nombre,
                     'doc_tutor_titulo' => $row->doc_tutor_titulo,
-                    'doc_estudiantes_resumen' => $estResumen,
+                    'doc_estudiantes_resumen' => $docResumenRow,
                     'fecha_designacion' => $fechaDesignacion,
                     'estudiantes' => [],
                 ];
+            }
+
+            if (!empty($docResumenRow)) {
+                $existingResumen = isset($grouped[$tutorId]['doc_estudiantes_resumen']) ? $grouped[$tutorId]['doc_estudiantes_resumen'] : [];
+                $mergedResumen = is_array($existingResumen) ? $existingResumen : [];
+                if (!is_array($mergedResumen)) {
+                    $mergedResumen = $this->decodeJsonColumn($mergedResumen);
+                    $mergedResumen = is_array($mergedResumen) ? $mergedResumen : [];
+                }
+                foreach ($docResumenRow as $entry) {
+                    $mergedResumen[] = $entry;
+                }
+                if (!empty($mergedResumen)) {
+                    $grouped[$tutorId]['doc_estudiantes_resumen'] = $mergedResumen;
+                }
             }
 
             if (!$grouped[$tutorId]['area'] && isset($row->designacion_area) && $row->designacion_area) {
@@ -334,6 +595,10 @@ class TutorController extends Controller
                 'proyecto_nombre' => $row->proyecto_nombre,
                 'fecha_designacion' => $fechaDesignacion,
                 'area' => isset($row->designacion_area) ? $row->designacion_area : null,
+                'documento_generado' => $this->resumenContieneEstudiante(
+                    $docResumenRow,
+                    $row->cod_ceta
+                ),
             ];
         }
 
@@ -442,7 +707,7 @@ class TutorController extends Controller
         return json_last_error() === JSON_ERROR_NONE ? $decoded : null;
     }
 
-    private function ensureDocDesignacion($row, $tutorNombreResolved, $estudianteNombreResolved)
+    private function ensureDocDesignacion($row, $tutorNombreResolved, $estudianteNombreResolved, ?array $seleccionadosCodCeta = null)
     {
         $docType = $this->resolveDocumentoTipo(isset($row->tipo_tutor_nombre) ? $row->tipo_tutor_nombre : null);
         $year = $this->extractYear(isset($row->fecha_designacion) ? $row->fecha_designacion : null);
@@ -479,10 +744,24 @@ class TutorController extends Controller
             $contextResumen = [];
         }
 
+        if ($seleccionadosCodCeta && !empty($contextResumen)) {
+            $seleccionadosNormalizados = array_map(function ($value) {
+                return (int) $value;
+            }, $seleccionadosCodCeta);
+            $selectionLookup = array_flip($seleccionadosNormalizados);
+            $contextResumen = array_values(array_filter($contextResumen, function ($rowResumen) use ($selectionLookup) {
+                $codigo = isset($rowResumen['cod_ceta']) ? (int) $rowResumen['cod_ceta'] : null;
+                return $codigo !== null && isset($selectionLookup[$codigo]);
+            }));
+        }
+
         $estudiantesResumen = $contextResumen;
         $resumenJson = !empty($contextResumen) ? json_encode($contextResumen) : null;
 
         $sharedDoc = $this->findExistingDocForContext($row, $docType, $year, (int) $row->id);
+        $sharedDocRow = null;
+        $sharedResumen = [];
+        $sharedResumenChanged = false;
 
         Log::info('Ensuring doc designacion', [
             'designacion_id' => $row->id,
@@ -501,78 +780,89 @@ class TutorController extends Controller
             if ($sharedDocRow) {
                 $sharedResumenDecoded = $this->decodeJsonColumn(isset($sharedDocRow->estudiantes_resumen) ? $sharedDocRow->estudiantes_resumen : null);
                 $sharedResumen = $sharedResumenDecoded ? $sharedResumenDecoded : [];
-                if ($resumenJson && $this->hasResumenChanged($sharedResumen, $estudiantesResumen)) {
-                    DB::table('doc_designaciones')
-                        ->where('designacion_tutor_id', $ownerId)
-                        ->update([
-                            'estudiantes_resumen' => $resumenJson,
-                            'updated_at' => $now,
-                        ]);
-                    $sharedDocRow->estudiantes_resumen = $resumenJson;
-                }
+                $sharedResumenChanged = $resumenJson && $this->hasResumenChanged($sharedResumen, $estudiantesResumen);
 
-                if (!$doc) {
-                    DB::table('doc_designaciones')->insert([
-                        'designacion_tutor_id' => $row->id,
-                        'doc_tipo' => $sharedDocRow->doc_tipo,
-                        'year' => $sharedDocRow->year,
-                        'correlativo' => $sharedDocRow->correlativo,
-                        'cite' => $sharedDocRow->cite,
-                        'para_nombre' => $sharedDocRow->para_nombre,
-                        'para_cargo' => $sharedDocRow->para_cargo,
-                        'de_nombre' => $sharedDocRow->de_nombre,
-                        'de_cargo' => $sharedDocRow->de_cargo,
-                        'asunto' => $sharedDocRow->asunto,
-                        'introduccion' => $sharedDocRow->introduccion,
-                        'cronograma_inicio' => $sharedDocRow->cronograma_inicio,
-                        'cronograma_fin' => $sharedDocRow->cronograma_fin,
-                        'cierre' => $sharedDocRow->cierre,
-                        'pie_notas' => $sharedDocRow->pie_notas,
-                        'tutor_nombre' => $sharedDocRow->tutor_nombre,
-                        'tutor_titulo' => $sharedDocRow->tutor_titulo,
+                if ($seleccionadosCodCeta && $sharedResumenChanged) {
+                    $sharedDoc = null;
+                }
+            } else {
+                $sharedDoc = null;
+            }
+        }
+
+        if ($sharedDoc && $sharedDocRow) {
+            if ($sharedResumenChanged) {
+                DB::table('doc_designaciones')
+                    ->where('designacion_tutor_id', $sharedDocRow->designacion_tutor_id)
+                    ->update([
                         'estudiantes_resumen' => $resumenJson,
-                        'created_at' => $now,
                         'updated_at' => $now,
                     ]);
+                $sharedDocRow->estudiantes_resumen = $resumenJson;
+                $sharedResumen = $estudiantesResumen;
+            }
+
+            if (!$doc) {
+                DB::table('doc_designaciones')->insert([
+                    'designacion_tutor_id' => $row->id,
+                    'doc_tipo' => $sharedDocRow->doc_tipo,
+                    'year' => $sharedDocRow->year,
+                    'correlativo' => $sharedDocRow->correlativo,
+                    'cite' => $sharedDocRow->cite,
+                    'para_nombre' => $sharedDocRow->para_nombre,
+                    'para_cargo' => $sharedDocRow->para_cargo,
+                    'de_nombre' => $sharedDocRow->de_nombre,
+                    'de_cargo' => $sharedDocRow->de_cargo,
+                    'asunto' => $sharedDocRow->asunto,
+                    'introduccion' => $sharedDocRow->introduccion,
+                    'cronograma_inicio' => $sharedDocRow->cronograma_inicio,
+                    'cronograma_fin' => $sharedDocRow->cronograma_fin,
+                    'cierre' => $sharedDocRow->cierre,
+                    'pie_notas' => $sharedDocRow->pie_notas,
+                    'tutor_nombre' => $sharedDocRow->tutor_nombre,
+                    'tutor_titulo' => $sharedDocRow->tutor_titulo,
+                    'estudiantes_resumen' => $resumenJson,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+
+                $doc = DB::table('doc_designaciones')
+                    ->where('designacion_tutor_id', $row->id)
+                    ->first();
+            } else {
+                $needsUpdate = [];
+                if ((int) $doc->correlativo !== (int) $sharedDocRow->correlativo) {
+                    $needsUpdate['correlativo'] = (int) $sharedDocRow->correlativo;
+                }
+                if ((string) $doc->cite !== (string) $sharedDocRow->cite) {
+                    $needsUpdate['cite'] = $sharedDocRow->cite;
+                }
+
+                $docResumenDecoded = $this->decodeJsonColumn(isset($doc->estudiantes_resumen) ? $doc->estudiantes_resumen : null);
+                $docResumen = $docResumenDecoded ? $docResumenDecoded : [];
+                if ($resumenJson && $this->hasResumenChanged($docResumen, $estudiantesResumen)) {
+                    $needsUpdate['estudiantes_resumen'] = $resumenJson;
+                }
+
+                if (!empty($needsUpdate)) {
+                    $needsUpdate['updated_at'] = $now;
+                    DB::table('doc_designaciones')
+                        ->where('designacion_tutor_id', $row->id)
+                        ->update($needsUpdate);
 
                     $doc = DB::table('doc_designaciones')
                         ->where('designacion_tutor_id', $row->id)
                         ->first();
-                } else {
-                    $needsUpdate = [];
-                    if ((int) $doc->correlativo !== (int) $sharedDocRow->correlativo) {
-                        $needsUpdate['correlativo'] = (int) $sharedDocRow->correlativo;
-                    }
-                    if ((string) $doc->cite !== (string) $sharedDocRow->cite) {
-                        $needsUpdate['cite'] = $sharedDocRow->cite;
-                    }
-
-                    $docResumenDecoded = $this->decodeJsonColumn(isset($doc->estudiantes_resumen) ? $doc->estudiantes_resumen : null);
-                    $docResumen = $docResumenDecoded ? $docResumenDecoded : [];
-                    if ($resumenJson && $this->hasResumenChanged($docResumen, $estudiantesResumen)) {
-                        $needsUpdate['estudiantes_resumen'] = $resumenJson;
-                    }
-
-                    if (!empty($needsUpdate)) {
-                        $needsUpdate['updated_at'] = $now;
-                        DB::table('doc_designaciones')
-                            ->where('designacion_tutor_id', $row->id)
-                            ->update($needsUpdate);
-
-                        $doc = DB::table('doc_designaciones')
-                            ->where('designacion_tutor_id', $row->id)
-                            ->first();
-                    }
                 }
-
-                $correlativoBase = isset($doc->correlativo) ? $doc->correlativo : (isset($sharedDocRow->correlativo) ? $sharedDocRow->correlativo : null);
-                $numeroStr = $this->normalizeNumero($correlativoBase);
-                $docPieNotasDecoded = $this->decodeJsonColumn(isset($doc->pie_notas) ? $doc->pie_notas : null);
-                $doc->pie_notas = $docPieNotasDecoded ? $docPieNotasDecoded : static::$docPieNotas;
-                $doc->estudiantes_resumen = $estudiantesResumen;
-
-                return [$doc, $numeroStr, $doc->cite];
             }
+
+            $correlativoBase = isset($doc->correlativo) ? $doc->correlativo : (isset($sharedDocRow->correlativo) ? $sharedDocRow->correlativo : null);
+            $numeroStr = $this->normalizeNumero($correlativoBase);
+            $docPieNotasDecoded = $this->decodeJsonColumn(isset($doc->pie_notas) ? $doc->pie_notas : null);
+            $doc->pie_notas = $docPieNotasDecoded ? $docPieNotasDecoded : static::$docPieNotas;
+            $doc->estudiantes_resumen = $estudiantesResumen;
+
+            return [$doc, $numeroStr, $doc->cite];
         }
 
         if (!$doc) {
@@ -821,18 +1111,13 @@ class TutorController extends Controller
                 'dt.convocatoria_id',
                 'dt.fecha_designacion',
                 'dt.created_at'
-            );
+            )
+            ->whereNotNull('dt.fecha_designacion');
 
         if ($convocatoriaId) {
             $query->where('dt.convocatoria_id', $convocatoriaId);
         } elseif ($year) {
-            $query->where(function ($q) use ($year) {
-                $q->whereYear('dt.fecha_designacion', $year)
-                    ->orWhere(function ($sub) use ($year) {
-                        $sub->whereNull('dt.fecha_designacion')
-                            ->whereYear('dt.created_at', $year);
-                    });
-            });
+            $query->whereYear('dt.fecha_designacion', $year);
         }
 
         $rows = $query->orderBy('dt.created_at')->get();
@@ -1632,6 +1917,8 @@ class TutorController extends Controller
             'area' => 'nullable|string|max:255',
             'user_id' => 'nullable|integer',
             'user_name' => 'nullable|string|max:150',
+            'seleccionados_cod_ceta' => 'nullable|array',
+            'seleccionados_cod_ceta.*' => 'integer',
         ]);
 
         if ($validator->fails()) {
@@ -1642,7 +1929,16 @@ class TutorController extends Controller
             ], 422);
         }
 
+
         $data = $validator->validated();
+
+        $seleccionadosCodCeta = null;
+        if (isset($data['seleccionados_cod_ceta']) && is_array($data['seleccionados_cod_ceta'])) {
+            $seleccionadosCodCeta = array_values(array_unique(array_map(function ($value) {
+                return (int) $value;
+            }, $data['seleccionados_cod_ceta'])));
+        }
+        unset($data['seleccionados_cod_ceta']);
 
         $userIdFromPayload = isset($data['user_id']) ? (int) $data['user_id'] : null;
         unset($data['user_id']);
@@ -1752,10 +2048,15 @@ class TutorController extends Controller
                 throw new \RuntimeException('No se pudo recuperar la designación recién creada.');
             }
 
+            if ($seleccionadosCodCeta && !in_array((int) $data['cod_ceta'], $seleccionadosCodCeta, true)) {
+                $seleccionadosCodCeta[] = (int) $data['cod_ceta'];
+            }
+
             $docRecordResult = $this->ensureDocDesignacion(
                 $baseRow,
                 $tutNombre ? $tutNombre : '',
-                $estNombre ? $estNombre : ''
+                $estNombre ? $estNombre : '',
+                $seleccionadosCodCeta
             );
             [$docRecord, $numeroDocumento, $cite] = $docRecordResult;
 

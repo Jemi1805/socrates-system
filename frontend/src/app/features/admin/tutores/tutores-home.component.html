@@ -261,10 +261,14 @@
                   <td>
                     <div class="form-check mb-2 ms-1">
                       <input class="form-check-input" type="checkbox"
-                             [checked]="item.estudiantes?.length && hasSelectedStudents(item)"
+                             [checked]="isAllStudentsSelected(item)"
                              (change)="selectAllStudents(item, $event.target.checked)"
+                             [disabled]="!hasSelectableStudents(item)"
                       />
-                      <label class="form-check-label small">Seleccionar todos</label>
+                      <label class="form-check-label small">
+                        Seleccionar todos
+                        <span *ngIf="!hasSelectableStudents(item)" class="text-muted">(ya generados)</span>
+                      </label>
                     </div>
                     <ul class="mb-0 ps-0 list-unstyled">
                       <li *ngFor="let est of item.estudiantes" class="mb-1">
@@ -273,9 +277,11 @@
                                  [checked]="isStudentSelected(item.tutor_id, est.cod_ceta)"
                                  (change)="toggleStudentSelection(item.tutor_id, est.cod_ceta, $event.target.checked)"
                                  [id]="'est-' + item.tutor_id + '-' + est.cod_ceta"
+                                 [disabled]="isDocumentoGenerado(est)"
                           />
                           <label class="form-check-label" [for]="'est-' + item.tutor_id + '-' + est.cod_ceta">
                             {{ est.estudiante_nombre || '-' }}
+                            <span *ngIf="isDocumentoGenerado(est)" class="badge bg-secondary ms-1">Documento generado</span>
                           </label>
                         </div>
                       </li>

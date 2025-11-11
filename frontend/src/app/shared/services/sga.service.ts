@@ -38,6 +38,7 @@ export interface TutorDesignacionItem {
     proyecto_id: number | null;
     proyecto_nombre: string | null;
     fecha_designacion: string | null;
+    documento_generado?: boolean;
   }>;
 }
 
@@ -459,6 +460,14 @@ export class SgaService {
     }
     return this.http
       .get<ApiResponse<TutorDesignacionItem[]>>(`${environment.apiUrl}/tutores/designaciones`, { params: httpParams })
+      .pipe(catchError(this.handleError));
+  }
+
+  getDocDesignacionesByCorrelativo(correlativo: string | number): Observable<ApiResponse<any>> {
+    const value = correlativo != null ? String(correlativo) : '';
+    const cleaned = value.trim();
+    return this.http
+      .get<ApiResponse<any>>(`${environment.apiUrl}/tutores/doc-designaciones/${encodeURIComponent(cleaned)}`)
       .pipe(catchError(this.handleError));
   }
 
