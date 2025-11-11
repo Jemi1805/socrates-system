@@ -114,6 +114,91 @@ export class ModalidadGraduacionComponent implements OnInit {
     this.cargarPostulantesInscritos();
   }
 
+  private buildPdfPayloadFromDesignation(designation: any, correlativo: string | number, docData: any | null): { documento: any; opciones?: { fileName?: string } } | null {
+    if (!designation) {
+      return null;
+    }
+
+    const modalDescripcion = this.getModalidadDescripcion();
+    const tutorNombre = this.resolvePdfTutorNombre(docData || designation);
+
+    const resolveDocEstudiantes = () => {
+      const candidates: any[] = [];
+      if (docData) {
+        if (Array.isArray(docData.estudiantes)) {
+          candidates.push(docData.estudiantes);
+        }
+        if (Array.isArray(docData.doc_estudiantes_resumen)) {
+          candidates.push(docData.doc_estudiantes_resumen);
+        }
+        if (typeof docData.doc_estudiantes_resumen === 'string') {
+          try {
+            const parsed = JSON.parse(docData.doc_estudiantes_resumen);
+            if (Array.isArray(parsed)) candidates.push(parsed);
+          } catch {}
+        }
+        if (typeof docData.estudiantes_resumen === 'string') {
+          try {
+            const parsed = JSON.parse(docData.estudiantes_resumen);
+            if (Array.isArray(parsed)) candidates.push(parsed);
+          } catch {}
+        }
+      }
+      if (Array.isArray(designation?.doc_estudiantes_resumen)) {
+        candidates.push(designation.doc_estudiantes_resumen);
+      }
+      if (typeof designation?.doc_estudiantes_resumen === 'string') {
+        try {
+          const parsed = JSON.parse(designation.doc_estudiantes_resumen);
+          if (Array.isArray(parsed)) candidates.push(parsed);
+        } catch {}
+      }
+      return candidates.find((entry) => Array.isArray(entry) && entry.length) || null;
+    };
+
+    const estudiantesFuente = resolveDocEstudiantes();
+
+    const estudiantes = this.mapDocEstudiantesToPdf(
+      estudiantesFuente,
+      docData,
+      designation,
+      modalDescripcion
+    ) || this.resolvePdfEstudiantes(designation, docData?.area ?? designation?.area, docData?.proyecto_nombre ?? designation?.proyecto_nombre, modalDescripcion) || [];
+
+    const fechaRaw = docData?.fecha_designacion || designation?.fecha_designacion || designation?.doc_fecha || new Date();
+    const fechaDocumento = fechaRaw ? new Date(fechaRaw) : new Date();
+
+    const documento = {
+      tutorNombre,
+      tutorTipo: this.resolvePdfTutorTipo(docData || designation),
+      tutorCi: this.resolvePdfTutorCi(docData || designation),
+      tutorCelular: this.resolvePdfTutorCelular(docData || designation),
+      tutorTitulo: this.resolvePdfTutorTitulo(docData || designation),
+      tutorTituloAcademico: this.resolvePdfTutorTituloAcademico(docData || designation),
+      area: docData?.area ?? docData?.designacion_area ?? designation?.area ?? undefined,
+      carrera: docData?.carrera_nombre || this.estudiante?.carrera || designation?.carrera_nombre || undefined,
+      convocatoria: docData?.convocatoria_nom || designation?.convocatoria_nom || undefined,
+      convocatoriaFechaInicio: docData?.convocatoria_fecha_inicio || designation?.convocatoria_fecha_inicio || undefined,
+      convocatoriaFechaFin: docData?.convocatoria_fecha_fin || designation?.convocatoria_fecha_fin || undefined,
+      cronogramaInicio: docData?.cronograma_inicio || docData?.convocatoria_fecha_inicio || designation?.cronograma_inicio || designation?.convocatoria_fecha_inicio || fechaDocumento,
+      cronogramaFin: docData?.cronograma_fin || docData?.convocatoria_fecha_fin || designation?.cronograma_fin || designation?.convocatoria_fecha_fin || fechaDocumento,
+      numeroDocumento: docData?.correlativo || designation?.numero_documento || correlativo,
+      cite: docData?.cite || designation?.cite || undefined,
+      fecha: fechaDocumento,
+      lugar: 'Cochabamba',
+      elaboradoPor: docData?.elaborado_por || designation?.user_name || undefined,
+      cargoElaborador: 'Responsable de Modalidad de Graduación',
+      estudiantes,
+    };
+
+    const fileNameBase = (docData?.correlativo || correlativo || tutorNombre || 'documento').toString().replace(/\s+/g, '-').toLowerCase();
+    const opciones = {
+      fileName: `designacion-${fileNameBase}.pdf`
+    };
+
+    return { documento, opciones };
+  }
+
   private formatNombreApellidosPrimero(
     apellidoP?: string | null,
     apellidoM?: string | null,
@@ -1296,75 +1381,37 @@ export class ModalidadGraduacionComponent implements OnInit {
       || designation?.numeroDocumento
       || designation?.doc_correlativo
       || designation?.correlativo
+      || designation?.numero
       || null;
-    let docData: any | null = null;
 
-    if (correlativoRaw) {
+    if (!correlativoRaw) {
+      alert('No se encontró correlativo asociado al documento.');
+      return;
+    }
+
+    this.loadingService.showModal();
+    try {
+      let docData: any = null;
       try {
-        const resp = await firstValueFrom(this.sgaService.getDocDesignacionesByCorrelativo(correlativoRaw));
-        if (resp && resp.success && resp.data) {
-          docData = resp.data;
-        }
-      } catch (error) {
-        console.error('Error al obtener documento por correlativo:', error);
+        const response = await firstValueFrom(this.sgaService.getDocDesignacionesByCorrelativo(correlativoRaw));
+        docData = (response as any)?.data ?? response ?? null;
+      } catch (fetchErr) {
+        console.warn('No se pudo obtener detalle del documento desde el backend.', fetchErr);
       }
+
+      const pdfPayload = this.buildPdfPayloadFromDesignation(designation, correlativoRaw, docData);
+      if (!pdfPayload) {
+        alert('No se pudo preparar el documento para descargar.');
+        return;
+      }
+
+      await this.pdfService.generarDesignacionTutorPdf(pdfPayload.documento, pdfPayload.opciones);
+    } catch (err) {
+      console.error('Error al descargar documento de designación:', err);
+      alert('No se pudo descargar el documento. Intente nuevamente.');
+    } finally {
+      this.loadingService.hideModal();
     }
-
-    const context = docData || designation;
-    const tutorNombre = this.resolvePdfTutorNombre(designation);
-    const user = this.auth.getUser();
-    const userNombre = designation?.user_name
-      || user?.nombre_usuario
-      || [user?.nombre, user?.apellido_p, user?.apellido_m].filter(Boolean).join(' ').trim()
-      || user?.email
-      || undefined;
-    const modalidadGeneral = this.getModalidadDescripcion();
-
-    let estudiantes = this.mapDocEstudiantesToPdf(
-      docData?.estudiantes,
-      docData,
-      designation,
-      modalidadGeneral
-    );
-
-    if (!estudiantes || !estudiantes.length) {
-      estudiantes = this.resolvePdfEstudiantes(
-        designation,
-        (docData && (docData.area || docData.designacion_area)) || designation?.area || null,
-        (docData && docData.proyecto_nombre) || this.proyectoActual?.nombre || null,
-        modalidadGeneral
-      );
-    }
-
-    const fechaDocumentoRaw = (docData && docData.fecha_designacion) || designation?.fecha_designacion;
-    const fechaDocumento = fechaDocumentoRaw ? new Date(fechaDocumentoRaw) : new Date();
-    this.pdfService.generarDesignacionTutorPdf({
-      tutorNombre: docData?.tutor_nombre || tutorNombre,
-      tutorTipo: docData?.tipo_tutor_nombre || this.resolvePdfTutorTipo(designation),
-      tutorCi: docData?.tutor_ci || this.resolvePdfTutorCi(designation),
-      tutorCelular: docData?.tutor_celular || this.resolvePdfTutorCelular(designation),
-      tutorTitulo: docData?.tutor_titulo || this.resolvePdfTutorTitulo(designation),
-      tutorTituloAcademico: docData?.tutor_titulo_academico || this.resolvePdfTutorTituloAcademico(designation),
-      area: docData?.area || designation?.area || undefined,
-      carrera: docData?.carrera_nombre || this.estudiante?.carrera || designation?.carrera_nombre || undefined,
-      convocatoria: docData?.convocatoria_nombre || designation?.convocatoria_nom || undefined,
-      convocatoriaFechaInicio: docData?.convocatoria_fecha_inicio || designation?.convocatoria_fecha_inicio || undefined,
-      convocatoriaFechaFin: docData?.convocatoria_fecha_fin || designation?.convocatoria_fecha_fin || undefined,
-      cronogramaInicio: docData?.cronograma_inicio || docData?.convocatoria_fecha_inicio || designation?.cronograma_inicio || designation?.convocatoria_fecha_inicio || fechaDocumento,
-      cronogramaFin: docData?.cronograma_fin || docData?.convocatoria_fecha_fin || designation?.cronograma_fin || designation?.convocatoria_fecha_fin || fechaDocumento,
-      numeroDocumento: docData?.correlativo || designation?.numero_documento || undefined,
-      cite: docData?.cite || designation?.cite || undefined,
-      fecha: fechaDocumento,
-      lugar: 'Cochabamba',
-      elaboradoPor: userNombre,
-      cargoElaborador: docData?.elaborado_por || 'Responsable de Modalidad de Graduación',
-      estudiantes,
-    }, {
-      fileName: `designacion-${(docData?.correlativo || correlativoRaw || tutorNombre).toString().replace(/\s+/g, '-').toLowerCase()}.pdf`
-    }).catch((error: unknown) => {
-      console.error('Error al generar PDF de designación:', error);
-      alert('No se pudo descargar el documento de designación.');
-    });
   }
 
   continuarConModalidad() {

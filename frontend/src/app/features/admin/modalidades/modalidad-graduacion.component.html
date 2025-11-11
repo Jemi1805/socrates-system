@@ -448,10 +448,11 @@
                           </button>
                           <button *ngIf="hasLastDesignationDocument()"
                                   type="button"
-                                  class="btn btn-sm btn-success ms-md-0"
-                                  (click)="descargarDocumentoDesignacion()">
-                            <i class="bi bi-file-earmark-arrow-down me-1"></i>
-                            Descargar documento
+                                  class="btn btn-sm btn-success ms-md-0 d-flex align-items-center gap-1"
+                                  (click)="descargarDocumentoDesignacion()"
+                                  [disabled]="loadingInscripcion">
+                            <i class="bi bi-file-earmark-arrow-down"></i>
+                            <span>Descargar documento</span>
                           </button>
                           <span *ngIf="!hasLastDesignationDocument()" class="badge bg-secondary ms-md-0 mt-2 mt-md-0">
                             Documento aún no generado

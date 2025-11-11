@@ -6,6 +6,7 @@ import { HeaderComponent } from '../../../shared/components/header/header.compon
 import { SgaService, Docente, ApiResponse, Pertinencia, TutorReg, TutorTipo, Convocatoria, TutorDesignacionItem } from '../../../shared/services/sga.service';
 import { PdfService } from '../../../shared/services/pdf.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { LoadingService } from '../../../core/services/loading.service';
 import { firstValueFrom, forkJoin } from 'rxjs';
 
 @Component({
@@ -102,7 +103,7 @@ export class TutoresHomeComponent implements OnInit {
     }
   }
 
-  constructor(private sga: SgaService, private router: Router, private pdfService: PdfService, private auth: AuthService) {}
+  constructor(private sga: SgaService, private router: Router, private pdfService: PdfService, private auth: AuthService, private loadingService: LoadingService) {}
 
   ngOnInit(): void {
     this.loadTutorTipos();
@@ -388,6 +389,7 @@ export class TutoresHomeComponent implements OnInit {
       return;
     }
     this.generatingDesignadoId = tutor.tutor_id;
+    this.loadingService.showModal();
     try {
       const selectedSet = this.getSelectedStudentSet(tutor.tutor_id);
       const estudiantesSeleccionados = (tutor.estudiantes || []).filter(est => selectedSet.has(est.cod_ceta));
@@ -423,6 +425,7 @@ export class TutoresHomeComponent implements OnInit {
         } catch (error) {
           console.error('Error al actualizar la designación en backend', error);
           alert('No se pudo generar el documento porque la actualización en el servidor falló.');
+          this.loadingService.hideModal();
           return;
         }
       }
@@ -509,6 +512,7 @@ export class TutoresHomeComponent implements OnInit {
       console.error('Error generando PDF de designado:', err);
       alert('No se pudo generar el documento PDF para este tutor.');
     } finally {
+      this.loadingService.hideModal();
       this.closeConfirmModal();
       const set = this.getSelectedStudentSet(tutor.tutor_id);
       set.clear();
