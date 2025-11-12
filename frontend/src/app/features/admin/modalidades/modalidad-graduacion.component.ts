@@ -120,7 +120,7 @@ export class ModalidadGraduacionComponent implements OnInit {
     }
 
     const modalDescripcion = this.getModalidadDescripcion();
-    const tutorNombre = this.resolvePdfTutorNombre(docData || designation);
+    const tutorNombre = this.dedupeNombreTexto(this.resolvePdfTutorNombre(docData || designation)) || this.resolvePdfTutorNombre(docData || designation);
 
     const resolveDocEstudiantes = () => {
       const candidates: any[] = [];
@@ -165,11 +165,28 @@ export class ModalidadGraduacionComponent implements OnInit {
       modalDescripcion
     ) || this.resolvePdfEstudiantes(designation, docData?.area ?? designation?.area, docData?.proyecto_nombre ?? designation?.proyecto_nombre, modalDescripcion) || [];
 
+    const estudiantesOrdenados = this.sortEstudiantesParaPdf(estudiantes);
+
     const fechaRaw = docData?.fecha_designacion || designation?.fecha_designacion || designation?.doc_fecha || new Date();
     const fechaDocumento = fechaRaw ? new Date(fechaRaw) : new Date();
 
+    const tutorApellidoP = this.resolveFirstNonEmpty(docData?.tutor_apellido_p, docData?.tutor_ap_pat, designation?.tutor_apellido_p, designation?.tutor?.apellido_p);
+    const tutorApellidoM = this.resolveFirstNonEmpty(docData?.tutor_apellido_m, docData?.tutor_ap_mat, designation?.tutor_apellido_m, designation?.tutor?.apellido_m);
+    const tutorNombres = this.resolveFirstNonEmpty(docData?.tutor_nombres, docData?.tutor_nombre_simple, designation?.tutor_nombres, designation?.tutor?.nombre);
+
+    const modalidadDoc = this.resolveFirstNonEmpty(
+      docData?.modalidad,
+      docData?.modalidad_nombre,
+      docData?.doc_modalidad,
+      designation?.modalidad_nombre,
+      modalDescripcion
+    );
+
     const documento = {
       tutorNombre,
+      tutorApellidoP: tutorApellidoP || undefined,
+      tutorApellidoM: tutorApellidoM || undefined,
+      tutorNombres: tutorNombres || undefined,
       tutorTipo: this.resolvePdfTutorTipo(docData || designation),
       tutorCi: this.resolvePdfTutorCi(docData || designation),
       tutorCelular: this.resolvePdfTutorCelular(docData || designation),
@@ -184,11 +201,13 @@ export class ModalidadGraduacionComponent implements OnInit {
       cronogramaFin: docData?.cronograma_fin || docData?.convocatoria_fecha_fin || designation?.cronograma_fin || designation?.convocatoria_fecha_fin || fechaDocumento,
       numeroDocumento: docData?.correlativo || designation?.numero_documento || correlativo,
       cite: docData?.cite || designation?.cite || undefined,
+      modalidad: modalidadDoc || undefined,
       fecha: fechaDocumento,
       lugar: 'Cochabamba',
       elaboradoPor: docData?.elaborado_por || designation?.user_name || undefined,
       cargoElaborador: 'Responsable de Modalidad de Graduación',
-      estudiantes,
+      paraNombre: tutorNombre,
+      estudiantes: estudiantesOrdenados,
     };
 
     const fileNameBase = (docData?.correlativo || correlativo || tutorNombre || 'documento').toString().replace(/\s+/g, '-').toLowerCase();
@@ -1357,18 +1376,69 @@ export class ModalidadGraduacionComponent implements OnInit {
     const fallbackFecha = (docData && docData.fecha_designacion) || designation?.fecha_designacion || undefined;
 
     return docEstudiantes.map((item: any) => {
-      const rawNombre = item?.estudiante_nombre || item?.nombre || this.estudianteNombre(item);
+      const rawNombre = this.resolveFirstNonEmpty(
+        item?.estudiante_nombre,
+        item?.nombre,
+        this.estudianteNombre(item)
+      );
       const nombre = rawNombre ? this.capitalizarPalabras(String(rawNombre)) : this.estudianteNombre(item);
+      const modalidadValor = this.resolveEstudianteModalidad(item, modalidadGeneral)
+        || this.resolveFirstNonEmpty(item?.modalidad_nombre, item?.modalidad_label, docData?.modalidad_nombre, modalidadGeneral)
+        || modalidadGeneral;
+      const areaValor = this.resolveFirstNonEmpty(
+        item?.area,
+        item?.area_nombre,
+        item?.area_label,
+        docData?.area,
+        fallbackArea
+      ) || undefined;
+      const temaValor = this.resolveFirstNonEmpty(
+        item?.tema,
+        item?.tema_proyecto,
+        item?.tema_estudiante,
+        item?.tema1,
+        item?.proyecto_tema,
+        item?.proyecto_nombre,
+        fallbackTema
+      ) || undefined;
       return {
         nombre,
         codigo: item?.cod_ceta ? String(item.cod_ceta) : undefined,
         carrera: item?.carrera || fallbackCarrera,
-        modalidad: item?.modalidad || modalidadGeneral,
-        area: item?.area || fallbackArea || undefined,
-        tema: item?.proyecto_nombre || fallbackTema || undefined,
+        modalidad: modalidadValor || undefined,
+        area: areaValor,
+        tema: temaValor,
         fechaDesignacion: item?.fecha_designacion || fallbackFecha,
       };
     });
+  }
+
+  private sortEstudiantesParaPdf(estudiantes: TutorDesignacionEstudiante[]): TutorDesignacionEstudiante[] {
+    if (!Array.isArray(estudiantes)) {
+      return [];
+    }
+    return [...estudiantes].sort((a, b) => {
+      const tokens = (value?: string) => (value || '').toLocaleLowerCase().split(/\s+/).filter(Boolean);
+      const [aPat, aMat, ...aNames] = tokens(a.nombre);
+      const [bPat, bMat, ...bNames] = tokens(b.nombre);
+      if (aPat !== bPat) return (aPat || '').localeCompare(bPat || '', 'es');
+      if (aMat !== bMat) return (aMat || '').localeCompare(bMat || '', 'es');
+      return (aNames.join(' ') || '').localeCompare(bNames.join(' ') || '', 'es');
+    });
+  }
+
+  private dedupeNombreTexto(nombre?: string | null): string | undefined {
+    if (!nombre) return undefined;
+    const tokens = nombre.split(/\s+/).filter(Boolean);
+    const seen = new Set<string>();
+    const deduped = tokens.filter(tok => {
+      const key = tok.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const result = deduped.join(' ').trim();
+    return result || undefined;
   }
 
   async descargarDocumentoDesignacion() {

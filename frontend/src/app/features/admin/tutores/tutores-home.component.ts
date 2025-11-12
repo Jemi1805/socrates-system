@@ -4,10 +4,12 @@ import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
 import { SgaService, Docente, ApiResponse, Pertinencia, TutorReg, TutorTipo, Convocatoria, TutorDesignacionItem } from '../../../shared/services/sga.service';
+import { ProyectoService } from '../proyectos/proyecto.service';
 import { PdfService } from '../../../shared/services/pdf.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { LoadingService } from '../../../core/services/loading.service';
-import { firstValueFrom, forkJoin } from 'rxjs';
+import { firstValueFrom, forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 @Component({
   selector: 'app-tutores-home',
@@ -96,6 +98,10 @@ export class TutoresHomeComponent implements OnInit {
     fecha_designacion?: string | null;
   }> = [];
 
+  private proyectoCachePorCod: Map<number, any> = new Map();
+  private proyectoCachePorId: Map<number, any> = new Map();
+  private proyectoFetchInFlight: Map<string, Promise<any | null>> = new Map();
+
   @HostListener('document:keydown.escape', ['$event'])
   onEscapeKey(_event?: Event) {
     if (this.confirmModalVisible) {
@@ -103,7 +109,7 @@ export class TutoresHomeComponent implements OnInit {
     }
   }
 
-  constructor(private sga: SgaService, private router: Router, private pdfService: PdfService, private auth: AuthService, private loadingService: LoadingService) {}
+  constructor(private sga: SgaService, private router: Router, private pdfService: PdfService, private auth: AuthService, private loadingService: LoadingService, private proyectoService: ProyectoService) {}
 
   ngOnInit(): void {
     this.loadTutorTipos();
@@ -180,21 +186,300 @@ export class TutoresHomeComponent implements OnInit {
   }
 
   private normalizeEstudianteData(est: any) {
-    const modalidad = this.resolveFirstNonEmpty(est?.modalidad, est?.modalidad_nombre, est?.modalidad_label);
-    const area = this.resolveFirstNonEmpty(est?.area, est?.area_nombre, est?.area_label);
-    const proyecto = this.resolveFirstNonEmpty(est?.proyecto_nombre, est?.tema, est?.tema_registro);
+    const modalidad = this.resolveFirstNonEmpty(
+      est?.modalidad,
+      est?.modalidad_nombre,
+      est?.modalidad_label,
+      est?.modalidad_est,
+      est?.modalidad_estudiante,
+      est?.doc_modalidad
+    );
+    const area = this.resolveFirstNonEmpty(est?.area, est?.area_nombre, est?.area_label, est?.pertinencia);
+    const proyecto = this.resolveFirstNonEmpty(
+      est?.proyecto_nombre,
+      est?.tema,
+      est?.tema_registro,
+      est?.tema_proyecto,
+      est?.tema_estudiante,
+      est?.tema1,
+      est?.proyecto_tema
+    );
     const fechaDesignacion = est?.fecha_designacion ? new Date(est.fecha_designacion) : null;
     const codCetaRaw = Number(est?.cod_ceta ?? 0);
 
+    let apellidoP = this.resolveFirstNonEmpty(est?.apellido_p, est?.ap_pat, est?.apellidoPaterno, est?.primer_apellido);
+    let apellidoM = this.resolveFirstNonEmpty(est?.apellido_m, est?.ap_mat, est?.apellidoMaterno, est?.segundo_apellido);
+    let nombres = this.resolveFirstNonEmpty(est?.nombres, est?.nombre, est?.nombres_est, est?.nombres_estudiante);
+
+    const nombreCompuesto = this.resolveFirstNonEmpty(
+      est?.estudiante_nombre,
+      est?.nombre_completo,
+      est?.nombre,
+      est?.nombre_estudiante
+    );
+
+    if (!apellidoP || !apellidoM || !nombres) {
+      if (nombreCompuesto) {
+        const parts = this.splitNombreCompleto(nombreCompuesto);
+        apellidoP = apellidoP || parts.apellidoP || '';
+        apellidoM = apellidoM || parts.apellidoM || '';
+        nombres = nombres || parts.nombres || '';
+      }
+    }
+
+    apellidoP = this.sanitizeNombreSegment(apellidoP);
+    apellidoM = this.sanitizeNombreSegment(apellidoM);
+    nombres = this.sanitizeNombreSegment(nombres);
+    const fallbackNombre = this.sanitizeNombreCompleto(nombreCompuesto);
+
+    if (apellidoP && apellidoM && apellidoP.toLocaleLowerCase() === apellidoM.toLocaleLowerCase() && fallbackNombre) {
+      const parts = this.splitNombreCompleto(fallbackNombre);
+      apellidoP = this.sanitizeNombreSegment(parts.apellidoP) || apellidoP;
+      apellidoM = this.sanitizeNombreSegment(parts.apellidoM) || apellidoM;
+      nombres = this.sanitizeNombreSegment(parts.nombres) || nombres;
+    }
+
+    if ((!apellidoP || !apellidoM) && fallbackNombre) {
+      const parts = this.splitNombreCompleto(fallbackNombre);
+      apellidoP = apellidoP || this.sanitizeNombreSegment(parts.apellidoP);
+      apellidoM = apellidoM || this.sanitizeNombreSegment(parts.apellidoM);
+      nombres = nombres || this.sanitizeNombreSegment(parts.nombres);
+    }
+
+    let nombreCompleto = this.formatNombreCompleto(
+      apellidoP,
+      apellidoM,
+      nombres,
+      fallbackNombre || (this.resolveFirstNonEmpty(est?.estudiante_nombre, est?.nombre, est?.nombre_completo) || '-').toString()
+    );
+    nombreCompleto = this.dedupeNombreCompleto(nombreCompleto) || nombreCompleto;
+
     return {
       cod_ceta: Number.isFinite(codCetaRaw) ? codCetaRaw : 0,
-      nombre: (est?.estudiante_nombre || '-').toString(),
+      nombre: nombreCompleto,
+      apellidoP: apellidoP ? apellidoP.toString() : '',
+      apellidoM: apellidoM ? apellidoM.toString() : '',
+      nombres: nombres ? nombres.toString() : '',
       modalidad,
       area,
       tema: proyecto,
       fechaDesignacion,
       raw: est,
     };
+  }
+
+  private resolveEstudianteModalidadFromRaw(raw: any): string | undefined {
+    if (!raw) return undefined;
+    return this.resolveFirstNonEmpty(
+      raw?.modalidad,
+      raw?.modalidad_nombre,
+      raw?.modalidad_label,
+      raw?.modalidad_id ? this.lookupModalidadNombre(raw.modalidad_id) : null
+    ) || undefined;
+  }
+
+  private lookupModalidadNombre(modalidadId: number | string | null | undefined): string | null {
+    if (modalidadId === null || modalidadId === undefined) return null;
+    const idNum = Number(modalidadId);
+    if (!Number.isFinite(idNum)) return null;
+    const map: Record<number, string> = {
+      1: 'Proyecto de Grado',
+      2: 'Proyecto Sociocomunitario Productivo',
+      3: 'Proyecto de Emprendimiento Productivo',
+      4: 'Trabajo Dirigido Externo',
+      5: 'Graduación por Experiencia Laboral',
+      6: 'Graduación por Excelencia Académica',
+    };
+    return map[idNum] || null;
+  }
+
+  private resolveEstudianteCarreraFromRaw(raw: any, tutor: TutorDesignacionItem): string | undefined {
+    return this.resolveFirstNonEmpty(
+      raw?.carrera,
+      raw?.carrera_nombre,
+      raw?.carrera_label,
+      raw?.carrera_estudiante,
+      tutor.carrera_nombre,
+      tutor.cod_carrera
+    ) || undefined;
+  }
+
+  private resolveEstudianteAreaFromRaw(raw: any, tutorArea?: string | null, fallbackArea?: string | null): string | undefined {
+    return this.resolveFirstNonEmpty(
+      raw?.area,
+      raw?.area_nombre,
+      raw?.area_label,
+      raw?.pertinencia,
+      fallbackArea,
+      tutorArea
+    ) || undefined;
+  }
+
+  private resolveEstudianteTemaFromRaw(raw: any, fallbackTema?: string | null): string | undefined {
+    return this.resolveFirstNonEmpty(
+      raw?.proyecto_nombre,
+      raw?.tema,
+      raw?.tema_registro,
+      raw?.tema_proyecto,
+      raw?.tema_estudiante,
+      raw?.tema1,
+      raw?.proyecto_tema,
+      fallbackTema
+    ) || undefined;
+  }
+
+  private extractResumenFromDocData(docData: any): any[] {
+    if (!docData) {
+      return [];
+    }
+    const candidates: any[] = [];
+
+    const pushCandidate = (value: any) => {
+      if (!value) return;
+      if (Array.isArray(value)) {
+        if (value.length) {
+          candidates.push(value);
+        }
+        return;
+      }
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed) && parsed.length) {
+            candidates.push(parsed);
+          }
+        } catch {
+          // ignorar valores string no parseables
+        }
+      }
+    };
+
+    pushCandidate(docData.doc_estudiantes_resumen);
+    pushCandidate(docData.estudiantes_resumen);
+    pushCandidate(docData.estudiantes);
+
+    return candidates.flat().filter(Boolean);
+  }
+
+  private buildResumenLookup(resumen: any[]): Map<number, any> {
+    const map = new Map<number, any>();
+    if (!Array.isArray(resumen)) {
+      return map;
+    }
+    resumen.forEach((item) => {
+      if (!item) return;
+      const codRaw = item.cod_ceta ?? item.codCeta ?? item.codigo ?? item.codigo_ceta ?? item.cod;
+      const cod = Number(codRaw);
+      if (!Number.isFinite(cod)) {
+        return;
+      }
+      if (!map.has(cod)) {
+        map.set(cod, item);
+      }
+    });
+    return map;
+  }
+
+  private sanitizeNombreSegment(value?: string | null): string {
+    if (!value) {
+      return '';
+    }
+    const trimmed = value.toString().trim();
+    if (!trimmed) {
+      return '';
+    }
+    return trimmed.replace(/\s+/g, ' ');
+  }
+
+  private sanitizeNombreCompleto(value?: string | null): string | undefined {
+    if (!value) return undefined;
+    const tokens = value.split(/\s+/).filter(Boolean);
+    if (!tokens.length) return undefined;
+    const seen = new Set<string>();
+    const deduped = tokens.filter(tok => {
+      const key = tok.toLowerCase();
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+    const result = deduped.join(' ').trim();
+    return result || undefined;
+  }
+
+  private compareEstudiantesByNombre(a: { apellidoP?: string; apellidoM?: string; nombres?: string; nombre?: string }, b: { apellidoP?: string; apellidoM?: string; nombres?: string; nombre?: string }): number {
+    const pA = (a.apellidoP || '').toLocaleLowerCase();
+    const pB = (b.apellidoP || '').toLocaleLowerCase();
+    if (pA !== pB) {
+      return pA.localeCompare(pB, 'es');
+    }
+    const mA = (a.apellidoM || '').toLocaleLowerCase();
+    const mB = (b.apellidoM || '').toLocaleLowerCase();
+    if (mA !== mB) {
+      return mA.localeCompare(mB, 'es');
+    }
+    const nA = (a.nombres || a.nombre || '').toLocaleLowerCase();
+    const nB = (b.nombres || b.nombre || '').toLocaleLowerCase();
+    return nA.localeCompare(nB, 'es');
+  }
+
+  private formatNombreCompleto(apellidoP?: string | null, apellidoM?: string | null, nombres?: string | null, fallback: string = '-'): string {
+    const parts = [apellidoP, apellidoM, nombres]
+      .map(seg => (seg || '').toString().trim())
+      .filter(seg => seg.length > 0);
+    const texto = parts.join(' ').trim();
+    if (texto.length) {
+      return texto;
+    }
+    return (fallback || '-').toString();
+  }
+
+  private splitNombreCompleto(nombre?: string | null): { apellidoP: string; apellidoM: string; nombres: string } {
+    if (!nombre) {
+      return { apellidoP: '', apellidoM: '', nombres: '' };
+    }
+    const tokens = nombre.split(/\s+/).filter(Boolean);
+    if (!tokens.length) {
+      return { apellidoP: '', apellidoM: '', nombres: '' };
+    }
+    if (tokens.length === 1) {
+      return { apellidoP: tokens[0], apellidoM: '', nombres: '' };
+    }
+    const apellidoP = tokens[0];
+    const apellidoM = tokens[1];
+    const nombres = tokens.slice(2).join(' ');
+    return { apellidoP, apellidoM, nombres };
+  }
+
+  private resolveNombreParts(
+    normalized: { apellidoP?: string; apellidoM?: string; nombres?: string; nombre?: string } | null,
+    fallbackNombre: string
+  ): { apellidoP: string; apellidoM: string; nombres: string } {
+    let apellidoP = normalized?.apellidoP || '';
+    let apellidoM = normalized?.apellidoM || '';
+    let nombres = normalized?.nombres || '';
+    if (!apellidoP || !apellidoM || !nombres) {
+      const parsed = this.splitNombreCompleto(fallbackNombre);
+      apellidoP = apellidoP || parsed.apellidoP;
+      apellidoM = apellidoM || parsed.apellidoM;
+      nombres = nombres || parsed.nombres;
+    }
+    return { apellidoP, apellidoM, nombres };
+  }
+
+  private dedupeNombreCompleto(nombre?: string | null): string | undefined {
+    if (!nombre) return undefined;
+    const tokens = nombre.split(/\s+/).filter(Boolean);
+    const seen = new Set<string>();
+    const deduped = tokens.filter(tok => {
+      const key = tok.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const result = deduped.join(' ').trim();
+    return result || undefined;
   }
 
   isDocumentoGenerado(est?: { documento_generado?: unknown; fecha_designacion?: unknown } | null): boolean {
@@ -364,8 +649,9 @@ export class TutoresHomeComponent implements OnInit {
       return;
     }
     const normalizados = estudiantes.map(est => this.normalizeEstudianteData(est));
+    const ordenados = normalizados.sort((a, b) => this.compareEstudiantesByNombre(a, b));
     this.confirmModalTutor = tutor;
-    this.confirmModalEstudiantes = normalizados.map((n) => ({
+    this.confirmModalEstudiantes = ordenados.map((n) => ({
       cod_ceta: n.cod_ceta,
       nombre: n.nombre,
       modalidad: n.modalidad,
@@ -430,16 +716,10 @@ export class TutoresHomeComponent implements OnInit {
         }
       }
 
-      const normalizados = estudiantesSeleccionados.map(est => {
-        const normalized = this.normalizeEstudianteData(est);
-        const respData = responseDataByCod.get(Number(est.cod_ceta));
-        if (respData?.fecha_designacion) {
-          normalized.fechaDesignacion = new Date(respData.fecha_designacion);
-        }
-        return normalized;
-      });
+      let docData: any = null;
 
       const primaryData = responseDataByCod.values().next().value || null;
+
       if (primaryData) {
         const numeroDocumento = this.normalizeNumeroDocumento(primaryData.numero_documento ?? primaryData.doc_correlativo ?? primaryData.correlativo);
         if (numeroDocumento) {
@@ -455,6 +735,64 @@ export class TutoresHomeComponent implements OnInit {
         tutor.cronograma_fin = this.resolveFirstNonEmpty(primaryData.cronograma_fin, tutor.cronograma_fin);
         tutor.area = this.resolveFirstNonEmpty(primaryData.area, tutor.area ?? null);
       }
+
+      const correlativoBusqueda = this.resolveFirstNonEmpty(
+        primaryData?.doc_correlativo,
+        primaryData?.correlativo,
+        primaryData?.numero_documento,
+        primaryData?.numeroDocumento,
+        tutor.numero_documento,
+        (tutor as any)?.doc_correlativo
+      );
+
+      if (correlativoBusqueda) {
+        try {
+          const correlativoParam = this.normalizeNumeroDocumento(correlativoBusqueda) || correlativoBusqueda;
+          const respDoc = await firstValueFrom(this.sga.getDocDesignacionesByCorrelativo(correlativoParam));
+          docData = (respDoc as any)?.data ?? respDoc ?? null;
+        } catch (err) {
+          console.warn('No se pudo obtener el documento consolidado para el correlativo', correlativoBusqueda, err);
+        }
+      }
+
+      if (docData) {
+        const numeroDoc = this.normalizeNumeroDocumento(docData.correlativo ?? docData.numero_documento ?? correlativoBusqueda ?? tutor.numero_documento);
+        if (numeroDoc) {
+          tutor.numero_documento = numeroDoc;
+        }
+        const citeDoc = this.resolveFirstNonEmpty(docData.cite, tutor.cite);
+        if (citeDoc) {
+          tutor.cite = citeDoc;
+        }
+        tutor.area = this.resolveFirstNonEmpty(docData.area, docData.designacion_area, tutor.area ?? null);
+        tutor.convocatoria_fecha_inicio = this.resolveFirstNonEmpty(docData.convocatoria_fecha_inicio, tutor.convocatoria_fecha_inicio);
+        tutor.convocatoria_fecha_fin = this.resolveFirstNonEmpty(docData.convocatoria_fecha_fin, tutor.convocatoria_fecha_fin);
+        tutor.cronograma_inicio = this.resolveFirstNonEmpty(docData.cronograma_inicio, tutor.cronograma_inicio);
+        tutor.cronograma_fin = this.resolveFirstNonEmpty(docData.cronograma_fin, tutor.cronograma_fin);
+      }
+
+      const resumenDocLookup = this.buildResumenLookup(this.extractResumenFromDocData(docData));
+
+      const normalizados = estudiantesSeleccionados.map(est => {
+        const cod = Number(est.cod_ceta);
+        const respData = responseDataByCod.get(cod);
+        const docItem = resumenDocLookup.get(cod) || {};
+        const merged = {
+          ...(est || {}),
+          ...(respData || {}),
+          ...(docItem || {}),
+        };
+        const normalized = this.normalizeEstudianteData(merged);
+        if (respData?.fecha_designacion) {
+          normalized.fechaDesignacion = new Date(respData.fecha_designacion);
+        } else if (docItem?.fecha_designacion) {
+          const fechaDoc = new Date(docItem.fecha_designacion as any);
+          if (!Number.isNaN(fechaDoc.getTime())) {
+            normalized.fechaDesignacion = fechaDoc;
+          }
+        }
+        return normalized;
+      }).sort((a, b) => this.compareEstudiantesByNombre(a, b));
 
       const fechaDocumento = normalizados[0]?.fechaDesignacion
         || (primaryData?.fecha_designacion ? new Date(primaryData.fecha_designacion) : new Date());
@@ -476,35 +814,66 @@ export class TutoresHomeComponent implements OnInit {
         match.documento_generado = true;
       }
 
+      const modalidadGeneral = this.resolveFirstNonEmpty(
+        docData?.modalidad,
+        docData?.modalidad_nombre,
+        docData?.doc_modalidad,
+        primaryData?.modalidad,
+        primaryData?.modalidad_nombre,
+        normalizados[0]?.modalidad,
+        this.resolveEstudianteModalidadFromRaw(normalizados[0]?.raw)
+      ) || undefined;
+
+      const tutorDisplayName = this.dedupeNombreCompleto(
+        this.resolveFirstNonEmpty(docData?.doc_para_nombre, docData?.tutor_nombre, primaryData?.tutor_nombre, tutor.tutor_nombre)
+      ) || tutor.tutor_nombre;
+
+      const paraNombre = this.dedupeNombreCompleto(
+        this.resolveFirstNonEmpty(docData?.doc_para_nombre, tutorDisplayName)
+      ) || tutorDisplayName;
+
       await this.pdfService.generarDesignacionTutorPdf({
-        tutorNombre: tutor.tutor_nombre,
+        tutorNombre: tutorDisplayName,
         tutorTipo: tutor.tipo_tutor_nombre || undefined,
         tutorCi: tutor.tutor_ci || undefined,
         tutorCelular: tutor.tutor_celular || undefined,
         tutorTitulo: tutor.tutor_titulo || undefined,
         tutorTituloAcademico: tutor.tutor_titulo_academico || undefined,
-        area: tutor.area || tutor.tutor_titulo || undefined,
-        carrera: tutor.carrera_nombre || tutor.cod_carrera || undefined,
+        area: docData?.area || docData?.designacion_area || tutor.area || tutor.tutor_titulo || undefined,
+        carrera: docData?.carrera_nombre || docData?.carrera || tutor.carrera_nombre || tutor.cod_carrera || undefined,
         convocatoria: tutor.convocatoria_label || undefined,
         convocatoriaFechaInicio: tutor.convocatoria_fecha_inicio || undefined,
         convocatoriaFechaFin: tutor.convocatoria_fecha_fin || undefined,
-        cronogramaInicio: tutor.cronograma_inicio || tutor.convocatoria_fecha_inicio || fechaDocumento,
-        cronogramaFin: tutor.cronograma_fin || tutor.convocatoria_fecha_fin || fechaDocumento,
+        cronogramaInicio: docData?.cronograma_inicio || tutor.cronograma_inicio || tutor.convocatoria_fecha_inicio || fechaDocumento,
+        cronogramaFin: docData?.cronograma_fin || tutor.cronograma_fin || tutor.convocatoria_fecha_fin || fechaDocumento,
+        modalidad: modalidadGeneral,
+        paraNombre,
         fecha: fechaDocumento,
         lugar: 'Cochabamba',
-        numeroDocumento: tutor.numero_documento || undefined,
-        cite: tutor.cite || undefined,
-        elaboradoPor: userNombre,
+        numeroDocumento: tutor.numero_documento || docData?.correlativo || undefined,
+        cite: tutor.cite || docData?.cite || undefined,
+        elaboradoPor: docData?.elaborado_por || userNombre,
         cargoElaborador: 'Responsable de Modalidad de Graduación',
-        estudiantes: normalizados.map((est) => ({
-          nombre: est.nombre || '-',
-          codigo: est.cod_ceta ? String(est.cod_ceta) : undefined,
-          carrera: tutor.carrera_nombre || tutor.cod_carrera || undefined,
-          modalidad: est.modalidad || undefined,
-          area: est.area || undefined,
-          tema: est.tema || undefined,
-          fechaDesignacion: est.fechaDesignacion || fechaDocumento,
-        })),
+        estudiantes: normalizados.map((est) => {
+          const raw = (est && est.raw) ? est.raw as any : {};
+          const mergedRaw = { ...(docData || {}), ...raw };
+          return {
+            nombre: est.nombre || '-',
+            codigo: est.cod_ceta ? String(est.cod_ceta) : undefined,
+            carrera: this.resolveEstudianteCarreraFromRaw(mergedRaw, tutor)
+              || docData?.carrera_nombre
+              || docData?.carrera
+              || tutor.carrera_nombre
+              || tutor.cod_carrera
+              || undefined,
+            modalidad: this.resolveEstudianteModalidadFromRaw(mergedRaw)
+              || est.modalidad
+              || modalidadGeneral,
+            area: this.resolveEstudianteAreaFromRaw(mergedRaw, docData?.area || tutor.area, est.area) || undefined,
+            tema: this.resolveEstudianteTemaFromRaw(mergedRaw, est.tema || raw?.tema || raw?.proyecto_nombre || (docData as any)?.proyecto_nombre) || undefined,
+            fechaDesignacion: est.fechaDesignacion || raw?.fecha_designacion || fechaDocumento,
+          };
+        }),
       }, {
         fileName: `designacion-${tutor.tutor_nombre.replace(/\s+/g, '-').toLowerCase()}.pdf`
       });

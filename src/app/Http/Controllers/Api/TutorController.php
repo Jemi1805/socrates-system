@@ -1103,6 +1103,8 @@ class TutorController extends Controller
         $query = DB::table('designacion_tutor as dt')
             ->where('dt.tutor_id', $tutorId)
             ->join('postulantes as p', 'dt.cod_ceta', '=', 'p.cod_ceta')
+            ->leftJoin('proyecto as pr', 'dt.proyecto_id', '=', 'pr.id')
+            ->leftJoin('inscrip_modalidad as im', 'pr.inscrip_modalidad_id', '=', 'im.id')
             ->select(
                 'dt.id as designacion_id',
                 'dt.cod_ceta',
@@ -1110,7 +1112,10 @@ class TutorController extends Controller
                 'dt.proyecto_id',
                 'dt.convocatoria_id',
                 'dt.fecha_designacion',
-                'dt.created_at'
+                'dt.created_at',
+                'pr.nombre as proyecto_nombre',
+                'pr.tipo as proyecto_modalidad',
+                'im.modalidad_nom as inscripcion_modalidad_nom'
             )
             ->whereNotNull('dt.fecha_designacion');
 
@@ -1127,12 +1132,39 @@ class TutorController extends Controller
         }
 
         return $rows->map(function ($item) {
-            return [
+            $tema = null;
+            if (isset($item->proyecto_nombre) && trim($item->proyecto_nombre) !== '') {
+                $tema = trim($item->proyecto_nombre);
+            }
+
+            $modalidad = null;
+            $modalidadCandidates = [
+                isset($item->proyecto_modalidad) ? $item->proyecto_modalidad : null,
+                isset($item->inscripcion_modalidad_nom) ? $item->inscripcion_modalidad_nom : null,
+            ];
+            foreach ($modalidadCandidates as $candidate) {
+                if ($candidate !== null && trim((string) $candidate) !== '') {
+                    $modalidad = trim((string) $candidate);
+                    break;
+                }
+            }
+
+            $payload = [
                 'designacion_id' => (int) $item->designacion_id,
                 'cod_ceta' => $item->cod_ceta,
                 'nombre' => $item->nombre,
                 'proyecto_id' => $item->proyecto_id !== null ? (int) $item->proyecto_id : null,
             ];
+
+            if ($tema !== null) {
+                $payload['proyecto_nombre'] = $tema;
+            }
+            if ($modalidad !== null) {
+                $payload['modalidad'] = $modalidad;
+                $payload['modalidad_nombre'] = $modalidad;
+            }
+
+            return $payload;
         })->toArray();
     }
 
@@ -1146,11 +1178,16 @@ class TutorController extends Controller
                     'proyecto_id' => array_key_exists('proyecto_id', $row) && $row['proyecto_id'] !== null
                         ? (string) $row['proyecto_id']
                         : '',
+                    'modalidad' => isset($row['modalidad']) ? trim((string) $row['modalidad']) : '',
+                    'proyecto_nombre' => isset($row['proyecto_nombre']) ? trim((string) $row['proyecto_nombre']) : '',
                 ];
             }, $items);
 
             usort($normalized, function ($a, $b) {
-                return strcmp($a['cod_ceta'] . '|' . $a['proyecto_id'], $b['cod_ceta'] . '|' . $b['proyecto_id']);
+                return strcmp(
+                    $a['cod_ceta'] . '|' . $a['proyecto_id'] . '|' . $a['modalidad'] . '|' . $a['proyecto_nombre'],
+                    $b['cod_ceta'] . '|' . $b['proyecto_id'] . '|' . $b['modalidad'] . '|' . $b['proyecto_nombre']
+                );
             });
 
             return $normalized;
