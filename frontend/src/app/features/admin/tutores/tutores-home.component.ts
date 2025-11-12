@@ -186,13 +186,18 @@ export class TutoresHomeComponent implements OnInit {
   }
 
   private normalizeEstudianteData(est: any) {
-    const modalidad = this.resolveFirstNonEmpty(
-      est?.modalidad,
-      est?.modalidad_nombre,
-      est?.modalidad_label,
-      est?.modalidad_est,
-      est?.modalidad_estudiante,
-      est?.doc_modalidad
+    const modalidad = this.sanitizeNombreSegment(
+      this.resolveFirstNonEmpty(
+        est?.proyecto_tipo,
+        est?.modalidad,
+        est?.modalidad_nombre,
+        est?.proyecto_modalidad,
+        est?.inscripcion_modalidad_nom,
+        est?.modalidad_label,
+        est?.modalidad_est,
+        est?.modalidad_estudiante,
+        est?.doc_modalidad
+      )
     );
     const area = this.resolveFirstNonEmpty(est?.area, est?.area_nombre, est?.area_label, est?.pertinencia);
     const proyecto = this.resolveFirstNonEmpty(
@@ -273,6 +278,9 @@ export class TutoresHomeComponent implements OnInit {
     return this.resolveFirstNonEmpty(
       raw?.modalidad,
       raw?.modalidad_nombre,
+      raw?.proyecto_modalidad,
+      raw?.proyecto_tipo,
+      raw?.inscripcion_modalidad_nom,
       raw?.modalidad_label,
       raw?.modalidad_id ? this.lookupModalidadNombre(raw.modalidad_id) : null
     ) || undefined;
@@ -828,9 +836,30 @@ export class TutoresHomeComponent implements OnInit {
         this.resolveFirstNonEmpty(docData?.doc_para_nombre, docData?.tutor_nombre, primaryData?.tutor_nombre, tutor.tutor_nombre)
       ) || tutor.tutor_nombre;
 
-      const paraNombre = this.dedupeNombreCompleto(
+      const paraNombreBase = this.dedupeNombreCompleto(
         this.resolveFirstNonEmpty(docData?.doc_para_nombre, tutorDisplayName)
       ) || tutorDisplayName;
+
+      const academicCargoRaw = this.resolveFirstNonEmpty(
+        docData?.tutor_titulo_academico,
+        primaryData?.tutor_titulo_academico,
+        tutor.tutor_titulo_academico,
+        (tutor as any)?.titulo_academico,
+      );
+      const academicCargo = this.sanitizeNombreSegment(
+        academicCargoRaw !== undefined && academicCargoRaw !== null ? String(academicCargoRaw) : ''
+      );
+
+      const cargoSegment = academicCargo ? academicCargo.toUpperCase() : 'DOCENTE TÉCNICO';
+      const paraCargo = 'DOCENTE TÉCNICO';
+      const nombreSegment = paraNombreBase ? paraNombreBase.replace(/\s+/g, ' ').trim() : '';
+      const paraNombre = nombreSegment
+        ? (nombreSegment.toUpperCase().startsWith(cargoSegment)
+          ? nombreSegment
+          : `${cargoSegment} ${nombreSegment}`)
+        : cargoSegment;
+
+      const fechaGeneracion = new Date();
 
       await this.pdfService.generarDesignacionTutorPdf({
         tutorNombre: tutorDisplayName,
@@ -848,7 +877,9 @@ export class TutoresHomeComponent implements OnInit {
         cronogramaFin: docData?.cronograma_fin || tutor.cronograma_fin || tutor.convocatoria_fecha_fin || fechaDocumento,
         modalidad: modalidadGeneral,
         paraNombre,
+        paraCargo,
         fecha: fechaDocumento,
+        fechaGeneracion,
         lugar: 'Cochabamba',
         numeroDocumento: tutor.numero_documento || docData?.correlativo || undefined,
         cite: tutor.cite || docData?.cite || undefined,

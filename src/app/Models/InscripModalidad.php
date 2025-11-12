@@ -47,6 +47,25 @@ class InscripModalidad extends Model
                 $model->modalidad_nom = null;
             }
         });
+
+        static::saved(function (self $model) {
+            $modalidadNombre = $model->modalidad_nom ? trim((string) $model->modalidad_nom) : null;
+
+            Proyecto::withoutEvents(function () use ($model, $modalidadNombre) {
+                $updates = [
+                    'tipo' => $modalidadNombre,
+                    'inscrip_modalidad_id' => $model->id,
+                ];
+
+                Proyecto::where('inscrip_modalidad_id', $model->id)->update($updates);
+
+                if (!empty($model->cod_ceta_est)) {
+                    Proyecto::whereNull('inscrip_modalidad_id')
+                        ->where('cod_ceta', (string) $model->cod_ceta_est)
+                        ->update($updates);
+                }
+            });
+        });
     }
 
     public function modalidad()

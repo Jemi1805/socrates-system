@@ -58,6 +58,7 @@ export interface TutorDesignacionPdfData {
   responsabilidades?: string[];
   pieNotas?: string[];
   estudiantes?: TutorDesignacionEstudiante[];
+  fechaGeneracion?: string | Date;
 }
 
 export interface TutorDesignacionEstudiante {
@@ -637,7 +638,21 @@ export class PdfService {
       const numero = normalizeNumber(data.numeroDocumento);
       return isMemorandum ? `CETA/DA/MEM/${year}/${numero}` : `CETA/DA/COMINT/${year}/${numero}`;
     })();
-    const tutorTitle = 'DOCENTE TÉCNICO';
+    const paraCargoResolved = (() => {
+      const raw = (data.paraCargo || '').toString().trim();
+      if (raw) {
+        return raw;
+      }
+      const tutorTitleFallback = (data.tutorTitulo || data.tutorTituloAcademico || '').toString().trim();
+      if (tutorTitleFallback) {
+        return tutorTitleFallback;
+      }
+      const tipoTutor = (data.tutorTipo || '').toString().trim();
+      if (tipoTutor) {
+        return tipoTutor;
+      }
+      return 'DOCENTE TÉCNICO';
+    })();
 
     const buildParaNombre = (): string | null => {
       const tituloAcadRaw = (data.tutorTituloAcademico || '').toString().trim();
@@ -773,7 +788,8 @@ export class PdfService {
       const infoX = headerOffsetX + headerWidth - infoWidth;
       const infoY = headerOffsetY;
       const infoRowHeight = headerHeight / 3;
-      const fechaTexto = formatDateShort(data.fecha, formatDateShort(new Date(), ''));
+      const fechaFuente = data.fechaGeneracion ?? data.fecha;
+      const fechaTexto = formatDateShort(fechaFuente, formatDateShort(new Date(), ''));
       const citeTexto = citeValue;
       const total = Math.max(totalPages, pageIndex);
       const hojaTexto = `${pageIndex} de ${total}`;
@@ -957,7 +973,7 @@ export class PdfService {
     // Sección "Para"
     if (resolvedParaNombre) {
       const indent = drawLabelValue('Para:', resolvedParaNombre, { uppercase: false, boldValue: false, labelWidthOverride: 24, tabStop: 25, labelBold: true, rightMargin: labelRightMargin });
-      const cargoLineRaw = tutorTitle;
+      const cargoLineRaw = paraCargoResolved;
       const cargoLine = cargoLineRaw.replace(/\s+/g, ' ').trim();
       if (cargoLine) {
         drawLabelValue('', cargoLine.toUpperCase(), { uppercase: false, boldValue: true, indent, tabStop: 0, labelBold: false, rightMargin: labelRightMargin });

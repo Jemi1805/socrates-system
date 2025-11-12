@@ -759,6 +759,11 @@ export class DesignarTutorComponent implements OnInit {
     this.generatingPdf = true;
     try {
       const modalidadGeneral = this.modalidadNombre || 'Proyecto de Grado';
+      const paraCargo = (designation?.doc_para_cargo
+        || designation?.tutor_cargo
+        || (tutor as any)?.cargo
+        || (tutor as any)?.tipo_tutor_nombre
+        || 'DOCENTE TÉCNICO')?.toString().trim();
       await this.pdfService.generarDesignacionTutorPdf({
         tutorNombre,
         tutorApellidoP: tutor?.apellido_p || undefined,
@@ -781,9 +786,10 @@ export class DesignarTutorComponent implements OnInit {
         numeroDocumento: (designation?.numero_documento ?? numeroDocumento ?? null)?.toString() || undefined,
         cite: designation?.cite || this.lastDesignation?.cite || undefined,
         fecha: new Date().toISOString(),
+        fechaGeneracion: new Date().toISOString(),
         formatoCodigo: '«F3»',
         paraNombre: undefined,
-        paraCargo: 'DOCENTE TÉCNICO',
+        paraCargo: paraCargo || 'DOCENTE TÉCNICO',
         deNombre: 'Ing. Bradley Jailita Burgoa',
         deCargo: 'DIRECTOR ACADÉMICO',
         asunto: 'Designación como tutor para proyectos de defensa de grado',

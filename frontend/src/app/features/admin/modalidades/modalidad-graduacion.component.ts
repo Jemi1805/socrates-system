@@ -246,6 +246,10 @@ export class ModalidadGraduacionComponent implements OnInit {
 
   private resolveEstudianteModalidad(est: any, modalidadGeneral?: string | null): string | undefined {
     const candidates: Array<any> = [
+      est?.proyecto?.tipo,
+      est?.proyecto?.modalidad,
+      est?.proyecto_tipo,
+      est?.proyecto_modalidad,
       est?.modalidad,
       est?.modalidad_nombre,
       est?.modalidad_nom,
@@ -1018,7 +1022,7 @@ export class ModalidadGraduacionComponent implements OnInit {
       }
     });
 
-    // 2) Búsqueda en DB local por CETA exacto (usar string, sin convertir a número)
+    // 2) Búsqueda local por CETA exacto (usar string, sin convertir a número)
     const codStr = (this.codigoCeta || '').trim();
     if (codStr) {
       this.postulanteService.getById(codStr as any).subscribe({
@@ -1515,11 +1519,7 @@ export class ModalidadGraduacionComponent implements OnInit {
     const modalidad = this.inscripcionActual
       ? { id: this.inscripcionActual.modalidad_id, nombre: this.inscripcionActual.nombre, descripcion: '', monto_arancel: '' }
       : null;
-    const datosPostulacion = {
-      estudiante: this.estudiante,
-      modalidad: modalidad,
-      last_designation: this.lastDesignation
-    };
+    const datosPostulacion = { estudiante: this.estudiante, modalidad, last_designation: this.lastDesignation };
     try {
       sessionStorage.setItem('datos_postulacion', JSON.stringify(datosPostulacion));
     } catch {}
