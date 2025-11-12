@@ -173,6 +173,22 @@ export class ModalidadGraduacionComponent implements OnInit {
     const tutorApellidoP = this.resolveFirstNonEmpty(docData?.tutor_apellido_p, docData?.tutor_ap_pat, designation?.tutor_apellido_p, designation?.tutor?.apellido_p);
     const tutorApellidoM = this.resolveFirstNonEmpty(docData?.tutor_apellido_m, docData?.tutor_ap_mat, designation?.tutor_apellido_m, designation?.tutor?.apellido_m);
     const tutorNombres = this.resolveFirstNonEmpty(docData?.tutor_nombres, docData?.tutor_nombre_simple, designation?.tutor_nombres, designation?.tutor?.nombre);
+    const tutorTituloAcademico = this.resolvePdfTutorTituloAcademico(docData || designation);
+    const tutorNombreNormalizado = this.dedupeNombreTexto(tutorNombre) || tutorNombre;
+    const cargoAcademico = (tutorTituloAcademico || '').toString().trim();
+    const cargoSegmento = (() => {
+      if (!cargoAcademico) {
+        return 'DOCENTE TÉCNICO';
+      }
+      const cleaned = cargoAcademico.replace(/\s+/g, ' ').trim().toUpperCase();
+      return cleaned.endsWith('.') ? cleaned : `${cleaned}.`;
+    })();
+    const paraCargo = 'DOCENTE TÉCNICO';
+    const nombrePara = tutorNombreNormalizado
+      ? (tutorNombreNormalizado.toUpperCase().startsWith(cargoSegmento)
+        ? tutorNombreNormalizado
+        : `${cargoSegmento} ${tutorNombreNormalizado}`.trim())
+      : cargoSegmento;
 
     const modalidadDoc = this.resolveFirstNonEmpty(
       docData?.modalidad,
@@ -191,7 +207,7 @@ export class ModalidadGraduacionComponent implements OnInit {
       tutorCi: this.resolvePdfTutorCi(docData || designation),
       tutorCelular: this.resolvePdfTutorCelular(docData || designation),
       tutorTitulo: this.resolvePdfTutorTitulo(docData || designation),
-      tutorTituloAcademico: this.resolvePdfTutorTituloAcademico(docData || designation),
+      tutorTituloAcademico: tutorTituloAcademico || undefined,
       area: docData?.area ?? docData?.designacion_area ?? designation?.area ?? undefined,
       carrera: docData?.carrera_nombre || this.estudiante?.carrera || designation?.carrera_nombre || undefined,
       convocatoria: docData?.convocatoria_nom || designation?.convocatoria_nom || undefined,
@@ -206,7 +222,8 @@ export class ModalidadGraduacionComponent implements OnInit {
       lugar: 'Cochabamba',
       elaboradoPor: docData?.elaborado_por || designation?.user_name || undefined,
       cargoElaborador: 'Responsable de Modalidad de Graduación',
-      paraNombre: tutorNombre,
+      paraNombre: nombrePara,
+      paraCargo,
       estudiantes: estudiantesOrdenados,
     };
 
