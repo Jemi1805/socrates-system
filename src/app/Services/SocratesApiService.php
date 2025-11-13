@@ -334,11 +334,11 @@ class SocratesApiService
     {
         $slug = strtolower(trim((string) $value));
 
-        if (in_array($slug, ['mecanica', 'mecánica', 'automotriz'], true)) {
+        if (in_array($slug, ['mecanica', 'mecánica', 'automotriz', 'mea'], true)) {
             return 'mecanica';
         }
 
-        if (in_array($slug, ['electricidad', 'electrónica', 'electronica'], true)) {
+        if (in_array($slug, ['electricidad', 'electrónica', 'electronica', 'eea'], true)) {
             return 'electricidad';
         }
 
@@ -631,128 +631,94 @@ class SocratesApiService
         try {
             // Verificar que tenemos una URL configurada
             $carrera = array_search($this->currentUrl, $this->baseUrls);
-            if ($carrera === false || $carrera === null) {
-                $carrera = 'unknown';
-            }
-            Log::info('URL actual para buscar estudiante por código', [
-                'carrera' => $carrera,
-                'url' => $this->currentUrl
-            ]);
-            
-            // Probar diferentes nombres de parámetros que puede esperar el SGA
-            $params = [
-                'cod_ceta' => $codigo,
-                'codigo' => $codigo,
-                'cod_estudiante' => $codigo,
-                'estudiante' => $codigo
-            ];
-            
-            $endpoint = 'index.php/titulacion/serviciostitulacion/buscar_estudiantes_por_cod';
-            $requestUrl = $this->currentUrl . $endpoint;
-            
-            Log::info('Enviando request al SGA', [
-                'url' => $requestUrl,
-                'params' => $params
-            ]);
+            if ($carrera === false || $carrera === null) { $carrera = 'unknown'; }
+            Log::info('URL actual para buscar estudiante por código', [ 'carrera' => $carrera, 'url' => $this->currentUrl ]);
 
-            // Configuración mejorada para la solicitud HTTP
+            // Variantes de endpoints que algunos SGA exponen (con/sin index.php y con nombre legacy)
+            $candidateEndpoints = [
+                'index.php/titulacion/serviciostitulacion/buscar_estudiantes_por_cod',
+                'titulacion/serviciostitulacion/buscar_estudiantes_por_cod',
+                'index.php/titulacion/serviciostitulacion/buscar_estudiantes',
+                'titulacion/serviciostitulacion/buscar_estudiantes',
+            ];
+
+            // Variantes de parámetros aceptados por distintos despliegues del SGA
+            $paramVariants = [
+                [ 'cod_ceta' => $codigo, 'codigo' => $codigo, 'cod_estudiante' => $codigo, 'estudiante' => $codigo ],
+                [ 'criterio' => 'codigo', 'cod_ceta' => $codigo, 'codigo' => $codigo ],
+            ];
+
+            // Cliente y headers comunes
             $cookieHeader = '';
             if (!empty($this->sessionCookies)) {
-                $cookieHeader = implode('; ', array_map(function ($cookieLine) {
-                    return explode(';', $cookieLine)[0];
-                }, $this->sessionCookies));
+                $cookieHeader = implode('; ', array_map(function ($cookieLine) { return explode(';', $cookieLine)[0]; }, $this->sessionCookies));
             }
+            $slug = $this->currentCarreraSlug ?: 'default';
+            $baseForSlug = isset($this->baseUrls[$slug]) ? $this->baseUrls[$slug] : $this->currentUrl;
 
-            $httpClient = Http::asForm()
-                ->timeout(15) // Timeout aumentado
-                ->withOptions([
-                    'allow_redirects' => true, // Seguir redirecciones automáticamente
-                    'http_errors' => false, // No lanzar excepción por errores HTTP
-                    'connect_timeout' => 5 // Timeout de conexión
-                ]);
+            Log::info('Base URL seleccionada para búsqueda por código', [ 'slug' => $slug, 'base' => $baseForSlug, 'current' => $this->currentUrl ]);
 
-            $headers = [
-                'Referer' => $this->currentUrl . 'titulacion/serviciostitulacion'
-            ];
-            if ($cookieHeader !== '') {
-                $headers['Cookie'] = $cookieHeader;
-            }
+            $commonHeaders = [ 'Referer' => rtrim($baseForSlug, '/') . '/titulacion/serviciostitulacion' ];
+            if ($cookieHeader !== '') { $commonHeaders['Cookie'] = $cookieHeader; }
 
-            $response = $httpClient->withHeaders($headers)
-                ->post($requestUrl, $params);
+            foreach ($candidateEndpoints as $endpoint) {
+                $requestUrl = rtrim($baseForSlug, '/') . '/' . ltrim($endpoint, '/');
+                foreach ($paramVariants as $params) {
+                    Log::info('Intento búsqueda por código (POST)', [ 'url' => $requestUrl, 'params' => $params ]);
+                    $response = Http::asForm()
+                        ->timeout(15)
+                        ->withOptions([ 'allow_redirects' => true, 'http_errors' => false, 'connect_timeout' => 5 ])
+                        ->withHeaders($commonHeaders)
+                        ->post($requestUrl, $params);
 
-            Log::info('Respuesta del SGA', [
-                'status' => $response->status(),
-                'headers' => $response->headers(),
-                'body_preview' => substr($response->body(), 0, 500)
-            ]);
-
-            if ($response->successful()) {
-                $html = $response->body();
-                
-                if (strpos($html, 'PHP Error') !== false || strpos($html, 'Fatal error') !== false) {
-                    Log::warning('SGA devuelve errores PHP', [
-                        'codigo' => $codigo,
-                        'errors' => substr($html, 0, 1000)
-                    ]);
-                    return ['success' => false, 'message' => 'Error interno del SGA'];
-                }
-                
-                $estudiantes = $this->parseEstudiantesHtml($html);
-                
-                return [
-                    'success' => true,
-                    'data' => $estudiantes
-                ];
-            }
-
-            // Si el código es 301 o 302, probablemente se debe a un problema de redirección
-            if ($response->status() == 301 || $response->status() == 302) {
-                $redirectUrl = $response->header('Location');
-                Log::warning('SGA intentó redireccionar', [
-                    'status' => $response->status(),
-                    'redirect_to' => $redirectUrl
-                ]);
-                
-                // Intentar seguir la redirección manualmente
-                if ($redirectUrl) {
-                    Log::info('Siguiendo redirección manualmente', ['url' => $redirectUrl]);
-                    $response = Http::asForm()->timeout(15)->post($redirectUrl, $params);
-                    
                     if ($response->successful()) {
                         $html = $response->body();
-                        $estudiantes = $this->parseEstudiantesHtml($html);
-                        
-                        return [
-                            'success' => true,
-                            'data' => $estudiantes
-                        ];
+                        if (stripos($html, 'PHP Error') !== false || stripos($html, 'Fatal error') !== false) {
+                            Log::warning('SGA devolvió errores PHP (POST)', [ 'endpoint' => $endpoint ]);
+                        } else {
+                            $estudiantes = $this->parseEstudiantesHtml($html);
+                            if (!empty($estudiantes)) {
+                                return [ 'success' => true, 'data' => $estudiantes ];
+                            }
+                        }
+                    } elseif (in_array($response->status(), [301, 302])) {
+                        $redirectUrl = $response->header('Location');
+                        if ($redirectUrl) {
+                            Log::info('Siguiendo redirección (POST)', [ 'to' => $redirectUrl ]);
+                            $redir = Http::asForm()->timeout(15)->withOptions([ 'allow_redirects' => true, 'http_errors' => false ])->post($redirectUrl, $params);
+                            if ($redir->successful()) {
+                                $estudiantes = $this->parseEstudiantesHtml($redir->body());
+                                if (!empty($estudiantes)) { return [ 'success' => true, 'data' => $estudiantes ]; }
+                            }
+                        }
+                    }
+
+                    // Fallback GET
+                    Log::info('Intento búsqueda por código (GET)', [ 'url' => $requestUrl, 'params' => $params ]);
+                    $getResp = Http::timeout(15)
+                        ->withOptions([ 'allow_redirects' => true, 'http_errors' => false, 'connect_timeout' => 5 ])
+                        ->withHeaders($commonHeaders)
+                        ->get($requestUrl, $params);
+                    if ($getResp->successful()) {
+                        $html = $getResp->body();
+                        if (stripos($html, 'PHP Error') !== false || stripos($html, 'Fatal error') !== false) {
+                            Log::warning('SGA devolvió errores PHP (GET)', [ 'endpoint' => $endpoint ]);
+                        } else {
+                            $estudiantes = $this->parseEstudiantesHtml($html);
+                            if (!empty($estudiantes)) {
+                                return [ 'success' => true, 'data' => $estudiantes ];
+                            }
+                        }
                     }
                 }
             }
 
-            Log::warning('SGA buscar_estudiantes_por_cod no exitoso', [
-                'codigo' => $codigo,
-                'status' => $response->status(),
-                'headers' => $response->headers(),
-                'response_body' => substr($response->body(), 0, 500)
-            ]);
-            
-            return [
-                'success' => false, 
-                'message' => 'Error en consulta SGA: ' . $response->status()
-            ];
+            // Si llegamos aquí, no hubo resultados aunque hubo intentos válidos
+            Log::warning('No se encontraron estudiantes por código tras probar endpoints', [ 'codigo' => $codigo ]);
+            return [ 'success' => true, 'data' => [] ];
         } catch (\Exception $e) {
-            Log::error('Error en buscarEstudiantesPorCodigo', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTrace(),
-                'codigo' => $codigo
-            ]);
-            
-            return [
-                'success' => false, 
-                'message' => 'Error de conexión: ' . $e->getMessage()
-            ];
+            Log::error('Error en buscarEstudiantesPorCodigo', [ 'error' => $e->getMessage(), 'codigo' => $codigo ]);
+            return [ 'success' => false, 'message' => 'Error de conexión: ' . $e->getMessage() ];
         }
     }
 

@@ -12,7 +12,10 @@ return [
         'http://192.168.0.78:4200',
     ],
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '#^http://(localhost|127\.0\.0\.1)(:\\d+)?$#',
+        '#^http://192\.168\.0\.78(:\\d+)?$#',
+    ],
 
     'allowed_headers' => ['*'],
 
