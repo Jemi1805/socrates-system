@@ -334,10 +334,23 @@ class SocratesApiService
     {
         $slug = strtolower(trim((string) $value));
 
-        if (in_array($slug, ['mecanica', 'mecánica', 'automotriz', 'mea'], true)) {
+        if ($slug === '' || $slug === null) {
+            return 'default';
+        }
+
+        // Detección por substrings primero (más robusto contra nombres descriptivos)
+        // Preferir 'electricidad' si aparece "elect" aunque también exista "automotriz"
+        if (strpos($slug, 'elect') !== false || strpos($slug, 'eea') !== false) {
+            return 'electricidad';
+        }
+        if (strpos($slug, 'mec') !== false || strpos($slug, 'automotriz') !== false || strpos($slug, 'mea') !== false) {
             return 'mecanica';
         }
 
+        // Fallback a coincidencias exactas conocidas
+        if (in_array($slug, ['mecanica', 'mecánica', 'automotriz', 'mea'], true)) {
+            return 'mecanica';
+        }
         if (in_array($slug, ['electricidad', 'electrónica', 'electronica', 'eea'], true)) {
             return 'electricidad';
         }
@@ -839,9 +852,15 @@ class SocratesApiService
             
             // Registrar los parámetros que estamos enviando
             Log::info('Parámetros enviados para búsqueda por nombre', $params);
-            
-            $requestUrl = $this->currentUrl . 'titulacion/serviciostitulacion/buscar_estudiantes/nombre';
-            
+
+            // Seleccionar base según carrera actual (evitar depender solo de currentUrl)
+            $slug = $this->currentCarreraSlug ?: 'default';
+            $baseForSlug = isset($this->baseUrls[$slug]) ? $this->baseUrls[$slug] : $this->currentUrl;
+
+            Log::info('Base URL seleccionada para búsqueda por nombre', [ 'slug' => $slug, 'base' => $baseForSlug, 'current' => $this->currentUrl ]);
+
+            $requestUrl = rtrim($baseForSlug, '/') . '/titulacion/serviciostitulacion/buscar_estudiantes/nombre';
+
             Log::info('Enviando request al SGA para búsqueda por nombre', [
                 'url' => $requestUrl,
                 'params' => $params
@@ -1321,7 +1340,22 @@ class SocratesApiService
 
                 // Filtrar filas que tengan al menos cod_ceta o nombres
                 if (!empty($estudiante['cod_ceta']) || !empty($estudiante['nombres'])) {
-                    $estudiantes[] = $estudiante;
+                    // Filtrar por carrera solicitada (si aplica)
+                    // Si no se configuró explícitamente la carrera, intentar derivarla desde la URL actual
+                    $slug = $this->currentCarreraSlug ?: (array_search($this->currentUrl, $this->baseUrls) ?: null);
+                    $include = true;
+                    if ($slug === 'electricidad') {
+                        $pensum = strtoupper($estudiante['pensum']);
+                        $carTxt = mb_strtolower($estudiante['carrera']);
+                        $include = (strpos($pensum, 'EEA') !== false) || (strpos($carTxt, 'elect') !== false);
+                    } elseif ($slug === 'mecanica') {
+                        $pensum = strtoupper($estudiante['pensum']);
+                        $carTxt = mb_strtolower($estudiante['carrera']);
+                        $include = (strpos($pensum, 'MEA') !== false) || (strpos($carTxt, 'mec') !== false);
+                    }
+                    if ($include) {
+                        $estudiantes[] = $estudiante;
+                    }
                 }
             }
 
