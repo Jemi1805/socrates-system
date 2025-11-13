@@ -227,20 +227,16 @@
           Convocatoria
         </h3>
         <div class="d-flex align-items-center gap-2">
-          <button class="btn btn-sm btn-primary" *ngIf="(viewInscripcion || resumenVisible) && !editBach" (click)="iniciarEdicionBachCard()">
-            <i class="bi bi-pencil-square me-1"></i>
-            Editar
-          </button>
-          <div class="d-flex gap-2" *ngIf="(viewInscripcion || resumenVisible) && editBach">
-            <button class="btn btn-sm btn-primary" (click)="guardarBachCard()">
+          <div class="d-flex gap-2" *ngIf="(viewInscripcion || resumenVisible) && editConvocatoria">
+            <button class="btn btn-sm btn-primary" (click)="guardarConvocatoriaSeleccionada()">
               <i class="bi bi-save me-1"></i>
               Guardar cambios
             </button>
-            <button class="btn btn-sm btn-primary" (click)="cancelarEdicionBachCard()">
-              <i class="bi bi-x-circle me-1"></i>
-              Cancelar
-            </button>
           </div>
+          <button class="btn btn-sm btn-primary" *ngIf="viewInscripcion" (click)="toggleEditConvocatoria()">
+            <i class="bi" [ngClass]="editConvocatoria ? 'bi-x-circle me-1' : 'bi-pencil-square'"></i>
+            {{ editConvocatoria ? 'Cancelar' : 'Editar' }}
+          </button>
           <button class="btn btn-sm" (click)="toggleBachilleratoData()">
           <i class="bi" [ngClass]="showBachilleratoData ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
           </button>
@@ -248,17 +244,6 @@
       </div>
       
       <div class="convocatoria-section">
-        <div class="convocatoria-header">
-          <button
-            class="btn btn-outline-secondary btn-sm ms-auto"
-            type="button"
-            (click)="toggleEditConvocatoria()"
-            *ngIf="viewInscripcion"
-          >
-            <i class="bi" [ngClass]="editConvocatoria ? 'bi-x-lg' : 'bi-pencil-square'"></i>
-            {{ editConvocatoria ? 'Cancelar' : 'Editar' }}
-          </button>
-        </div>
         <div class="convocatoria-body">
           <div class="convocatoria-select">
             <div class="convocatoria-panel">
@@ -290,16 +275,6 @@
               <div class="d-flex align-items-center gap-2">
                 <span class="summary-title">Convocatoria seleccionada</span>
               </div>
-              <button
-                class="btn btn-success btn-sm"
-                type="button"
-                (click)="guardarConvocatoriaSeleccionada()"
-                *ngIf="editConvocatoria"
-                [disabled]="!convocatoriaSeleccionada || guardandoConvocatoria"
-              >
-                <i class="bi bi-save me-1"></i>
-                {{ guardandoConvocatoria ? 'Guardando...' : 'Guardar' }}
-              </button>
             </div>
             <span class="summary-name">{{ convocatoriaSeleccionada.numero_convocatoria }} - {{ convocatoriaSeleccionada.nombre }}</span>
             <span class="summary-dates" *ngIf="convocatoriaSeleccionada.fecha_inicio && convocatoriaSeleccionada.fecha_fin">

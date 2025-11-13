@@ -3236,13 +3236,26 @@ private cargarPostulanteDesdeBD() {
     const tieneAranceles = arancelesSeleccionados.length > 0;
     const pagoCompleto = tieneAranceles && !!this.pagoCompletoSeleccionados;
 
+    // Resolver convocatoria (permitir selección actual, pendiente o persistida)
+    const convId = (this.convocatoriaSeleccionada?.id
+      ?? this.convocatoriaIdPendiente
+      ?? this.convocatoriaSeleccionadaBackupId
+      ?? null) as number | null;
+    const convObj = convId
+      ? (this.convocatorias.find(c => Number(c.id) === Number(convId)) || this.convocatoriaSeleccionada)
+      : null;
+    const convLabel = convObj
+      ? this.formatConvocatoriaLabel(convObj)
+      : (this.convocatoriaLabelPendiente || this.convocatoriaLabelPersistida || null);
+
     const payload: any = {
       cod_ceta_est: codEst,
       nombres_est: nombres,
       apellidos_est: apellidos,
       modalidad_id: this.modalidad?.id,
       modalidad_nom: this.modalidad?.nombre,
-      convocatoria_id: this.convocatoriaSeleccionada?.id || null,
+      convocatoria_id: convId || null,
+      nom_convocatoria: convLabel,
       carrera: this.carreraNormalizada || this.postulanteActual.carrera || null,
       aranceles_completos: pagoCompleto,
       aranceles: arancelesSeleccionados.map((a: any) => ({
