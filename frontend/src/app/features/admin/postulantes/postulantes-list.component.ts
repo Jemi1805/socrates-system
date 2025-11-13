@@ -955,7 +955,7 @@ cargarDatosPostulacion() {
         ap_mat: this.estudiante.ap_mat,
         ci: this.estudiante.ci,
         procedencia: this.estudiante.procedencia,
-        fecha_nacimiento: this.estudiante.fecha_nacimiento,
+        fecha_nacimiento: this.normalizarFecha(this.estudiante.fecha_nacimiento) as any,
         lugar_nacimiento: this.estudiante.lugar_nacimiento,
         carrera: this.estudiante.carrera,
         pensum: this.estudiante.pensum,
@@ -1054,7 +1054,7 @@ private cargarPostulanteDesdeBD() {
         put('ap_mat', src.ap_mat);
         put('ci', src.ci);
         put('procedencia', (src as any).procedencia || (src as any).expedido);
-        put('fecha_nacimiento', (src as any).fecha_nacimiento);
+        put('fecha_nacimiento', this.normalizarFecha((src as any).fecha_nacimiento) || (src as any).fecha_nacimiento);
         put('lugar_nacimiento', src.lugar_nacimiento);
         put('nro_serie_titulo', (src as any).nro_serie_titulo);
         this.postulanteActual = dst;

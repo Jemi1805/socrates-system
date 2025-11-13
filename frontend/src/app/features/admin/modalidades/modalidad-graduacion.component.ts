@@ -430,11 +430,32 @@ export class ModalidadGraduacionComponent implements OnInit {
     };
   }
 
-  private parseNullableDate(value?: string | null): Date | undefined {
+  private parseNullableDate(value?: string | Date | null): Date | undefined {
     if (!value) {
       return undefined;
     }
-    const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+    // Si ya es Date, validar y devolver
+    if (value instanceof Date) {
+      return isNaN(value.getTime()) ? undefined : value;
+    }
+    const s = String(value).trim();
+    if (!s) return undefined;
+    // Formato dd/mm/yyyy o d/m/yyyy
+    const m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m1) {
+      const d = parseInt(m1[1], 10);
+      const mo = parseInt(m1[2], 10) - 1;
+      const y = parseInt(m1[3], 10);
+      const dt = new Date(y, mo, d);
+      return isNaN(dt.getTime()) ? undefined : dt;
+    }
+    // Formato YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const dt = new Date(`${s}T00:00:00`);
+      return isNaN(dt.getTime()) ? undefined : dt;
+    }
+    // Intentar parseo general (ISO u otros con espacio)
+    const normalized = s.includes('T') ? s : s.replace(' ', 'T');
     const parsed = new Date(normalized);
     return isNaN(parsed.getTime()) ? undefined : parsed;
   }
