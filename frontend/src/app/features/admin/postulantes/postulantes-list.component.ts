@@ -3011,6 +3011,16 @@ private cargarPostulanteDesdeBD() {
     return null;
   }
 
+  isConvocatoriaVigente(conv: any): boolean {
+    if (!conv) return false;
+    const s = this.normalizarFecha(conv.fecha_inicio);
+    const e = this.normalizarFecha(conv.fecha_fin);
+    if (!s || !e) return false;
+    const today = this.normalizarFecha(new Date());
+    if (!today) return false;
+    return s <= today && today <= e;
+  }
+
   private normalizarValor(v: any): string {
     if (v === undefined || v === null) return '';
     return String(v).trim();
