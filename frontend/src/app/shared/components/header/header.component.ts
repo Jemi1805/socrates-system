@@ -63,7 +63,8 @@ export class HeaderComponent implements OnInit, OnDestroy {
 
   // Menú de navegación
   menuItems = [
-    { label: 'Modalidad de Graduación', route: '/modalidad-graduacion', active: true },
+    { label: 'Postulantes inscritos', route: '/postulantes', active: true },
+    { label: 'Inscripción de postulantes', route: '/modalidad-graduacion', active: false },
     { label: 'Tutores', route: '/tutores', active: false },
     { label: 'Seguimiento de Proyecto', route: '/seguimiento-proyecto', active: false },
     { label: 'Defensa', route: '/defensa', active: false },

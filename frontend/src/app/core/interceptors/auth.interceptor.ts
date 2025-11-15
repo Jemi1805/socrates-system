@@ -17,8 +17,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (token && isApiCall && auth.isTokenExpired()) {
     auth.logout();
-    const returnUrl = router.url;
-    router.navigate(['/login'], { queryParams: { returnUrl } });
+    router.navigate(['/login']);
     return throwError(() => new HttpErrorResponse({ status: 401, statusText: 'Token expired' }));
   }
 
@@ -34,8 +33,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     catchError((error) => {
       if (error?.status === 401 && !isAuthLoginCall) {
         auth.logout();
-        const returnUrl = router.url;
-        router.navigate(['/login'], { queryParams: { returnUrl } });
+        router.navigate(['/login']);
       }
       return throwError(() => error);
     })

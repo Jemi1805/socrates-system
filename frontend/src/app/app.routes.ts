@@ -10,7 +10,7 @@ import { ConfiguracionComponent } from './features/admin/configuracion/configura
 import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
-  { path: '', redirectTo: '/login', pathMatch: 'full' },
+  { path: '', redirectTo: '/postulantes', pathMatch: 'full' },
   { path: 'login', component: LoginComponent },
   { path: 'modalidad-graduacion', component: ModalidadGraduacionComponent, canActivate: [authGuard] },
   { path: 'postulantes', component: PostulantesListComponent, canActivate: [authGuard] },

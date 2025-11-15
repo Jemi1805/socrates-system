@@ -20,16 +20,12 @@ export class LoginComponent implements OnInit {
   loading = false;
   error = '';
   passwordVisible = false;
-  private returnUrl = '/modalidad-graduacion';
 
   constructor(
     private authService: AuthService,
     private router: Router,
     private route: ActivatedRoute
-  ) {
-    const ret = this.route.snapshot.queryParamMap.get('returnUrl');
-    if (ret) this.returnUrl = ret;
-  }
+  ) {}
 
   ngOnInit() {
     this.credentials.nombre_usuario = '';
@@ -49,7 +45,7 @@ export class LoginComponent implements OnInit {
     this.authService.login(this.credentials).subscribe({
       next: (response) => {
         this.loading = false;
-        this.router.navigate([this.returnUrl]);
+        this.router.navigate(['/postulantes']);
       },
       error: (error) => {
         this.loading = false;

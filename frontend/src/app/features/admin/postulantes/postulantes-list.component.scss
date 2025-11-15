@@ -651,6 +651,16 @@ input {
   }
 }
 
+.inscritos-head {
+  border-bottom: 2px solid $primary-color;
+  padding-bottom: 10px;
+}
+.inscritos-head .card-title {
+  border-bottom: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
 // Estilos de tabla para Aranceles (basados en Modalidad de Graduación)
 .aranceles-card, .docs-card {
   .card-title {

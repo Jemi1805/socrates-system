@@ -7,7 +7,7 @@ import { PostulanteService, DocumentoPostulante, ModalidadPostulante } from './p
 import { Postulante } from './postulante.model';
 import { HttpEventType, HttpResponse } from '@angular/common/http';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
-import { CommonModule } from '@angular/common';
+import { CommonModule, formatDate } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { SgaService, Convocatoria } from '../../../shared/services/sga.service';
 import { LoadingService } from '../../../core/services/loading.service';
@@ -55,6 +55,25 @@ interface Arancel {
   pagado: boolean;
 }
 
+interface PostulanteInscrito {
+  cod_ceta: number;
+  nombres_est: string;
+  ap_pat: string;
+  ap_mat: string;
+  ci?: string | null;
+  procedencia?: string | null;
+  celular?: string | null;
+  correo?: string | null;
+  email?: string | null;
+  fecha_nacimiento?: string | null;
+  lugar_nacimiento?: string | null;
+  pensum?: string | null;
+  modo?: string | null;
+  fecha_inscripcion?: string | null;
+  estado?: string | null;
+  carrera?: string | null;
+}
+
 @Component({
   selector: 'app-postulantes-list',
   templateUrl: './postulantes-list.component.html',
@@ -65,6 +84,11 @@ interface Arancel {
 export class PostulantesListComponent implements OnInit {
   postulantes: Postulante[] = [];
   postulanteActual: Partial<Postulante> = {};
+  // Vista lista-only
+  soloTabla: boolean = true;
+  // Postulantes inscritos (lista)
+  postulantesInscritos: PostulanteInscrito[] = [];
+  loadingInscritos: boolean = false;
   
   // Datos del estudiante y modalidad
   estudiante: Estudiante | null = null;
@@ -891,6 +915,150 @@ private formatTipoBachiller(v: string | null | undefined): string | null {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : null;
 }
 
+// --- Helpers y lógica para "Postulantes inscritos" ---
+private normalizeCarreraKey(v: string | null | undefined): 'mecanica' | 'electricidad' | null {
+  const s = (v || '').toString().trim().toLowerCase();
+  if (!s) return null;
+  if (/(mec[aá]nica|mecanica|mec\.|mec$|m\.a\.|automotriz.*mec)/.test(s)) return 'mecanica';
+  if (/(electricidad|electr[oó]nica|electronica|eea|el[eé]ctrica|electrica|e\.e\.a\.|electricidad.*auto)/.test(s)) return 'electricidad';
+  // códigos abreviados
+  if (/^m$/.test(s)) return 'mecanica';
+  if (/^e$/.test(s)) return 'electricidad';
+  return null;
+}
+
+private formatCarreraLabel(key: string | null | undefined): string {
+  switch (key) {
+    case 'electricidad':
+      return 'Electricidad y Electrónica Automotriz';
+    case 'mecanica':
+      return 'Mecánica Automotriz';
+    default:
+      return key ? String(key) : '';
+  }
+}
+
+private parseNullableDate(value?: string | Date | null): Date | undefined {
+  if (!value) return undefined;
+  if (value instanceof Date) return isNaN(value.getTime()) ? undefined : value;
+  const s = String(value).trim();
+  if (!s) return undefined;
+  const m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m1) {
+    const d = parseInt(m1[1], 10);
+    const mo = parseInt(m1[2], 10) - 1;
+    const y = parseInt(m1[3], 10);
+    const dt = new Date(y, mo, d);
+    return isNaN(dt.getTime()) ? undefined : dt;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const dt = new Date(`${s}T00:00:00`);
+    return isNaN(dt.getTime()) ? undefined : dt;
+  }
+  const normalized = s.includes('T') ? s : s.replace(' ', 'T');
+  const parsed = new Date(normalized);
+  return isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+private formatFechaInscripcion(value?: string | null): string {
+  if (!value) return '-';
+  const raw = value.trim();
+  if (!raw) return '-';
+  const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+  const date = new Date(normalized);
+  if (!isNaN(date.getTime())) {
+    try {
+      return formatDate(date, 'dd/MM/yyyy HH:mm', 'es-BO', 'UTC-04:00');
+    } catch {}
+  }
+  const [fechaPart, timePart] = raw.split(/[T ]/);
+  if (fechaPart) {
+    const [y, m, d] = fechaPart.split('-');
+    if (y && m && d) {
+      const hora = (timePart || '').slice(0, 5);
+      const horaLabel = hora ? ` ${hora}` : '';
+      return `${d}/${m}/${y}${horaLabel}`;
+    }
+  }
+  return raw;
+}
+
+private mapInscritoToEstudiante(p: PostulanteInscrito): Estudiante {
+  const carreraKey = this.normalizeCarreraKey(p.carrera || null);
+  const carreraLabel = this.formatCarreraLabel(carreraKey);
+  const fechaNacimiento = this.parseNullableDate(p.fecha_nacimiento);
+  return {
+    cod_ceta: String(p.cod_ceta),
+    ap_pat: p.ap_pat || '',
+    ap_mat: p.ap_mat || '',
+    nombres: p.nombres_est || '',
+    ci: p.ci || '',
+    procedencia: p.procedencia || '',
+    carrera: carreraLabel,
+    pensum: p.pensum || '',
+    fecha_nacimiento: fechaNacimiento ? formatDate(fechaNacimiento, 'yyyy-MM-dd', 'es-BO') : '',
+    lugar_nacimiento: p.lugar_nacimiento || '',
+    // Campos no estrictamente necesarios aquí
+    reg_ini_c: '',
+    gestion_ini: '',
+    reg_con_c: '',
+    gestion_fin: '',
+    incrip_uni: false,
+  } as Estudiante;
+}
+
+getCarreraLabel(ins: PostulanteInscrito): string {
+  return this.formatCarreraLabel(this.normalizeCarreraKey(ins.carrera || null));
+}
+
+getFechaInscripcion(ins: PostulanteInscrito): string {
+  return this.formatFechaInscripcion(ins.fecha_inscripcion);
+}
+
+cargarPostulantesInscritos() {
+  this.loadingInscritos = true;
+  this.postulanteService.getInscritos({ per_page: 200 }).subscribe({
+    next: (resp: any) => {
+      const payload = resp?.data ?? resp;
+      const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+      this.postulantesInscritos = rows.map((row: any) => ({
+        cod_ceta: Number(row?.cod_ceta_est ?? row?.cod_ceta ?? row?.codCeta ?? 0),
+        nombres_est: row?.nombres_est ?? row?.nombres ?? '',
+        ap_pat: row?.ap_pat ?? row?.apellido_p ?? '',
+        ap_mat: row?.ap_mat ?? row?.apellido_m ?? '',
+        ci: row?.ci ?? row?.ci_est ?? null,
+        procedencia: row?.procedencia ?? row?.expedido ?? null,
+        celular: row?.celular ?? row?.telf_movil ?? row?.telefono ?? row?.celular_est ?? null,
+        correo: row?.correo ?? row?.email ?? row?.email_est ?? null,
+        email: row?.email ?? row?.email_est ?? null,
+        fecha_nacimiento: row?.fecha_nacimiento ?? row?.fec_nac ?? null,
+        lugar_nacimiento: row?.lugar_nacimiento ?? row?.lugar_nac ?? null,
+        pensum: row?.pensum ?? row?.pensum_actual ?? null,
+        modo: row?.modalidad_nom ?? row?.modalidad ?? null,
+        fecha_inscripcion: row?.fecha_inscripcion ?? row?.created_at ?? null,
+        estado: row?.estado ?? null,
+        carrera: row?.carrera ?? row?.carrera_nombre ?? null,
+      })).filter((row: PostulanteInscrito) => !!row.cod_ceta);
+      this.loadingInscritos = false;
+    },
+    error: () => {
+      this.loadingInscritos = false;
+    }
+  });
+}
+
+seleccionarInscrito(postulante: PostulanteInscrito) {
+  const estudiante = this.mapInscritoToEstudiante(postulante);
+  try {
+    const raw = sessionStorage.getItem('datos_postulacion');
+    const parsed = raw ? JSON.parse(raw) : {};
+    parsed.estudiante = { ...(parsed.estudiante || {}), ...estudiante };
+    sessionStorage.setItem('datos_postulacion', JSON.stringify(parsed));
+  } catch {}
+  // Navegar a la vista de inscripción
+  this.router.navigate(['/modalidad-graduacion']);
+}
+
 ngOnInit() {
   this.cargarDatosPostulacion();
   // Intentar traer el postulante desde BD para usar sus valores persistidos
@@ -914,6 +1082,8 @@ ngOnInit() {
     // Activar modo Ver inmediatamente para que aparezcan los botones "Editar"
     this.entrarVerInscripcion();
   }
+  // Cargar lista de postulantes inscritos para vista de solo tabla
+  this.cargarPostulantesInscritos();
 }
 
 cargarDatosPostulacion() {
