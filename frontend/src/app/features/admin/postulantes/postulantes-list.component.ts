@@ -1074,6 +1074,35 @@ getFechaInscripcion(ins: PostulanteInscrito): string {
   return this.formatFechaInscripcion(ins.fecha_inscripcion);
 }
 
+// --- Helpers UI: Tema ---
+temaNombreUI(ins: PostulanteInscrito): string {
+  if (!ins) return '';
+  const p: any = (ins as any).proyecto || {};
+  const v = p.nombre
+    ?? p.tema
+    ?? p.nombre_tema
+    ?? p.titulo
+    ?? p.title
+    ?? p.nombre_proyecto
+    ?? p.proyecto
+    ?? p.tema_nombre
+    ?? '';
+  return (v || '').toString();
+}
+
+temaObjetivoUI(ins: PostulanteInscrito): string {
+  if (!ins) return '';
+  const p: any = (ins as any).proyecto || {};
+  const v = p.objetivo
+    ?? p.objetivos
+    ?? p.objetivo_general
+    ?? p.objetivo_especifico
+    ?? p.descripcion
+    ?? p.resumen
+    ?? '';
+  return (v || '').toString();
+}
+
 cargarPostulantesInscritos() {
   this.loadingInscritos = true;
   this.postulanteService.getInscritos({ per_page: 200 }).subscribe({
@@ -1134,8 +1163,23 @@ cargarDetallesTabla() {
       next: (res) => {
         const p = this.pickProyectoFromResponse(res, String(cod));
         if (p) {
-          const nombre = (p as any).nombre ?? (p as any).tema ?? (p as any).nombre_tema ?? (p as any).titulo ?? (p as any).title ?? null;
-          const objetivo = (p as any).objetivo ?? (p as any).objetivos ?? null;
+          const nombre = (p as any).nombre
+            ?? (p as any).tema
+            ?? (p as any).nombre_tema
+            ?? (p as any).titulo
+            ?? (p as any).title
+            ?? (p as any).nombre_proyecto
+            ?? (p as any).proyecto
+            ?? (p as any).tema_nombre
+            ?? null;
+          const objetivo = (p as any).objetivo
+            ?? (p as any).objetivos
+            ?? (p as any).objetivo_general
+            ?? (p as any).objetivo_especifico
+            ?? (p as any).descripcion
+            ?? (p as any).resumen
+            ?? null;
+          (ins as any).proyecto_existe = true;
           ins.proyecto = { nombre: nombre ? String(nombre) : null, objetivo: objetivo ? String(objetivo) : null };
         } else {
           ins.proyecto = null;
@@ -1169,23 +1213,46 @@ cargarDetallesTabla() {
 
 private pickProyectoFromResponse(res: any, wantedCod: string): any | null {
   if (!res) return null;
-  const pickFromArray = (arr: any[]): any => {
+  const getCod = (o: any): string | null => {
+    const v = (o?.cod_ceta ?? o?.codCeta ?? o?.codigo_ceta ?? o?.cod_ceta_est);
+    if (v === undefined || v === null) return null;
+    const s = String(v);
+    return s;
+  };
+  const pickFromArray = (arr: any[]): any | null => {
     const found = (arr || []).find(it => {
-      const v = (it?.cod_ceta ?? it?.codCeta ?? it?.codigo_ceta);
-      return v !== undefined && v !== null && String(v) === wantedCod;
+      const s = getCod(it);
+      return s !== null && s === wantedCod;
     });
-    return found || (arr && arr.length ? arr[0] : null);
+    return found || null;
   };
   if (Array.isArray(res)) return pickFromArray(res);
   if ((res as any).data) {
     const data = (res as any).data;
-    return Array.isArray(data) ? pickFromArray(data) : data;
+    return Array.isArray(data) ? pickFromArray(data) : (getCod(data) === wantedCod ? data : null);
   }
   if ((res as any).proyecto) {
     const pr = (res as any).proyecto;
-    return Array.isArray(pr) ? pickFromArray(pr) : pr;
+    return Array.isArray(pr) ? pickFromArray(pr) : (getCod(pr) === wantedCod ? pr : null);
   }
-  return res;
+  if ((res as any).result) {
+    const r = (res as any).result;
+    return Array.isArray(r) ? pickFromArray(r) : (getCod(r) === wantedCod ? r : null);
+  }
+  if ((res as any).record) {
+    const rec = (res as any).record;
+    return getCod(rec) === wantedCod ? rec : null;
+  }
+  return getCod(res) === wantedCod ? res : null;
+}
+
+// Determina si existe un registro de tema, aunque el nombre venga con alias o vacío
+tieneProyecto(ins: PostulanteInscrito): boolean {
+  if (!ins) return false;
+  const anyIns: any = ins as any;
+  if (anyIns.proyecto_existe === true) return true;
+  const nom = ins?.proyecto?.nombre;
+  return !!(nom && String(nom).trim());
 }
 
 private findDesignationForCod(list: any[], wantedCod: string): any | null {
@@ -1209,6 +1276,28 @@ irRegistrarTema(ins: PostulanteInscrito) {
   const cod = ins?.cod_ceta;
   if (!cod) return;
   this.router.navigate(['/registro-tema'], { queryParams: { cod_ceta: String(cod) } });
+}
+
+verRegistroTemaResumen(ins: PostulanteInscrito) {
+  const cod = ins?.cod_ceta;
+  if (!cod) return;
+  // Persistir contexto base para el componente RegistroTema
+  try {
+    const estudiante = this.mapInscritoToEstudiante(ins);
+    const modalidad = (ins.modo && ins.modo.toString().trim())
+      ? { id: 0 as any, nombre: ins.modo.toString().trim(), descripcion: '', monto_arancel: '' }
+      : null;
+    const raw = sessionStorage.getItem('datos_postulacion');
+    const parsed = raw ? JSON.parse(raw) : {};
+    parsed.estudiante = { ...(parsed.estudiante || {}), ...estudiante };
+    if (modalidad) parsed.modalidad = modalidad;
+    sessionStorage.setItem('datos_postulacion', JSON.stringify(parsed));
+    // Si tenemos datos del proyecto en la fila, sembrarlos para hidratar rápidamente el resumen
+    if ((ins as any)?.proyecto) {
+      sessionStorage.setItem('proyecto_cache', JSON.stringify((ins as any).proyecto));
+    }
+  } catch {}
+  this.router.navigate(['/registro-tema'], { queryParams: { cod_ceta: String(cod), ver: 'resumen' } });
 }
 
 irDesignarTutor(ins: PostulanteInscrito) {
@@ -1250,8 +1339,8 @@ generarFmdg(ins: PostulanteInscrito) {
       celular: (ins as any)?.celular || '',
       carrera: this.getCarreraLabel(ins) || (ins as any)?.carrera || '',
       modalidad: ins?.modo || '',
-      tema: (ins as any)?.proyecto?.nombre || '',
-      objetivo: (ins as any)?.proyecto?.objetivo || '',
+      tema: this.temaNombreUI(ins) || '',
+      objetivo: this.temaObjetivoUI(ins) || '',
     };
     this.pdfService.generarFMDG1(data, { logoWidthMm: 24, logoMaxHeightMm: 24, logoFormat: 'JPEG', logoBgColor: '#FFFFFF' });
   } catch (e) {

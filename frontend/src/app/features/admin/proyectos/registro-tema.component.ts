@@ -111,11 +111,17 @@ export class RegistroTemaComponent implements OnInit {
           const pc = JSON.parse(rawProyecto);
           const estado = pc?.estado ?? '';
           const tipo = pc?.tipo ?? '';
+          const nombreSeed = (pc?.nombre ?? pc?.tema ?? pc?.nombre_tema ?? pc?.titulo ?? pc?.title ?? pc?.nombre_proyecto ?? pc?.proyecto ?? pc?.tema_nombre ?? '') as any;
+          const objSeed = (pc?.objetivo ?? pc?.objetivos ?? pc?.objetivo_general ?? pc?.objetivo_especifico ?? pc?.descripcion ?? pc?.resumen ?? '') as any;
           this.proyectoGuardado = {
             ...(this.proyectoGuardado || {}),
             estado: estado || (this.proyectoGuardado?.estado || undefined),
             tipo: tipo || (this.proyectoGuardado?.tipo || undefined),
+            nombre: (nombreSeed || (this.proyectoGuardado as any)?.nombre || undefined),
+            objetivo: (objSeed || (this.proyectoGuardado as any)?.objetivo || undefined),
           };
+          if (nombreSeed && !this.tema) this.tema = String(nombreSeed);
+          if (objSeed && !this.objetivos) this.objetivos = String(objSeed);
         } catch {
           // Ignorar cache inválido
         }
@@ -238,9 +244,9 @@ export class RegistroTemaComponent implements OnInit {
               // Fusionar sobre el objeto existente para evitar reflow y parpadeo
               this.proyectoGuardado = { ...(this.proyectoGuardado || {}), ...p };
               // Sincronizar campos locales para que el resumen siempre tenga valores (acepta varias claves)
-              const nombreTema = (p as any).nombre ?? (p as any).tema ?? (p as any).nombre_tema ?? (p as any).titulo ?? (p as any).title;
+              const nombreTema = (p as any).nombre ?? (p as any).tema ?? (p as any).nombre_tema ?? (p as any).titulo ?? (p as any).title ?? (p as any).nombre_proyecto ?? (p as any).proyecto ?? (p as any).tema_nombre;
               if (nombreTema) this.tema = String(nombreTema);
-              const obj = (p as any).objetivo ?? (p as any).objetivos;
+              const obj = (p as any).objetivo ?? (p as any).objetivos ?? (p as any).objetivo_general ?? (p as any).objetivo_especifico ?? (p as any).descripcion ?? (p as any).resumen;
               if (obj && !this.objetivos) this.objetivos = String(obj);
               // Limpiar cache de proyecto para no dejar datos viejos en futuras navegaciones
               try { sessionStorage.removeItem('proyecto_cache'); } catch {}
@@ -617,7 +623,7 @@ export class RegistroTemaComponent implements OnInit {
   // Valor consolidado del nombre del tema para el resumen (evita depender de una sola clave)
   get nombreTemaResumen(): string {
     const pg: any = this.proyectoGuardado || {};
-    const v = pg.nombre ?? pg.tema ?? pg.nombre_tema ?? pg.titulo ?? pg.title ?? this.tema ?? '';
+    const v = pg.nombre ?? pg.tema ?? pg.nombre_tema ?? pg.titulo ?? pg.title ?? pg.nombre_proyecto ?? pg.proyecto ?? pg.tema_nombre ?? this.tema ?? '';
     return (v || '').toString().trim() || '-';
   }
 

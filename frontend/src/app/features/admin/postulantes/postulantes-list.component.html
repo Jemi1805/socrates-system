@@ -61,29 +61,29 @@
                       <div class="fw-semibold">{{ ins.modo || '-' }}</div>
                       <div class="small text-muted">{{ getCarreraLabel(ins) || '-' }}</div>
                     </div>
-                    <button type="button" class="btn btn-outline-secondary btn-sm px-2 py-1" title="Ver formulario de inscripción" aria-label="Ver inscripción" data-bs-toggle="tooltip" data-bs-placement="top" (click)="verInscripcionDesdeFila(ins)">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-2 py-1 btn-eye" title="Ver formulario de inscripción" aria-label="Ver inscripción" data-bs-toggle="tooltip" data-bs-placement="top" (click)="verInscripcionDesdeFila(ins)">
                       <i class="bi bi-eye"></i>
                     </button>
                   </div>
                 </td>
                 <td class="registro-tema-cell">
-                  <div class="d-flex align-items-start justify-content-between gap-2">
-                    <div class="flex-grow-1">
-                      <ng-container *ngIf="ins.proyecto?.nombre; else noTemaTpl">
-                        <div class="tema-titulo ellipsis-1">{{ ins.proyecto?.nombre }}</div>
-                        <div class="tema-objetivo ellipsis-2" *ngIf="ins.proyecto?.objetivo">{{ ins.proyecto?.objetivo }}</div>
-                      </ng-container>
-                      <ng-template #noTemaTpl>
-                        <button type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irRegistrarTema(ins)">
-                          <i class="bi bi-plus-circle"></i>
-                          <span class="ms-1">Registrar</span>
-                        </button>
-                      </ng-template>
+                  <ng-container *ngIf="tieneProyecto(ins); else noTemaTpl">
+                    <div class="tema-row d-flex align-items-center gap-2">
+                      <div class="tema-text flex-grow-1">
+                        <div class="tema-titulo ellipsis-3">{{ temaNombreUI(ins) }}</div>
+                        <div class="tema-sub ellipsis-2" *ngIf="temaObjetivoUI(ins)">{{ temaObjetivoUI(ins) }}</div>
+                      </div>
+                      <button type="button" class="btn btn-outline-secondary btn-sm px-2 py-1 btn-eye ms-auto" title="Ver resumen del registro de tema" aria-label="Ver tema" data-bs-toggle="tooltip" data-bs-placement="top" (click)="verRegistroTemaResumen(ins)">
+                        <i class="bi bi-eye"></i>
+                      </button>
                     </div>
-                    <button type="button" class="btn btn-outline-secondary btn-sm px-2 py-1" title="Ver detalle de tema" aria-label="Ver tema" data-bs-toggle="tooltip" data-bs-placement="top" (click)="verDetalle('tema', ins)">
-                      <i class="bi bi-eye"></i>
+                  </ng-container>
+                  <ng-template #noTemaTpl>
+                    <button type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irRegistrarTema(ins)">
+                      <i class="bi bi-plus-circle"></i>
+                      <span class="ms-1">Registrar</span>
                     </button>
-                  </div>
+                  </ng-template>
                 </td>
                 <td class="designacion-cell">
                   <div class="d-flex align-items-start justify-content-between gap-2">
@@ -99,7 +99,7 @@
                         </button>
                       </ng-template>
                     </div>
-                    <button type="button" class="btn btn-outline-secondary btn-sm px-2 py-1" title="Ver detalle de designación" aria-label="Ver designación" data-bs-toggle="tooltip" data-bs-placement="top" (click)="verDetalle('designacion', ins)">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-2 py-1 btn-eye" title="Ver detalle de designación" aria-label="Ver designación" data-bs-toggle="tooltip" data-bs-placement="top" (click)="verDetalle('designacion', ins)">
                       <i class="bi bi-eye"></i>
                     </button>
                   </div>
