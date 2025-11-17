@@ -13,6 +13,7 @@ export const routes: Routes = [
   { path: '', redirectTo: '/postulantes', pathMatch: 'full' },
   { path: 'login', component: LoginComponent },
   { path: 'modalidad-graduacion', component: ModalidadGraduacionComponent, canActivate: [authGuard] },
+  { path: 'postulantes/:cod_ceta', component: PostulantesListComponent, canActivate: [authGuard] },
   { path: 'postulantes', component: PostulantesListComponent, canActivate: [authGuard] },
   { path: 'registro-tema', component: RegistroTemaComponent, canActivate: [authGuard] },
   { path: 'tutores', component: TutoresHomeComponent, canActivate: [authGuard] },

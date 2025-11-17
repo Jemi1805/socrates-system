@@ -136,6 +136,41 @@ $transition: all 0.3s ease;
   }
 }
 
+// Utilidades de truncado
+.ellipsis-1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ellipsis-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+// Celdas compactas para Tema y Designación
+.registro-tema-cell {
+  width: 280px;
+  max-width: 280px;
+  .tema-titulo { font-weight: 600; font-size: .95rem; line-height: 1.1; }
+  .tema-objetivo { font-size: .85rem; color: $text-light; }
+}
+.designacion-cell {
+  max-width: 320px;
+  .tutor-nombre { font-weight: 600; font-size: .95rem; line-height: 1.2; }
+  .tutor-area { font-size: .85rem; color: $text-light; }
+}
+
+// Modal simple de detalle (overlay ligero)
+.detalle-overlay {
+  position: fixed; inset: 0; z-index: 1050;
+  display: flex; align-items: center; justify-content: center;
+  .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+  .card { position: relative; width: 92%; max-width: 680px; }
+}
+
 .modal-confirm-layer {
   position: fixed;
   inset: 0;
@@ -185,6 +220,11 @@ $transition: all 0.3s ease;
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem 1rem;
+}
+
+.content-wrapper.form-view {
+  padding-top: 0.75rem;
+  padding-bottom: 1rem;
 }
 
 // Contenedor estrecho para el resumen (similar al card de biográficos visualmente)
@@ -648,6 +688,25 @@ input {
       --bs-table-border-color: #4C9DBD !important;
       color: white !important;
     }
+
+    // Compactar filas y celdas
+    .table.table-sm.align-middle > :not(caption) > * > * {
+      padding: .4rem .5rem;
+      vertical-align: middle;
+    }
+    .table.table-sm td, .table.table-sm th { font-size: .92rem; }
+
+    // Fijar layout de la tabla para evitar saltos y desbordes
+    .table-fixed { table-layout: fixed; width: 100%; }
+    .table-fixed thead th, .table-fixed tbody td {
+      overflow: hidden; text-overflow: ellipsis; white-space: normal; vertical-align: top;
+    }
+    // Anchos de columnas (Postulante, Inscripción, Tema, Designación, Documentos)
+    .table-fixed thead th:nth-child(1), .table-fixed tbody td:nth-child(1) { width: 20%; }
+    .table-fixed thead th:nth-child(2), .table-fixed tbody td:nth-child(2) { width: 22%; }
+    .table-fixed thead th:nth-child(3), .table-fixed tbody td:nth-child(3) { width: 28%; }
+    .table-fixed thead th:nth-child(4), .table-fixed tbody td:nth-child(4) { width: 20%; }
+    .table-fixed thead th:nth-child(5), .table-fixed tbody td:nth-child(5) { width: 10%; }
   }
 }
 

@@ -11,6 +11,8 @@ import { CommonModule, formatDate } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { SgaService, Convocatoria } from '../../../shared/services/sga.service';
 import { LoadingService } from '../../../core/services/loading.service';
+import { ProyectoService } from '../proyectos/proyecto.service';
+import { PdfService } from '../../../shared/services/pdf.service';
 
 interface Estudiante {
   cod_ceta: string;
@@ -72,6 +74,8 @@ interface PostulanteInscrito {
   fecha_inscripcion?: string | null;
   estado?: string | null;
   carrera?: string | null;
+  proyecto?: { nombre?: string | null; objetivo?: string | null } | null;
+  designacion?: { tutor_nombre?: string | null; area?: string | null; numero_documento?: string | null; cite?: string | null } | null;
 }
 
 @Component({
@@ -89,6 +93,11 @@ export class PostulantesListComponent implements OnInit {
   // Postulantes inscritos (lista)
   postulantesInscritos: PostulanteInscrito[] = [];
   loadingInscritos: boolean = false;
+  loadingDetalles: boolean = false;
+  // Modal de detalle de procesos
+  detalleVisible: boolean = false;
+  detalleTipo: 'inscripcion' | 'tema' | 'designacion' | null = null;
+  detalleData: any = null;
   
   // Datos del estudiante y modalidad
   estudiante: Estudiante | null = null;
@@ -902,7 +911,7 @@ get labelNuevoArancelGestion(): string {
   return this.nuevoArancel?.gestion || 'Seleccione gestión';
 }
 
-constructor(private postulanteService: PostulanteService, private sgaService: SgaService, private router: Router, private route: ActivatedRoute, private loadingService: LoadingService) {}
+constructor(private postulanteService: PostulanteService, private sgaService: SgaService, private router: Router, private route: ActivatedRoute, private loadingService: LoadingService, private proyectoService: ProyectoService, private pdfService: PdfService) {}
 
 // Normalizador para Tipo de Bachiller: siempre 'Nacional' o 'Extranjero'
 private formatTipoBachiller(v: string | null | undefined): string | null {
@@ -936,6 +945,56 @@ private formatCarreraLabel(key: string | null | undefined): string {
     default:
       return key ? String(key) : '';
   }
+}
+
+// --- Modal de detalle de procesos ---
+verDetalle(tipo: 'inscripcion' | 'tema' | 'designacion', ins: PostulanteInscrito) {
+  this.detalleTipo = tipo;
+  if (tipo === 'inscripcion') {
+    this.detalleData = {
+      modalidad: ins?.modo || null,
+      carrera: this.getCarreraLabel(ins) || (ins as any)?.carrera || null,
+      fecha: this.getFechaInscripcion(ins) || null,
+      estado: ins?.estado || null,
+      __src: ins,
+    };
+  } else if (tipo === 'tema') {
+    this.detalleData = {
+      nombre: ins?.proyecto?.nombre || null,
+      objetivo: ins?.proyecto?.objetivo || null,
+      __src: ins,
+    };
+  } else if (tipo === 'designacion') {
+    this.detalleData = {
+      tutor: ins?.designacion?.tutor_nombre || null,
+      area: ins?.designacion?.area || null,
+      numero_documento: ins?.designacion?.numero_documento || null,
+      cite: ins?.designacion?.cite || null,
+      __src: ins,
+    };
+  }
+  this.detalleVisible = true;
+}
+
+cerrarDetalle() {
+  this.detalleVisible = false;
+  this.detalleTipo = null;
+  this.detalleData = null;
+}
+
+getDetalleTitulo(): string {
+  if (this.detalleTipo === 'inscripcion') return 'Detalle de Inscripción';
+  if (this.detalleTipo === 'tema') return 'Detalle de Registro de Tema';
+  if (this.detalleTipo === 'designacion') return 'Detalle de Designación de Tutor';
+  return 'Detalle';
+}
+
+volverATabla() {
+  this.soloTabla = true;
+  this.viewInscripcion = false;
+  this.resumenVisible = false;
+  this.detalleVisible = false;
+  this.router.navigate(['/postulantes']);
 }
 
 private parseNullableDate(value?: string | Date | null): Date | undefined {
@@ -1040,6 +1099,8 @@ cargarPostulantesInscritos() {
         carrera: row?.carrera ?? row?.carrera_nombre ?? null,
       })).filter((row: PostulanteInscrito) => !!row.cod_ceta);
       this.loadingInscritos = false;
+      // Enriquecer filas con tema y designación
+      this.cargarDetallesTabla();
     },
     error: () => {
       this.loadingInscritos = false;
@@ -1059,7 +1120,189 @@ seleccionarInscrito(postulante: PostulanteInscrito) {
   this.router.navigate(['/modalidad-graduacion']);
 }
 
+// --- Enriquecimiento de datos por fila (tema y designación) ---
+cargarDetallesTabla() {
+  if (!Array.isArray(this.postulantesInscritos) || this.postulantesInscritos.length === 0) return;
+  this.loadingDetalles = true;
+  const items = this.postulantesInscritos.slice();
+  let remaining = items.length * 2; // proyecto + designación por fila
+  const done = () => { remaining--; if (remaining <= 0) this.loadingDetalles = false; };
+  for (const ins of items) {
+    const cod = ins.cod_ceta;
+    // Proyecto (tema/objetivo)
+    this.proyectoService.getByCod(String(cod)).subscribe({
+      next: (res) => {
+        const p = this.pickProyectoFromResponse(res, String(cod));
+        if (p) {
+          const nombre = (p as any).nombre ?? (p as any).tema ?? (p as any).nombre_tema ?? (p as any).titulo ?? (p as any).title ?? null;
+          const objetivo = (p as any).objetivo ?? (p as any).objetivos ?? null;
+          ins.proyecto = { nombre: nombre ? String(nombre) : null, objetivo: objetivo ? String(objetivo) : null };
+        } else {
+          ins.proyecto = null;
+        }
+      },
+      error: () => { ins.proyecto = ins.proyecto || null; },
+      complete: () => done()
+    });
+    // Designación (tutor/área)
+    this.sgaService.getTutoresDesignados({ cod_ceta: String(cod) }).subscribe({
+      next: (resp) => {
+        const list = (resp as any)?.data ?? resp;
+        const arr: any[] = Array.isArray(list) ? list : [];
+        const found = this.findDesignationForCod(arr, String(cod));
+        if (found) {
+          const tutorNombre = found.tutor_nombre
+            || (found.tutor ? [found.tutor.apellido_p, found.tutor.apellido_m, found.tutor.nombre].filter(Boolean).join(' ').trim() : null);
+          const area = found.area || found.pertinencia || (Array.isArray(found.estudiantes) ? (found.estudiantes[0]?.area || null) : null);
+          const numeroDoc = (found as any)?.numero_documento ?? null;
+          const cite = (found as any)?.cite ?? null;
+          ins.designacion = { tutor_nombre: tutorNombre || null, area: area || null, numero_documento: numeroDoc, cite };
+        } else {
+          ins.designacion = null;
+        }
+      },
+      error: () => { ins.designacion = ins.designacion || null; },
+      complete: () => done()
+    });
+  }
+}
+
+private pickProyectoFromResponse(res: any, wantedCod: string): any | null {
+  if (!res) return null;
+  const pickFromArray = (arr: any[]): any => {
+    const found = (arr || []).find(it => {
+      const v = (it?.cod_ceta ?? it?.codCeta ?? it?.codigo_ceta);
+      return v !== undefined && v !== null && String(v) === wantedCod;
+    });
+    return found || (arr && arr.length ? arr[0] : null);
+  };
+  if (Array.isArray(res)) return pickFromArray(res);
+  if ((res as any).data) {
+    const data = (res as any).data;
+    return Array.isArray(data) ? pickFromArray(data) : data;
+  }
+  if ((res as any).proyecto) {
+    const pr = (res as any).proyecto;
+    return Array.isArray(pr) ? pickFromArray(pr) : pr;
+  }
+  return res;
+}
+
+private findDesignationForCod(list: any[], wantedCod: string): any | null {
+  for (const item of (list || [])) {
+    // Si el item contiene estudiantes, buscar coincidencia por cod_ceta
+    const ests = (item && Array.isArray(item.estudiantes)) ? item.estudiantes : [];
+    const hit = ests.find((e: any) => {
+      const v = (e?.cod_ceta ?? e?.codCeta ?? e?.codigo_ceta);
+      return v !== undefined && v !== null && String(v) === wantedCod;
+    });
+    if (hit) return item;
+    // Si no hay arreglo, ver si el propio item tiene cod_ceta
+    const v = (item?.cod_ceta ?? item?.codCeta ?? item?.codigo_ceta);
+    if (v !== undefined && v !== null && String(v) === wantedCod) return item;
+  }
+  return null;
+}
+
+// --- Acciones de navegación y documentos ---
+irRegistrarTema(ins: PostulanteInscrito) {
+  const cod = ins?.cod_ceta;
+  if (!cod) return;
+  this.router.navigate(['/registro-tema'], { queryParams: { cod_ceta: String(cod) } });
+}
+
+irDesignarTutor(ins: PostulanteInscrito) {
+  const cod = ins?.cod_ceta;
+  if (!cod) return;
+  const carreraKey = this.normalizeCarreraKey(ins?.carrera || null) || undefined;
+  this.router.navigate(['/tutores/designar'], { queryParams: { cod_ceta: String(cod), carrera: carreraKey } });
+}
+
+verInscripcionDesdeFila(ins: PostulanteInscrito) {
+  if (!ins || !ins.cod_ceta) return;
+  // Persistir contexto mínimo en sessionStorage y navegar a /postulantes/:cod
+  const estudiante = this.mapInscritoToEstudiante(ins);
+  const modalidad = (ins.modo && ins.modo.toString().trim())
+    ? { id: 0 as any, nombre: ins.modo.toString().trim(), descripcion: '', monto_arancel: '' }
+    : null;
+  try {
+    const raw = sessionStorage.getItem('datos_postulacion');
+    const parsed = raw ? JSON.parse(raw) : {};
+    parsed.estudiante = { ...(parsed.estudiante || {}), ...estudiante };
+    if (modalidad) parsed.modalidad = modalidad;
+    sessionStorage.setItem('datos_postulacion', JSON.stringify(parsed));
+  } catch {}
+  this.router.navigate(['/postulantes', String(ins.cod_ceta)]);
+}
+
+generarFmdg(ins: PostulanteInscrito) {
+  try {
+    const nombres = (ins as any)?.nombres_est || '';
+    const apPat = (ins as any)?.ap_pat || '';
+    const apMat = (ins as any)?.ap_mat || '';
+    const data: any = {
+      codCeta: String(ins.cod_ceta || ''),
+      nombreCompleto: `${nombres} ${apPat} ${apMat}`.trim(),
+      nombres,
+      apellidos: `${apPat} ${apMat}`.trim(),
+      ci: (ins as any)?.ci || '',
+      expedicion: (ins as any)?.procedencia || '',
+      celular: (ins as any)?.celular || '',
+      carrera: this.getCarreraLabel(ins) || (ins as any)?.carrera || '',
+      modalidad: ins?.modo || '',
+      tema: (ins as any)?.proyecto?.nombre || '',
+      objetivo: (ins as any)?.proyecto?.objetivo || '',
+    };
+    this.pdfService.generarFMDG1(data, { logoWidthMm: 24, logoMaxHeightMm: 24, logoFormat: 'JPEG', logoBgColor: '#FFFFFF' });
+  } catch (e) {
+    console.error('No fue posible generar FDMG-1', e);
+  }
+}
+
+generarDesignacionPdf(ins: PostulanteInscrito) {
+  if (!ins?.designacion) return;
+  try {
+    const nombres = (ins as any)?.nombres_est || '';
+    const apPat = (ins as any)?.ap_pat || '';
+    const apMat = (ins as any)?.ap_mat || '';
+    const estudianteNombre = `${apPat} ${apMat} ${nombres}`.trim();
+    const data: any = {
+      tutorNombre: ins.designacion?.tutor_nombre || 'Tutor designado',
+      area: ins.designacion?.area || undefined,
+      estudianteNombre,
+      estudianteCodigo: String(ins.cod_ceta || ''),
+      carrera: this.getCarreraLabel(ins) || (ins as any)?.carrera || undefined,
+      modalidad: ins?.modo || 'Proyecto de Grado',
+      proyectoNombre: (ins as any)?.proyecto?.nombre || undefined,
+      convocatoria: undefined,
+      numeroDocumento: ins.designacion?.numero_documento || undefined,
+      cite: ins.designacion?.cite || undefined,
+    };
+    this.pdfService.generarDesignacionTutorPdf(data, { fileName: `designacion-tutor-${ins.cod_ceta}.pdf` });
+  } catch (e) {
+    console.error('No fue posible generar el documento de designación', e);
+  }
+}
+
 ngOnInit() {
+  // Si viene /postulantes/:cod_ceta, preparar vista individual
+  const codFromParam = this.route.snapshot.paramMap.get('cod_ceta');
+  if (codFromParam) {
+    const codNum = Number(codFromParam);
+    if (!isNaN(codNum)) {
+      // Persistir en sessionStorage para rehidratar el formulario
+      try {
+        const raw = sessionStorage.getItem('datos_postulacion');
+        const parsed = raw ? JSON.parse(raw) : {};
+        parsed.estudiante = { ...(parsed.estudiante || {}), cod_ceta: codNum };
+        sessionStorage.setItem('datos_postulacion', JSON.stringify(parsed));
+      } catch {}
+      // Estados de vista
+      this.soloTabla = false;
+      this.debeEntrarVer = true;
+      this.postulanteActual = { ...(this.postulanteActual || {}), cod_ceta: codNum } as any;
+    }
+  }
   this.cargarDatosPostulacion();
   // Intentar traer el postulante desde BD para usar sus valores persistidos
   this.cargarPostulanteDesdeBD();
@@ -1077,13 +1320,41 @@ ngOnInit() {
   } catch {}
   // Si venimos desde el modal con query ver=1, activar modo Ver inscripción
   const ver = this.route.snapshot.queryParamMap.get('ver');
-  this.debeEntrarVer = (ver === '1');
+  this.debeEntrarVer = (ver === '1') || this.debeEntrarVer;
   if (this.debeEntrarVer && !this.viewInscripcion) {
     // Activar modo Ver inmediatamente para que aparezcan los botones "Editar"
     this.entrarVerInscripcion();
   }
   // Cargar lista de postulantes inscritos para vista de solo tabla
   this.cargarPostulantesInscritos();
+
+  // Escuchar cambios de parámetros para permitir navegación dentro del mismo componente
+  this.route.paramMap.subscribe(pm => {
+    const cod = pm.get('cod_ceta');
+    if (cod) {
+      const codNum = Number(cod);
+      if (!isNaN(codNum)) {
+        try {
+          const raw = sessionStorage.getItem('datos_postulacion');
+          const parsed = raw ? JSON.parse(raw) : {};
+          parsed.estudiante = { ...(parsed.estudiante || {}), cod_ceta: codNum };
+          sessionStorage.setItem('datos_postulacion', JSON.stringify(parsed));
+        } catch {}
+        this.soloTabla = false;
+        this.debeEntrarVer = true;
+        this.postulanteActual = { ...(this.postulanteActual || {}), cod_ceta: codNum } as any;
+        this.cargarDatosPostulacion();
+        this.entrarVerInscripcion();
+        this.cargarPostulanteDesdeBD();
+      }
+    } else {
+      // Volver al modo lista si se remueve el parámetro
+      this.soloTabla = true;
+      this.viewInscripcion = false;
+      this.resumenVisible = false;
+      this.detalleVisible = false;
+    }
+  });
 }
 
 cargarDatosPostulacion() {

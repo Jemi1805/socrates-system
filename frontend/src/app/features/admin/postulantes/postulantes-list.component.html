@@ -7,8 +7,10 @@
     ]">
     </app-header>
 
+  
+
   <!-- Tabla de Postulantes inscritos -->
-  <div class="content-wrapper">
+  <div class="content-wrapper" *ngIf="soloTabla">
     <div class="card">
       <div class="card-body">
         <div class="inscritos-head d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
@@ -34,50 +36,131 @@
           Cargando postulantes inscritos...
         </div>
         <div class="table-responsive" *ngIf="!loadingInscritos && postulantesInscritos.length > 0">
-          <table class="table table-hover align-middle">
+          <table class="table table-hover table-sm align-middle table-fixed">
             <thead class="table-dark">
               <tr>
-                <th scope="col">Código CETA</th>
-                <th scope="col">Nombre completo</th>
-                <th scope="col">CI</th>
-                <th scope="col">Carrera</th>
-                <th scope="col">Modalidad</th>
-                <th scope="col">Fecha inscripción</th>
-                <th scope="col" class="text-center">Acciones</th>
+                <th scope="col">Postulante</th>
+                <th scope="col">Inscripción</th>
+                <th scope="col">Registro de Tema</th>
+                <th scope="col">Designación de Tutor</th>
+                <th scope="col">Documentos</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let ins of postulantesInscritos">
-                <td>{{ ins.cod_ceta }}</td>
                 <td>
-                  {{ ins.ap_pat }} {{ ins.ap_mat }} {{ ins.nombres_est }}
+                  <div class="fw-semibold"> {{ ins.cod_ceta }}</div>
+                  <div>{{ ins.ap_pat }} {{ ins.ap_mat }} {{ ins.nombres_est }}</div>
+                  <div class="text-muted" *ngIf="ins.celular as cel">
+                    <i class="bi bi-telephone me-1"></i>{{ cel }}
+                  </div>
                 </td>
                 <td>
-                  <span *ngIf="ins.ci; else sinCi">{{ ins.ci }} {{ ins.procedencia || '' }}</span>
-                  <ng-template #sinCi>
-                    <span class="text-muted">Sin CI registrado</span>
-                  </ng-template>
+                  <div class="d-flex align-items-start justify-content-between gap-2">
+                    <div>
+                      <div class="fw-semibold">{{ ins.modo || '-' }}</div>
+                      <div class="small text-muted">{{ getCarreraLabel(ins) || '-' }}</div>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-2 py-1" title="Ver formulario de inscripción" aria-label="Ver inscripción" data-bs-toggle="tooltip" data-bs-placement="top" (click)="verInscripcionDesdeFila(ins)">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                  </div>
                 </td>
-                <td>{{ getCarreraLabel(ins) || '-' }}</td>
-                <td>{{ ins.modo || '-' }}</td>
+                <td class="registro-tema-cell">
+                  <div class="d-flex align-items-start justify-content-between gap-2">
+                    <div class="flex-grow-1">
+                      <ng-container *ngIf="ins.proyecto?.nombre; else noTemaTpl">
+                        <div class="tema-titulo ellipsis-1">{{ ins.proyecto?.nombre }}</div>
+                        <div class="tema-objetivo ellipsis-2" *ngIf="ins.proyecto?.objetivo">{{ ins.proyecto?.objetivo }}</div>
+                      </ng-container>
+                      <ng-template #noTemaTpl>
+                        <button type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irRegistrarTema(ins)">
+                          <i class="bi bi-plus-circle"></i>
+                          <span class="ms-1">Registrar</span>
+                        </button>
+                      </ng-template>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-2 py-1" title="Ver detalle de tema" aria-label="Ver tema" data-bs-toggle="tooltip" data-bs-placement="top" (click)="verDetalle('tema', ins)">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                  </div>
+                </td>
+                <td class="designacion-cell">
+                  <div class="d-flex align-items-start justify-content-between gap-2">
+                    <div class="flex-grow-1">
+                      <ng-container *ngIf="ins.designacion?.tutor_nombre; else noTutorTpl">
+                        <div class="tutor-nombre ellipsis-1">{{ ins.designacion?.tutor_nombre }}</div>
+                        <div class="tutor-area ellipsis-1" *ngIf="ins.designacion?.area">Área: {{ ins.designacion?.area }}</div>
+                      </ng-container>
+                      <ng-template #noTutorTpl>
+                        <button type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irDesignarTutor(ins)">
+                          <i class="bi bi-person-plus"></i>
+                          <span class="ms-1">Designar</span>
+                        </button>
+                      </ng-template>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-2 py-1" title="Ver detalle de designación" aria-label="Ver designación" data-bs-toggle="tooltip" data-bs-placement="top" (click)="verDetalle('designacion', ins)">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                  </div>
+                </td>
                 <td>
-                  <span *ngIf="ins.fecha_inscripcion; else sinFecha">{{ getFechaInscripcion(ins) }}</span>
-                  <ng-template #sinFecha>
-                    <span class="text-muted">-</span>
-                  </ng-template>
-                </td>
-                <td class="text-center">
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-success text-white d-inline-flex align-items-center gap-2"
-                    (click)="seleccionarInscrito(ins)">
-                    <i class="bi bi-check2-circle"></i>
-                    Seleccionar
-                  </button>
+                  <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-2 py-1" title="Generar FMDG-1" aria-label="Generar FMDG-1" data-bs-toggle="tooltip" data-bs-placement="top"
+                            [disabled]="!ins.proyecto?.nombre"
+                            (click)="generarFmdg(ins)">
+                      FDMG-1
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-2 py-1" title="Generar documento de designación" aria-label="Generar designación" data-bs-toggle="tooltip" data-bs-placement="top"
+                            [disabled]="!ins.designacion?.tutor_nombre"
+                            (click)="generarDesignacionPdf(ins)">
+                      Designación
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Modal de detalle de procesos -->
+        <div *ngIf="detalleVisible" class="detalle-overlay">
+          <div class="backdrop"></div>
+          <div class="card shadow">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span class="fw-semibold">{{ getDetalleTitulo() }}</span>
+              <button type="button" class="btn-close" aria-label="Cerrar" (click)="cerrarDetalle()"></button>
+            </div>
+            <div class="card-body">
+              <ng-container [ngSwitch]="detalleTipo">
+                <div *ngSwitchCase="'inscripcion'">
+                  <div><span class="text-muted">Modalidad:</span> <span class="fw-semibold">{{ detalleData?.modalidad || '-' }}</span></div>
+                  <div><span class="text-muted">Carrera:</span> {{ detalleData?.carrera || '-' }}</div>
+                  <div><span class="text-muted">Fecha inscripción:</span> {{ detalleData?.fecha || '-' }}</div>
+                  <div><span class="text-muted">Estado:</span> {{ detalleData?.estado || '-' }}</div>
+                </div>
+                <div *ngSwitchCase="'tema'">
+                  <div><span class="text-muted">Tema:</span> <span class="fw-semibold">{{ detalleData?.nombre || 'No registrado' }}</span></div>
+                  <div *ngIf="detalleData?.objetivo"><span class="text-muted">Objetivo:</span> {{ detalleData?.objetivo }}</div>
+                  <div *ngIf="!detalleData?.nombre" class="mt-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm" (click)="irRegistrarTema(detalleData?.__src)"><i class="bi bi-plus-circle me-1"></i>Registrar</button>
+                  </div>
+                </div>
+                <div *ngSwitchCase="'designacion'">
+                  <div><span class="text-muted">Tutor:</span> <span class="fw-semibold">{{ detalleData?.tutor || 'Sin designación' }}</span></div>
+                  <div *ngIf="detalleData?.area"><span class="text-muted">Área:</span> {{ detalleData?.area }}</div>
+                  <div *ngIf="detalleData?.numero_documento"><span class="text-muted">Documento:</span> {{ detalleData?.numero_documento }}</div>
+                  <div *ngIf="detalleData?.cite"><span class="text-muted">CITE:</span> {{ detalleData?.cite }}</div>
+                  <div *ngIf="!detalleData?.tutor" class="mt-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm" (click)="irDesignarTutor(detalleData?.__src)"><i class="bi bi-person-plus me-1"></i>Designar</button>
+                  </div>
+                </div>
+              </ng-container>
+            </div>
+            <div class="card-footer text-end">
+              <button type="button" class="btn btn-secondary btn-sm" (click)="cerrarDetalle()">Cerrar</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -155,7 +238,13 @@
     </div>
   </div>
 
-  <div class="content-wrapper" *ngIf="!resumenVisible && !soloTabla">
+  <div class="content-wrapper form-view" *ngIf="!resumenVisible && !soloTabla">
+    <div class="mb-2">
+      <button type="button" class="btn btn-success btn-sm" (click)="volverATabla()" title="Volver a Postulantes inscritos">
+        <i class="bi bi-arrow-left me-1"></i>
+        Volver a la lista
+      </button>
+    </div>
     
     <!-- Datos biográficos del estudiante -->
     <div class="biographical-card">
