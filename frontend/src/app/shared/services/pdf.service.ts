@@ -230,7 +230,7 @@ export class PdfService {
 
   async generarFMDG1(
     data: Fmdg1Data,
-    options?: { logoUrl?: string; logoWidthMm?: number; logoMaxHeightMm?: number; logoBgColor?: string; logoFormat?: 'PNG' | 'JPEG' }
+    options?: { logoUrl?: string; logoWidthMm?: number; logoMaxHeightMm?: number; logoBgColor?: string; logoFormat?: 'PNG' | 'JPEG'; behavior?: 'download' | 'view' }
   ) {
     const doc = new jsPDF({ unit: 'mm', format: 'letter' }); // 216 x 279 mm aprox
     // Usaremos la fuente por defecto (Helvetica)
@@ -550,13 +550,21 @@ export class PdfService {
     doc.setFont('helvetica', 'italic');
     doc.text(notaResto, cx, yMiddle);
 
-    // Guardar
-    doc.save('FMDG-1.pdf');
+    if (options?.behavior === 'view') {
+      try {
+        const url = doc.output('bloburl');
+        window.open(url, '_blank');
+      } catch {
+        (doc as any).output('dataurlnewwindow');
+      }
+    } else {
+      doc.save('FMDG-1.pdf');
+    }
   }
 
   async generarDesignacionTutorPdf(
     data: TutorDesignacionPdfData,
-    options?: { fileName?: string; logoUrl?: string; logoWidthMm?: number; logoMaxHeightMm?: number; logoBgColor?: string; logoFormat?: 'PNG' | 'JPEG' }
+    options?: { fileName?: string; logoUrl?: string; logoWidthMm?: number; logoMaxHeightMm?: number; logoBgColor?: string; logoFormat?: 'PNG' | 'JPEG'; behavior?: 'download' | 'view' }
   ) {
     const doc = new jsPDF({ unit: 'mm', format: 'letter' });
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -1071,6 +1079,15 @@ export class PdfService {
     refreshHeaders();
 
     const fileName = options?.fileName || `designacion-tutor-${(data.numeroDocumento || data.tutorNombre || 'documento')}.pdf`;
-    doc.save(fileName);
+    if (options?.behavior === 'view') {
+      try {
+        const url = doc.output('bloburl');
+        window.open(url, '_blank');
+      } catch {
+        (doc as any).output('dataurlnewwindow');
+      }
+    } else {
+      doc.save(fileName);
+    }
   }
 }

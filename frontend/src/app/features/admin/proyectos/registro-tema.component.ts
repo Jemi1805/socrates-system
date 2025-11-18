@@ -7,6 +7,7 @@ import { HeaderComponent } from '../../../shared/components/header/header.compon
 import { PostulanteService } from '../postulantes/postulante.service';
 import { PdfService } from '../../../shared/services/pdf.service';
 import { LoadingService } from '../../../core/services/loading.service';
+import { SgaService } from '../../../shared/services/sga.service';
 
 interface EstudianteCtx {
   cod_ceta?: string | number;
@@ -93,6 +94,7 @@ export class RegistroTemaComponent implements OnInit {
     private pdfService: PdfService,
     private route: ActivatedRoute,
     private loadingService: LoadingService,
+    private sgaService: SgaService,
   ) {}
 
   ngOnInit(): void {
@@ -192,6 +194,39 @@ export class RegistroTemaComponent implements OnInit {
           },
           error: () => {}
         });
+
+        const codNum = Number(qpCod);
+        if (!isNaN(codNum)) {
+          this.sgaService.getPostulanteById(codNum).subscribe({
+            next: (resp: any) => {
+              const data = resp?.data ?? resp;
+              const obj = Array.isArray(data?.data) ? data.data[0] : data;
+              if (!obj) return;
+              let cel: any = obj.celular ?? obj.telf_movil ?? obj.telefono ?? obj.celular_est ?? null;
+              if (!cel) {
+                let raw: any = obj.raw ?? obj.raw_data ?? null;
+                if (raw && typeof raw === 'string') {
+                  try { raw = JSON.parse(raw); } catch { raw = null; }
+                }
+                if (raw && typeof raw === 'object') {
+                  cel = raw.Celular ?? raw.celular ?? raw.TELF_MOVIL ?? raw.telf_movil ?? raw.telefono ?? raw.Telefono ?? raw.cel ?? raw.MOVIL ?? raw.movil ?? raw['Teléfono'] ?? null;
+                }
+              }
+              if (cel) {
+                const celStr = String(cel).trim();
+                this.celular = celStr;
+                this.estudiante = { ...(this.estudiante || {}), celular: celStr } as any;
+                try {
+                  const raw = sessionStorage.getItem('datos_postulacion');
+                  const datos = raw ? JSON.parse(raw) : {};
+                  datos.estudiante = { ...(datos.estudiante || {}), celular: celStr };
+                  sessionStorage.setItem('datos_postulacion', JSON.stringify(datos));
+                } catch {}
+              }
+            },
+            error: () => {}
+          });
+        }
 
         // Reconsultar proyecto por el nuevo CETA y sincronizar resumen
         const cod = String(qpCod);
@@ -348,6 +383,37 @@ export class RegistroTemaComponent implements OnInit {
             this.hydratingResumen = false;
           }
         }
+        const stableCod = this.codCeta || qpCod || '';
+        const codNum2 = Number(stableCod);
+        if (!this.celular && stableCod && !isNaN(codNum2)) {
+          this.sgaService.getPostulanteById(codNum2).subscribe({
+            next: (resp: any) => {
+              const data = resp?.data ?? resp;
+              const obj = Array.isArray(data?.data) ? data.data[0] : data;
+              if (!obj) return;
+              let cel: any = obj.celular ?? obj.telf_movil ?? obj.telefono ?? obj.celular_est ?? null;
+              if (!cel) {
+                let raw: any = obj.raw ?? obj.raw_data ?? null;
+                if (raw && typeof raw === 'string') { try { raw = JSON.parse(raw); } catch { raw = null; } }
+                if (raw && typeof raw === 'object') {
+                  cel = raw.Celular ?? raw.celular ?? raw.TELF_MOVIL ?? raw.telf_movil ?? raw.telefono ?? raw.Telefono ?? raw.cel ?? raw.MOVIL ?? raw.movil ?? raw['Teléfono'] ?? null;
+                }
+              }
+              if (cel) {
+                const celStr = String(cel).trim();
+                this.celular = celStr;
+                this.estudiante = { ...(this.estudiante || {}), celular: celStr } as any;
+                try {
+                  const raw = sessionStorage.getItem('datos_postulacion');
+                  const datos = raw ? JSON.parse(raw) : {};
+                  datos.estudiante = { ...(datos.estudiante || {}), celular: celStr };
+                  sessionStorage.setItem('datos_postulacion', JSON.stringify(datos));
+                } catch {}
+              }
+            },
+            error: () => {}
+          });
+        }
       }
     });
 
@@ -366,7 +432,7 @@ export class RegistroTemaComponent implements OnInit {
 
   cancelar() {
     // Volver a la pantalla de selección de modalidad
-    this.router.navigate(['/modalidad-graduacion']);
+    this.router.navigate(['/postulantes']);
   }
 
   onSubmit() {
@@ -438,8 +504,8 @@ export class RegistroTemaComponent implements OnInit {
     this.resumenVisible = true;
   }
 
-  irModalidadGraduacion() {
-    this.router.navigate(['/modalidad-graduacion']);
+  irListaPostulantes() {
+    this.router.navigate(['/postulantes']);
   }
 
   irPostulantes() {

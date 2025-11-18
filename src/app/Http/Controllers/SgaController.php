@@ -99,6 +99,23 @@ class SgaController extends Controller
         $result = $this->sgaService->getEstudiantes($params);
 
         if ($result) {
+            if (is_array($result) && isset($result['data']) && is_array($result['data'])) {
+                foreach ($result['data'] as $idx => $item) {
+                    $cod = null;
+                    if (is_array($item)) {
+                        $cod = isset($item['cod_ceta']) ? $item['cod_ceta'] : null;
+                    }
+                    if ($cod !== null && $cod !== '') {
+                        $localCel = DB::table('proyecto')
+                            ->where('cod_ceta', (string)$cod)
+                            ->orderByDesc('id')
+                            ->value('celular');
+                        if (!empty($localCel)) {
+                            $result['data'][$idx]['celular'] = $localCel;
+                        }
+                    }
+                }
+            }
             return response()->json([
                 'success' => true,
                 'data' => $result,
@@ -117,25 +134,42 @@ class SgaController extends Controller
      */
     public function getEstudianteByCodigo(Request $request, $codCeta)
     {
-        $carrera = $request->get('carrera');
-        $result = $this->sgaService->getEstudianteByCodigo($codCeta, $carrera);
+        $carreraRaw = $request->get('carrera');
+        $carreraNorm = $this->normalizeCarrera($carreraRaw);
+        $slugs = [];
 
-        if ($result && !empty($result['data'])) {
-            $carreraOut = 'default';
-            if (!empty($carrera)) {
-                $carreraOut = $carrera;
+        if (!empty($carreraNorm)) {
+            $slugs = [$carreraNorm];
+        } else {
+            $slugs = ['mecanica', 'electricidad'];
+        }
+
+        foreach ($slugs as $slug) {
+            $result = $this->sgaService->getEstudianteByCodigo($codCeta, $slug);
+            if ($result && !empty($result['data'])) {
+                $row = isset($result['data'][0]) ? $result['data'][0] : $result['data'];
+                $localCel = DB::table('proyecto')
+                    ->where('cod_ceta', (string)$codCeta)
+                    ->orderByDesc('id')
+                    ->value('celular');
+                if (!empty($localCel)) {
+                    if (is_array($row)) {
+                        $row['celular'] = $localCel;
+                    }
+                }
+                return response()->json([
+                    'success' => true,
+                    'data' => $row,
+                    'carrera' => $slug
+                ]);
             }
-            return response()->json([
-                'success' => true,
-                'data' => isset($result['data'][0]) ? $result['data'][0] : null,
-                'carrera' => $carreraOut
-            ]);
         }
 
         return response()->json([
-            'success' => false,
+            'success' => true,
+            'data' => null,
             'message' => 'Estudiante no encontrado'
-        ], 404);
+        ]);
     }
 
     /**
@@ -276,7 +310,7 @@ class SgaController extends Controller
     {
         $result = $this->sgaService->getInscripciones($codCeta);
 
-        if ($result) {
+        if (is_array($result) && !empty($result)) {
             return response()->json([
                 'success' => true,
                 'data' => $result
@@ -284,9 +318,10 @@ class SgaController extends Controller
         }
 
         return response()->json([
-            'success' => false,
-            'message' => 'Error al obtener inscripciones'
-        ], 500);
+            'success' => true,
+            'data' => [],
+            'message' => 'Sin inscripciones encontradas o endpoint no disponible'
+        ]);
     }
 
     /**
@@ -294,46 +329,39 @@ class SgaController extends Controller
      */
     public function getPagosMaterialExtra(Request $request, $codCeta)
     {
-        $carrera = $request->get('carrera');
-        $result = $this->sgaService->getPagosMaterialExtra($codCeta, $carrera);
+        $carreraRaw = $request->get('carrera');
+        $carreraNorm = $this->normalizeCarrera($carreraRaw);
+        $slugs = [];
 
-        if ($result && isset($result['success']) && $result['success']) {
-            $data = array();
-            if (isset($result['data'])) {
-                $data = $result['data'];
-            }
-
-            $total = 0;
-            if (isset($result['total'])) {
-                $total = $result['total'];
-            } else {
-                if (isset($result['data'])) {
-                    $total = count($result['data']);
-                }
-            }
-
-            $carreraOut = 'default';
-            if (!empty($carrera)) {
-                $carreraOut = $carrera;
-            }
-
-            return response()->json(array(
-                'success' => true,
-                'data' => $data,
-                'total' => $total,
-                'carrera' => $carreraOut,
-            ));
+        if (!empty($carreraNorm)) {
+            $slugs = [$carreraNorm];
+        } else {
+            $slugs = ['mecanica', 'electricidad'];
         }
 
-        $message = 'Error al obtener pagos de material extra';
-        if (is_array($result) && isset($result['message'])) {
-            $message = $result['message'];
+        foreach ($slugs as $slug) {
+            $result = $this->sgaService->getPagosMaterialExtra($codCeta, $slug);
+
+            if ($result && isset($result['success']) && $result['success']) {
+                $data = isset($result['data']) ? $result['data'] : [];
+                $total = isset($result['total']) ? $result['total'] : count($data);
+
+                return response()->json([
+                    'success' => true,
+                    'data' => $data,
+                    'total' => $total,
+                    'carrera' => $slug,
+                ]);
+            }
         }
 
-        return response()->json(array(
-            'success' => false,
-            'message' => $message
-        ), 500);
+        return response()->json([
+            'success' => true,
+            'data' => [],
+            'total' => 0,
+            'carrera' => $carreraNorm ?: 'default',
+            'message' => 'Sin pagos de material extra o endpoint no disponible'
+        ]);
     }
     
     /**

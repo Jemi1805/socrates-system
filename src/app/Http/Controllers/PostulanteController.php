@@ -30,6 +30,11 @@ class PostulanteController extends Controller
             ->select('cod_ceta_est', DB::raw('MAX(id) as last_id'))
             ->groupBy('cod_ceta_est');
 
+        // Último proyecto por estudiante para exponer celular local actualizado
+        $latestProyecto = DB::table('proyecto')
+            ->select('cod_ceta', DB::raw('MAX(id) as last_id'))
+            ->groupBy('cod_ceta');
+
         $query = Postulante::query()
             ->select([
                 'postulantes.cod_ceta',
@@ -43,12 +48,20 @@ class PostulanteController extends Controller
                 'inscrip_modalidad.modalidad_nom',
                 'inscrip_modalidad.estado',
                 'inscrip_modalidad.fecha_inscripcion',
+                DB::raw('proj.celular as celular'),
             ])
             ->joinSub($latestInscripciones, 'latest_insc', function ($join) {
                 $join->on('latest_insc.cod_ceta_est', '=', 'postulantes.cod_ceta');
             })
             ->join('inscrip_modalidad', function ($join) {
                 $join->on('inscrip_modalidad.id', '=', 'latest_insc.last_id');
+            })
+            // Unir el último proyecto para obtener celular local
+            ->leftJoinSub($latestProyecto, 'latest_proy', function ($join) {
+                $join->on('latest_proy.cod_ceta', '=', 'postulantes.cod_ceta');
+            })
+            ->leftJoin('proyecto as proj', function ($join) {
+                $join->on('proj.id', '=', 'latest_proy.last_id');
             });
 
         if ($estado !== null && $estado !== '') {

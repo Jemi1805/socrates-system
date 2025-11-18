@@ -11,7 +11,7 @@
 
   <!-- Tabla de Postulantes inscritos -->
   <div class="content-wrapper" *ngIf="soloTabla">
-    <div class="card">
+    <div class="card table-card">
       <div class="card-body">
         <div class="inscritos-head d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
           <h5 class="card-title mb-0 d-flex align-items-center gap-2">
@@ -41,13 +41,15 @@
               <tr>
                 <th scope="col">Postulante</th>
                 <th scope="col">Inscripción</th>
+                <th scope="col" class="pagos-col">Estado de Pagos</th>
                 <th scope="col">Registro de Tema</th>
                 <th scope="col">Designación de Tutor</th>
                 <th scope="col">Documentos</th>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let ins of postulantesInscritos">
+              <ng-container *ngFor="let ins of postulantesInscritos">
+              <tr>
                 <td>
                   <div class="fw-semibold"> {{ ins.cod_ceta }}</div>
                   <div>{{ ins.ap_pat }} {{ ins.ap_mat }} {{ ins.nombres_est }}</div>
@@ -56,21 +58,29 @@
                   </div>
                 </td>
                 <td>
-                  <div class="d-flex align-items-start justify-content-between gap-2">
+                  <div class="d-flex align-items-center justify-content-between gap-2">
                     <div>
                       <div class="fw-semibold">{{ ins.modo || '-' }}</div>
                       <div class="small text-muted">{{ getCarreraLabel(ins) || '-' }}</div>
+                      <div class="small text-muted mt-1">{{ (ins.primera_inscripcion || ins.fecha_inscripcion) | date:'dd/MM/yyyy' }}</div>
                     </div>
                     <button type="button" class="btn btn-outline-secondary btn-sm px-2 py-1 btn-eye" title="Ver formulario de inscripción" aria-label="Ver inscripción" data-bs-toggle="tooltip" data-bs-placement="top" (click)="verInscripcionDesdeFila(ins)">
                       <i class="bi bi-eye"></i>
                     </button>
                   </div>
                 </td>
+                <td class="pagos-cell">
+                  <span class="pago-badge" [ngClass]="{
+                    'pago-completo': ins.pago_estado === 'completo',
+                    'pago-parcial': ins.pago_estado === 'parcial',
+                    'pago-sin': !ins.pago_estado || ins.pago_estado === 'sin_pagos'
+                  }">{{ pagoEstadoLabel(ins) }}</span>
+                </td>
                 <td class="registro-tema-cell">
                   <ng-container *ngIf="tieneProyecto(ins); else noTemaTpl">
                     <div class="tema-row d-flex align-items-center gap-2">
                       <div class="tema-text flex-grow-1">
-                        <div class="tema-titulo ellipsis-3">{{ temaNombreUI(ins) }}</div>
+                        <div class="fw-semibold ellipsis-3">{{ temaNombreUI(ins) }}</div>
                         <div class="tema-sub ellipsis-2" *ngIf="temaObjetivoUI(ins)">{{ temaObjetivoUI(ins) }}</div>
                       </div>
                       <button type="button" class="btn btn-outline-secondary btn-sm px-2 py-1 btn-eye ms-auto" title="Ver resumen del registro de tema" aria-label="Ver tema" data-bs-toggle="tooltip" data-bs-placement="top" (click)="verRegistroTemaResumen(ins)">
@@ -86,11 +96,12 @@
                   </ng-template>
                 </td>
                 <td class="designacion-cell">
-                  <div class="d-flex align-items-start justify-content-between gap-2">
+                  <div class="d-flex align-items-center justify-content-between gap-2">
                     <div class="flex-grow-1">
                       <ng-container *ngIf="ins.designacion?.tutor_nombre; else noTutorTpl">
-                        <div class="tutor-nombre ellipsis-1">{{ ins.designacion?.tutor_nombre }}</div>
-                        <div class="tutor-area ellipsis-1" *ngIf="ins.designacion?.area">Área: {{ ins.designacion?.area }}</div>
+                        <div class="tutor-nombre ellipsis-2">{{ ins.designacion?.tutor_nombre }}</div>
+                        <div class="tutor-area ellipsis-2" *ngIf="ins.designacion?.area">Área: {{ ins.designacion?.area }}</div>
+                        <div class="tutor-cel ellipsis-1" *ngIf="ins.designacion?.tutor_celular">Cel: {{ ins.designacion?.tutor_celular }}</div>
                       </ng-container>
                       <ng-template #noTutorTpl>
                         <button type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irDesignarTutor(ins)">
@@ -99,29 +110,37 @@
                         </button>
                       </ng-template>
                     </div>
-                    <button type="button" class="btn btn-outline-secondary btn-sm px-2 py-1 btn-eye" title="Ver detalle de designación" aria-label="Ver designación" data-bs-toggle="tooltip" data-bs-placement="top" (click)="verDetalle('designacion', ins)">
-                      <i class="bi bi-eye"></i>
-                    </button>
+                    <ng-container *ngIf="tieneDesignacion(ins)">
+                      <button type="button" class="btn btn-outline-secondary btn-sm px-2 py-1 btn-eye" title="Ver designación" aria-label="Ver designación" data-bs-toggle="tooltip" data-bs-placement="top" (click)="verDesignacionDesdeFila(ins)">
+                        <i class="bi bi-eye"></i>
+                      </button>
+                    </ng-container>
                   </div>
                 </td>
-                <td>
-                  <div class="d-flex flex-wrap gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary px-2 py-1" title="Generar FMDG-1" aria-label="Generar FMDG-1" data-bs-toggle="tooltip" data-bs-placement="top"
-                            [disabled]="!ins.proyecto?.nombre"
-                            (click)="generarFmdg(ins)">
-                      FDMG-1
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary px-2 py-1" title="Generar documento de designación" aria-label="Generar designación" data-bs-toggle="tooltip" data-bs-placement="top"
-                            [disabled]="!ins.designacion?.tutor_nombre"
-                            (click)="generarDesignacionPdf(ins)">
-                      Designación
-                    </button>
-                  </div>
+                <td class="docs-cell">
+                  <ng-container *ngIf="ins?.proyecto?.nombre || ins?.designacion?.tutor_nombre; else noDocsTpl">
+                    <ul class="docs-list">
+                      <li *ngIf="ins?.proyecto?.nombre">
+                        <a href="" (click)="verFmdg(ins); $event.preventDefault()">FDMG-1</a>
+                      </li>
+                      <li *ngIf="ins?.designacion?.tutor_nombre">
+                        <a href="" (click)="verDesignacion(ins); $event.preventDefault()">Designación</a>
+                      </li>
+                    </ul>
+                  </ng-container>
+                  <ng-template #noDocsTpl>
+                    <span class="text-muted">Documentos no generados</span>
+                  </ng-template>
                 </td>
               </tr>
+              
+              </ng-container>
             </tbody>
           </table>
         </div>
+
+        
+        
 
         <!-- Modal de detalle de procesos -->
         <div *ngIf="detalleVisible" class="detalle-overlay">
@@ -176,7 +195,7 @@
             <i class="bi bi-clipboard-check me-2"></i>
             Resumen de la inscripción
           </h5>
-          <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/modalidad-graduacion']" style="position: relative; z-index: 1061; pointer-events: auto;">
+          <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/postulantes']" style="position: relative; z-index: 1061; pointer-events: auto;">
             <i class="bi bi-arrow-left me-1"></i>
             Volver
           </a>

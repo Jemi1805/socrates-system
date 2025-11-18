@@ -589,7 +589,7 @@ export class DesignarTutorComponent implements OnInit {
   }
 
   public volverAModalidadGraduacion() {
-    this.router.navigate(['/modalidad-graduacion']);
+    this.router.navigate(['/postulantes']);
   }
 
   // Texto de áreas mostrado en la tabla

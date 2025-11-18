@@ -24,6 +24,7 @@ interface Estudiante {
   fecha_nacimiento: string;
   lugar_nacimiento: string;
   ci: string;
+  celular?: string;
   procedencia?: string;
   nro_serie_titulo?: string;
   reg_ini_c?: string;
@@ -32,6 +33,7 @@ interface Estudiante {
   gestion_fin?: string;
   incrip_uni?: boolean;
 }
+ 
 interface ModalidadGraduacion {
   id: number;
   nombre: string;
@@ -75,7 +77,9 @@ interface PostulanteInscrito {
   estado?: string | null;
   carrera?: string | null;
   proyecto?: { nombre?: string | null; objetivo?: string | null } | null;
-  designacion?: { tutor_nombre?: string | null; area?: string | null; numero_documento?: string | null; cite?: string | null } | null;
+  designacion?: { tutor_nombre?: string | null; area?: string | null; numero_documento?: string | null; cite?: string | null; tutor_celular?: string | null } | null;
+  primera_inscripcion?: string | null;
+  pago_estado?: 'sin_pagos' | 'parcial' | 'completo' | null;
 }
 
 @Component({
@@ -1052,6 +1056,7 @@ private mapInscritoToEstudiante(p: PostulanteInscrito): Estudiante {
     ap_mat: p.ap_mat || '',
     nombres: p.nombres_est || '',
     ci: p.ci || '',
+    celular: (p.celular || '') as any,
     procedencia: p.procedencia || '',
     carrera: carreraLabel,
     pensum: p.pensum || '',
@@ -1137,6 +1142,8 @@ cargarPostulantesInscritos() {
   });
 }
 
+//
+
 seleccionarInscrito(postulante: PostulanteInscrito) {
   const estudiante = this.mapInscritoToEstudiante(postulante);
   try {
@@ -1154,7 +1161,7 @@ cargarDetallesTabla() {
   if (!Array.isArray(this.postulantesInscritos) || this.postulantesInscritos.length === 0) return;
   this.loadingDetalles = true;
   const items = this.postulantesInscritos.slice();
-  let remaining = items.length * 2; // proyecto + designación por fila
+  let remaining = items.length * 5; // proyecto + designación + postulante(SGA) + inscripciones + aranceles
   const done = () => { remaining--; if (remaining <= 0) this.loadingDetalles = false; };
   for (const ins of items) {
     const cod = ins.cod_ceta;
@@ -1200,7 +1207,8 @@ cargarDetallesTabla() {
           const area = found.area || found.pertinencia || (Array.isArray(found.estudiantes) ? (found.estudiantes[0]?.area || null) : null);
           const numeroDoc = (found as any)?.numero_documento ?? null;
           const cite = (found as any)?.cite ?? null;
-          ins.designacion = { tutor_nombre: tutorNombre || null, area: area || null, numero_documento: numeroDoc, cite };
+          const tutorCel = (found as any)?.tutor_celular ?? (found as any)?.tutor_cel ?? (found as any)?.celular ?? (found?.tutor?.celular ?? null);
+          ins.designacion = { tutor_nombre: tutorNombre || null, area: area || null, numero_documento: numeroDoc, cite, tutor_celular: tutorCel || null };
         } else {
           ins.designacion = null;
         }
@@ -1208,7 +1216,88 @@ cargarDetallesTabla() {
       error: () => { ins.designacion = ins.designacion || null; },
       complete: () => done()
     });
+    // Datos del postulante desde SGA (para celular seguro y otros campos)
+    this.sgaService.getPostulanteById(cod).subscribe({
+      next: (resp) => {
+        let data = (resp as any)?.data ?? resp;
+        let obj: any = Array.isArray((data as any)?.data) ? (data as any).data[0] : data;
+        // Desempaquetar un nivel más si la respuesta viene anidada
+        if (obj && obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data)) {
+          obj = obj.data;
+        }
+        if (obj) {
+          let cel: any = obj.celular ?? obj.telf_movil ?? obj.telefono ?? obj.celular_est ?? null;
+          // Intentar en anidados comunes
+          if (!cel) {
+            const est = (obj as any).estudiante ?? (obj as any).student ?? null;
+            if (est) {
+              cel = est.celular ?? est.telf_movil ?? est.telefono ?? est.celular_est ?? null;
+            }
+          }
+          // Intentar en raw (objeto o string JSON)
+          if (!cel) {
+            let raw: any = (obj as any).raw ?? (obj as any).raw_data ?? null;
+            if (raw && typeof raw === 'string') {
+              try { raw = JSON.parse(raw); } catch { raw = null; }
+            }
+            if (raw && typeof raw === 'object') {
+              cel = raw.Celular ?? raw.celular ?? raw.TELF_MOVIL ?? raw.telf_movil ?? raw.telefono ?? raw.Telefono ?? raw.cel ?? raw.MOVIL ?? raw.movil ?? raw['Teléfono'] ?? null;
+            }
+          }
+          if (cel) ins.celular = String(cel).trim();
+          // En caso de que venga fecha de inscripción directa
+          const fi = (obj as any)?.fecha_inscripcion || (obj as any)?.created_at || null;
+          if (fi && !ins.primera_inscripcion) ins.primera_inscripcion = String(fi);
+        }
+      },
+      error: () => {},
+      complete: () => done()
+    });
+    // Inscripciones del postulante: obtener la primera fecha de inscripción
+    this.sgaService.getInscripModalidadByPostulante(cod).subscribe({
+      next: (resp) => {
+        const list = (resp as any)?.data ?? resp;
+        const arr: any[] = Array.isArray(list) ? list : [];
+        if (arr.length > 0) {
+          const fechas = arr
+            .map(it => (it?.fecha_inscripcion || it?.created_at || null))
+            .filter(Boolean)
+            .map((s: any) => new Date(String(s)).getTime())
+            .filter(n => !isNaN(n));
+          if (fechas.length > 0) {
+            const minTs = Math.min(...fechas);
+            ins.primera_inscripcion = new Date(minTs).toISOString();
+          }
+        }
+      },
+      error: () => {},
+      complete: () => done()
+    });
+    // Aranceles del postulante: estado de pago (sin_pagos, parcial, completo)
+    this.sgaService.getArancelesEst(cod).subscribe({
+      next: (resp) => {
+        const list = (resp as any)?.data ?? resp;
+        const arr: any[] = Array.isArray(list) ? list : [];
+        if (arr.length === 0) {
+          ins.pago_estado = 'sin_pagos';
+          return;
+        }
+        const pagados = arr.filter(it => !!it?.pagado).length;
+        if (pagados === 0) ins.pago_estado = 'sin_pagos';
+        else if (pagados === arr.length) ins.pago_estado = 'completo';
+        else ins.pago_estado = 'parcial';
+      },
+      error: () => { ins.pago_estado = ins.pago_estado ?? null; },
+      complete: () => done()
+    });
   }
+}
+
+pagoEstadoLabel(ins: PostulanteInscrito): string {
+  const v = ins?.pago_estado;
+  if (v === 'completo') return 'Completo';
+  if (v === 'parcial') return 'Parcial';
+  return 'Sin pagos';
 }
 
 private pickProyectoFromResponse(res: any, wantedCod: string): any | null {
@@ -1275,6 +1364,21 @@ private findDesignationForCod(list: any[], wantedCod: string): any | null {
 irRegistrarTema(ins: PostulanteInscrito) {
   const cod = ins?.cod_ceta;
   if (!cod) return;
+  // Persistir contexto base (incluye celular) para el componente RegistroTema
+  try {
+    const estudiante = this.mapInscritoToEstudiante(ins);
+    const modalidad = (ins.modo && ins.modo.toString().trim())
+      ? { id: 0 as any, nombre: ins.modo.toString().trim(), descripcion: '', monto_arancel: '' }
+      : null;
+    const raw = sessionStorage.getItem('datos_postulacion');
+    const parsed = raw ? JSON.parse(raw) : {};
+    parsed.estudiante = { ...(parsed.estudiante || {}), ...estudiante };
+    if (modalidad) parsed.modalidad = modalidad;
+    sessionStorage.setItem('datos_postulacion', JSON.stringify(parsed));
+    if ((ins as any)?.proyecto) {
+      sessionStorage.setItem('proyecto_cache', JSON.stringify((ins as any).proyecto));
+    }
+  } catch {}
   this.router.navigate(['/registro-tema'], { queryParams: { cod_ceta: String(cod) } });
 }
 
@@ -1303,6 +1407,27 @@ verRegistroTemaResumen(ins: PostulanteInscrito) {
 irDesignarTutor(ins: PostulanteInscrito) {
   const cod = ins?.cod_ceta;
   if (!cod) return;
+  const carreraKey = this.normalizeCarreraKey(ins?.carrera || null) || undefined;
+  this.router.navigate(['/tutores/designar'], { queryParams: { cod_ceta: String(cod), carrera: carreraKey } });
+}
+
+tieneDesignacion(ins: PostulanteInscrito): boolean {
+  const d: any = ins?.designacion || null;
+  if (!d) return false;
+  return !!(d.tutor_nombre || d.numero_documento || d.cite || d.area);
+}
+
+verDesignacionDesdeFila(ins: PostulanteInscrito) {
+  const cod = ins?.cod_ceta;
+  if (!cod) return;
+  try {
+    const estudiante = this.mapInscritoToEstudiante(ins);
+    const raw = sessionStorage.getItem('datos_postulacion');
+    const parsed = raw ? JSON.parse(raw) : {};
+    parsed.estudiante = { ...(parsed.estudiante || {}), ...estudiante };
+    if (ins?.designacion) parsed.last_designation = ins.designacion;
+    sessionStorage.setItem('datos_postulacion', JSON.stringify(parsed));
+  } catch {}
   const carreraKey = this.normalizeCarreraKey(ins?.carrera || null) || undefined;
   this.router.navigate(['/tutores/designar'], { queryParams: { cod_ceta: String(cod), carrera: carreraKey } });
 }
@@ -1372,6 +1497,57 @@ generarDesignacionPdf(ins: PostulanteInscrito) {
     console.error('No fue posible generar el documento de designación', e);
   }
 }
+
+verFmdg(ins: PostulanteInscrito) {
+  try {
+    const nombres = (ins as any)?.nombres_est || '';
+    const apPat = (ins as any)?.ap_pat || '';
+    const apMat = (ins as any)?.ap_mat || '';
+    const data: any = {
+      codCeta: String(ins.cod_ceta || ''),
+      nombreCompleto: `${nombres} ${apPat} ${apMat}`.trim(),
+      nombres,
+      apellidos: `${apPat} ${apMat}`.trim(),
+      ci: (ins as any)?.ci || '',
+      expedicion: (ins as any)?.procedencia || '',
+      celular: (ins as any)?.celular || '',
+      carrera: this.getCarreraLabel(ins) || (ins as any)?.carrera || '',
+      modalidad: ins?.modo || '',
+      tema: this.temaNombreUI(ins) || '',
+      objetivo: this.temaObjetivoUI(ins) || '',
+    };
+    this.pdfService.generarFMDG1(data, { logoWidthMm: 24, logoMaxHeightMm: 24, logoFormat: 'JPEG', logoBgColor: '#FFFFFF', behavior: 'view' });
+  } catch (e) {
+    console.error('No fue posible previsualizar FMDG-1', e);
+  }
+}
+
+verDesignacion(ins: PostulanteInscrito) {
+  if (!ins?.designacion) return;
+  try {
+    const nombres = (ins as any)?.nombres_est || '';
+    const apPat = (ins as any)?.ap_pat || '';
+    const apMat = (ins as any)?.ap_mat || '';
+    const estudianteNombre = `${apPat} ${apMat} ${nombres}`.trim();
+    const data: any = {
+      tutorNombre: ins.designacion?.tutor_nombre || 'Tutor designado',
+      area: ins.designacion?.area || undefined,
+      estudianteNombre,
+      estudianteCodigo: String(ins.cod_ceta || ''),
+      carrera: this.getCarreraLabel(ins) || (ins as any)?.carrera || undefined,
+      modalidad: ins?.modo || 'Proyecto de Grado',
+      proyectoNombre: (ins as any)?.proyecto?.nombre || undefined,
+      convocatoria: undefined,
+      numeroDocumento: ins.designacion?.numero_documento || undefined,
+      cite: ins.designacion?.cite || undefined,
+    };
+    this.pdfService.generarDesignacionTutorPdf(data, { fileName: `designacion-tutor-${ins.cod_ceta}.pdf`, behavior: 'view' });
+  } catch (e) {
+    console.error('No fue posible previsualizar el documento de designación', e);
+  }
+}
+
+//
 
 ngOnInit() {
   // Si viene /postulantes/:cod_ceta, preparar vista individual
@@ -2010,7 +2186,7 @@ private cargarPostulanteDesdeBD() {
       // Mantener datos por si el usuario regresa nuevamente
       // sessionStorage.removeItem('datos_postulacion'); // si quisieras limpiar, descomenta
     } catch {}
-    this.router.navigate(['/modalidad-graduacion']);
+    this.router.navigate(['/postulantes']);
   }
   
   // Métodos para gestión de modalidades

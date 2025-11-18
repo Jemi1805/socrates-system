@@ -21,6 +21,50 @@ $transition: all 0.3s ease;
   padding: 0;
 }
 
+// Hacer que la página de lista (soloTabla) aproveche el alto del viewport
+.postulantes-container {
+  display: flex;
+  flex-direction: column;
+}
+.postulantes-container .content-wrapper {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.postulantes-container .table-card {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.postulantes-container .table-card .card-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.postulantes-container .table-card .card-body .table-responsive {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+// Badge de estado de pagos
+.pago-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.2;
+  &.pago-completo { background: rgba(76, 175, 80, 0.15); color: #2e7d32; }
+  &.pago-parcial { background: rgba(255, 152, 0, 0.18); color: #b26a00; }
+  &.pago-sin { background: rgba(158, 158, 158, 0.2); color: #424242; }
+}
+
+// (LIMPIEZA) Se eliminaron estilos de overlay de documentos
+
 // Dropdown de gestiones dentro de la tarjeta de Aranceles
 .aranceles-card {
   position: relative;
@@ -136,6 +180,26 @@ $transition: all 0.3s ease;
   }
 }
 
+// --- Fix superposición del dropdown de Documentos (tabla de inscritos) ---
+.table-card {
+  overflow: visible !important; // anula overflow:hidden del selector genérico .card
+  position: relative;
+  z-index: 18;
+
+  .card-body { overflow: visible; position: relative; }
+
+  .table-responsive {
+    overflow-x: visible !important;   // permitir que el dropdown se muestre hacia afuera
+    overflow-y: visible; // permitir que el dropdown salga por debajo/arriba
+  }
+
+  td.docs-cell {
+    overflow: visible;  // visible aunque la tabla use layout fijo
+    position: relative;
+    .dropdown-menu { z-index: 2002; }
+  }
+}
+
 // Utilidades de truncado
 .ellipsis-1 {
   overflow: hidden;
@@ -174,13 +238,16 @@ $transition: all 0.3s ease;
   max-width: 320px;
   .tutor-nombre { font-weight: 600; font-size: .95rem; line-height: 1.2; }
   .tutor-area { font-size: .85rem; color: $text-light; }
-  > .d-flex { flex-wrap: wrap; }
+  .tutor-cel { font-size: .85rem; color: $text-light; }
+  // Mantener en una sola fila (texto a la izquierda con 2 líneas y botón a la derecha)
+  > .d-flex { flex-wrap: nowrap; }
+  .flex-grow-1 { min-width: 0; }
   .btn-eye { margin-left: auto; }
 }
 
 // Modal simple de detalle (overlay ligero)
 .detalle-overlay {
-  position: fixed; inset: 0; z-index: 1050;
+  position: fixed; inset: 0; z-index: 12000 !important;
   display: flex; align-items: center; justify-content: center;
   .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
   .card { position: relative; width: 92%; max-width: 680px; }
@@ -232,7 +299,7 @@ $transition: all 0.3s ease;
 }
 
 .content-wrapper {
-  max-width: 1200px;
+  max-width: 1800px;
   margin: 0 auto;
   padding: 2rem 1rem;
 }
@@ -716,8 +783,34 @@ input {
     .table-fixed thead th, .table-fixed tbody td {
       overflow: hidden; text-overflow: ellipsis; white-space: normal; vertical-align: top;
     }
+    // Hacer más angosta la columna de Estado de Pagos
+    .table-fixed thead th.pagos-col, .table-fixed tbody td.pagos-cell { width: 120px; max-width: 120px; }
     // Evitar que los botones ojo desaparezcan al colapsar el espacio
     .btn-eye { flex: 0 0 auto; white-space: nowrap; }
+
+    // Permitir que el menú de documentos se muestre sobre el TD (no recortar por overflow hidden)
+    .table-fixed tbody tr { overflow: visible; }
+    .table-fixed td.docs-cell { overflow: visible; position: relative; z-index: 13000; }
+    td.docs-cell { position: relative; z-index: 13000; }
+    td.docs-cell .dropdown-menu { z-index: 2001; }
+    // Controlar ancho compacto de la columna de documentos
+    .table-fixed td.docs-cell, .table-fixed thead th.text-center { width: auto; max-width: none; min-width: 180px; }
+  }
+}
+
+// Panel de documentos (Angular) dentro de la celda
+.docs-cell {
+  .docs-menu-wrapper { position: relative; display: inline-block; z-index: 13001; }
+  .docs-links {
+    font-size: .92rem;
+    white-space: nowrap;
+    a { text-decoration: underline; }
+    a.disabled { pointer-events: none; opacity: .5; text-decoration: none; }
+  }
+  .docs-list {
+    margin: 0;
+    padding-left: 1.1rem; // viñetas
+    li { margin-bottom: .1rem; }
   }
 }
 

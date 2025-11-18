@@ -286,12 +286,12 @@ export class SgaService {
         }
       });
     }
-    return this.http.get<ApiResponse<Postulante[]>>(`${this.baseUrl}/postulantes`, { params: httpParams })
+    return this.http.get<ApiResponse<Postulante[]>>(`${this.baseUrl}/estudiantes`, { params: httpParams })
       .pipe(catchError(this.handleError));
   }
 
   getPostulanteById(cod_ceta: number): Observable<ApiResponse<Postulante>> {
-    return this.http.get<ApiResponse<Postulante>>(`${this.baseUrl}/postulantes/${cod_ceta}`)
+    return this.http.get<ApiResponse<Postulante>>(`${this.baseUrl}/estudiantes/${cod_ceta}`)
       .pipe(catchError(this.handleError));
   }
 
@@ -493,7 +493,12 @@ export class SgaService {
 
   // --- ARANCELES ESTUDIANTE ---
   getArancelesEst(cod_ceta_est: number): Observable<ApiResponse<ArancelEst[]>> {
-    return this.http.get<ApiResponse<ArancelEst[]>>(`${this.baseUrl}/postulantes/${cod_ceta_est}/aranceles`)
+    return this.http.get<ApiResponse<ArancelEst[]>>(`${this.baseUrl}/estudiantes/${cod_ceta_est}/pagos/material-extra`)
+      .pipe(catchError(this.handleError));
+  }
+
+  getInscripModalidadByPostulante(cod_ceta_est: number): Observable<ApiResponse<InscripModalidad[]>> {
+    return this.http.get<ApiResponse<InscripModalidad[]>>(`${this.baseUrl}/inscripciones/${cod_ceta_est}`)
       .pipe(catchError(this.handleError));
   }
 
@@ -596,15 +601,9 @@ export class SgaService {
       .pipe(catchError(this.handleError));
   }
 
-  // --- INSCRIPCIÓN MODALIDAD ---
-  getInscripModalidadByPostulante(cod_ceta_est: number): Observable<ApiResponse<InscripModalidad[]>> {
-    return this.http.get<ApiResponse<InscripModalidad[]>>(`${this.baseUrl}/inscripciones/${cod_ceta_est}`)
-      .pipe(catchError(this.handleError));
-  }
-
   // --- AUTENTICACIÓN Y CONEXIÓN ---
   checkConnection(): Observable<ApiResponse<boolean>> {
-    return this.http.get<ApiResponse<boolean>>(`${this.baseUrl}/connection`)
+    return this.http.get<ApiResponse<boolean>>(`${this.baseUrl}/check-connection`)
       .pipe(catchError(this.handleError));
   }
 
@@ -617,11 +616,11 @@ export class SgaService {
   private handleError(error: any): Observable<never> {
     console.error('Error en SGA Service:', error);
     let errorMessage = 'Error desconocido';
-    if (error.error?.message) {
+    if (error?.error?.message) {
       errorMessage = error.error.message;
-    } else if (error.message) {
+    } else if (error?.message) {
       errorMessage = error.message;
-    } else if (error.status) {
+    } else if (error?.status) {
       switch (error.status) {
         case 401:
           errorMessage = 'No autorizado';
