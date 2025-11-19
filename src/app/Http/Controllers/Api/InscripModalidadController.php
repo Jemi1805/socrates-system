@@ -128,6 +128,7 @@ class InscripModalidadController extends CrudController
             'convocatoria_id' => 'nullable|exists:convocatorias,id',
             'nom_convocatoria' => 'nullable|string|max:150',
             'aranceles_completos' => 'nullable|boolean',
+            'estado_arancel' => 'nullable|in:sin_pagos,parcial,completo',
         ]);
 
         $payload = [
@@ -142,6 +143,7 @@ class InscripModalidadController extends CrudController
             'convocatoria_id',
             'nom_convocatoria',
             'aranceles_completos',
+            'estado_arancel',
         ] as $key) {
             if (array_key_exists($key, $data)) {
                 $payload[$key] = $data[$key];
@@ -293,8 +295,10 @@ class InscripModalidadController extends CrudController
             $ins->fecha_inscripcion = now()->toDateString();
             $ins->estado = 'pendiente';
             $ins->save();
-
+            
             $allPaid = true;
+            $total = 0;
+            $paid = 0;
             if (!empty($data['aranceles'])) {
                 foreach ($data['aranceles'] as $a) {
                     $item = null;
@@ -351,17 +355,28 @@ class InscripModalidadController extends CrudController
                         }
                     }
                     $item->save();
-                    if (!$item->pagado) $allPaid = false;
+                    $total++;
+                    if ($item->pagado) { $paid++; } else { $allPaid = false; }
                 }
             } else {
                 // Si no hay aranceles en el payload, no es pago completo
                 $allPaid = false;
+                $total = 0;
+                $paid = 0;
             }
 
             // Actualizar pago completo si corresponde
             $ins->aranceles_completos = $allPaid ? 1 : 0;
             // Actualizar estado según pagos
             $ins->estado = $allPaid ? 'inscrito' : 'pendiente';
+            // Calcular estado_arancel granular: sin_pagos | parcial | completo
+            if ($total <= 0 || $paid === 0) {
+                $ins->estado_arancel = 'sin_pagos';
+            } elseif ($paid === $total) {
+                $ins->estado_arancel = 'completo';
+            } else {
+                $ins->estado_arancel = 'parcial';
+            }
             $ins->save();
 
             // Guardar/actualizar Datos de Carrera si vienen en el payload

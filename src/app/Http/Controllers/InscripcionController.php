@@ -151,6 +151,7 @@ class InscripcionController extends Controller
             ? DB::table('inscrip_modalidad')->where('cod_ceta_est', (int) $cod_ceta)->orderByDesc('updated_at')->first()
             : null;
         $arancelesCompletos = $insRow && isset($insRow->aranceles_completos) ? (bool)$insRow->aranceles_completos : null;
+        $estadoArancel = $insRow && isset($insRow->estado_arancel) ? $insRow->estado_arancel : null;
         $estadoInscripcion = $insRow && isset($insRow->estado) ? $insRow->estado : null;
         $convocatoriaId = $insRow && isset($insRow->convocatoria_id) ? $insRow->convocatoria_id : null;
         $convocatoriaNom = $insRow && isset($insRow->nom_convocatoria) ? $insRow->nom_convocatoria : null;
@@ -223,6 +224,7 @@ class InscripcionController extends Controller
 
             // Indicadores de inscripción
             'aranceles_completos' => $arancelesCompletos,
+            'estado_arancel' => $estadoArancel,
             'estado' => $estadoInscripcion,
         ];
 
@@ -234,6 +236,7 @@ class InscripcionController extends Controller
                 'modalidad_nom' => isset($insRow->modalidad_nom) ? $insRow->modalidad_nom : null,
                 'fecha_inscripcion' => isset($insRow->fecha_inscripcion) ? $insRow->fecha_inscripcion : null,
                 'aranceles_completos' => isset($insRow->aranceles_completos) ? (bool)$insRow->aranceles_completos : null,
+                'estado_arancel' => isset($insRow->estado_arancel) ? $insRow->estado_arancel : null,
                 'estado' => isset($insRow->estado) ? $insRow->estado : null,
                 'convocatoria_id' => $convocatoriaId,
                 'convocatoria_nom' => $convocatoriaNom,

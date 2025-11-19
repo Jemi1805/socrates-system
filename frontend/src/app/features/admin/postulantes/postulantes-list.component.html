@@ -41,7 +41,7 @@
               <tr>
                 <th scope="col">Postulante</th>
                 <th scope="col">Inscripción</th>
-                <th scope="col" class="pagos-col">Estado de Pagos</th>
+                <th scope="col" class="pagos-col">Estado de Arancel</th>
                 <th scope="col">Registro de Tema</th>
                 <th scope="col">Designación de Tutor</th>
                 <th scope="col">Documentos</th>
@@ -71,10 +71,10 @@
                 </td>
                 <td class="pagos-cell">
                   <span class="pago-badge" [ngClass]="{
-                    'pago-completo': ins.pago_estado === 'completo',
-                    'pago-parcial': ins.pago_estado === 'parcial',
-                    'pago-sin': !ins.pago_estado || ins.pago_estado === 'sin_pagos'
-                  }">{{ pagoEstadoLabel(ins) }}</span>
+                    'pago-completo': (ins.estado_arancel || ins.pago_estado) === 'completo',
+                    'pago-parcial': (ins.estado_arancel || ins.pago_estado) === 'parcial',
+                    'pago-sin': !(ins.estado_arancel || ins.pago_estado) || (ins.estado_arancel || ins.pago_estado) === 'sin_pagos'
+                  }">{{ ins.estado_arancel ? estadoArancelLabel(ins) : pagoEstadoLabel(ins) }}</span>
                 </td>
                 <td class="registro-tema-cell">
                   <ng-container *ngIf="tieneProyecto(ins); else noTemaTpl">

@@ -73,13 +73,14 @@ interface PostulanteInscrito {
   lugar_nacimiento?: string | null;
   pensum?: string | null;
   modo?: string | null;
-  fecha_inscripcion?: string | null;
-  estado?: string | null;
   carrera?: string | null;
   proyecto?: { nombre?: string | null; objetivo?: string | null } | null;
   designacion?: { tutor_nombre?: string | null; area?: string | null; numero_documento?: string | null; cite?: string | null; tutor_celular?: string | null } | null;
   primera_inscripcion?: string | null;
+  fecha_inscripcion?: string | null;
+  estado?: string | null;
   pago_estado?: 'sin_pagos' | 'parcial' | 'completo' | null;
+  estado_arancel?: 'sin_pagos' | 'parcial' | 'completo' | null;
 }
 
 @Component({
@@ -1130,6 +1131,15 @@ cargarPostulantesInscritos() {
         modo: row?.modalidad_nom ?? row?.modalidad ?? null,
         fecha_inscripcion: row?.fecha_inscripcion ?? row?.created_at ?? null,
         estado: row?.estado ?? null,
+        estado_arancel: (() => {
+          const raw = (row as any)?.estado_arancel ?? (row as any)?.inscripcion?.estado_arancel ?? null;
+          if (raw === null || raw === undefined) return null;
+          const s = String(raw).toLowerCase().trim().replace(/\s+/g, '_');
+          if (s === 'completo') return 'completo' as const;
+          if (s === 'parcial') return 'parcial' as const;
+          if (s === 'sin_pagos' || s === 'sin-pagos' || s === 'sinpagos') return 'sin_pagos' as const;
+          return s as any;
+        })(),
         carrera: row?.carrera ?? row?.carrera_nombre ?? null,
       })).filter((row: PostulanteInscrito) => !!row.cod_ceta);
       this.loadingInscritos = false;
@@ -1280,12 +1290,20 @@ cargarDetallesTabla() {
         const arr: any[] = Array.isArray(list) ? list : [];
         if (arr.length === 0) {
           ins.pago_estado = 'sin_pagos';
+          if ((ins as any).estado_arancel == null) ins.estado_arancel = 'sin_pagos';
           return;
         }
         const pagados = arr.filter(it => !!it?.pagado).length;
-        if (pagados === 0) ins.pago_estado = 'sin_pagos';
-        else if (pagados === arr.length) ins.pago_estado = 'completo';
-        else ins.pago_estado = 'parcial';
+        if (pagados === 0) {
+          ins.pago_estado = 'sin_pagos';
+          if ((ins as any).estado_arancel == null) ins.estado_arancel = 'sin_pagos';
+        } else if (pagados === arr.length) {
+          ins.pago_estado = 'completo';
+          if ((ins as any).estado_arancel == null) ins.estado_arancel = 'completo';
+        } else {
+          ins.pago_estado = 'parcial';
+          if ((ins as any).estado_arancel == null) ins.estado_arancel = 'parcial';
+        }
       },
       error: () => { ins.pago_estado = ins.pago_estado ?? null; },
       complete: () => done()
@@ -1297,7 +1315,14 @@ pagoEstadoLabel(ins: PostulanteInscrito): string {
   const v = ins?.pago_estado;
   if (v === 'completo') return 'Completo';
   if (v === 'parcial') return 'Parcial';
-  return 'Sin pagos';
+  return 'Sin Pagos';
+}
+
+estadoArancelLabel(ins: PostulanteInscrito): string {
+  const v = ins?.estado_arancel;
+  if (v === 'completo') return 'Completo';
+  if (v === 'parcial') return 'Parcial';
+  return 'Sin Pagos';
 }
 
 private pickProyectoFromResponse(res: any, wantedCod: string): any | null {
