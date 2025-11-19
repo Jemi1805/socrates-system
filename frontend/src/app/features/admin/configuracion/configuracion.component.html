@@ -210,8 +210,8 @@
                     <td>{{ c.anio }}</td>
                     <td>{{ c.numero_convocatoria }}</td>
                     <td>{{ c.nombre }}</td>
-                    <td>{{ c.fecha_inicio | date:'yyyy-MM-dd' }}</td>
-                    <td>{{ c.fecha_fin | date:'yyyy-MM-dd' }}</td>
+                    <td>{{ c.fecha_inicio | date:'yyyy-MM-dd':'UTC' }}</td>
+                    <td>{{ c.fecha_fin | date:'yyyy-MM-dd':'UTC' }}</td>
                     <td>{{ c.inscripciones_count ?? '-' }}</td>
                     <td>{{ c.designaciones_tutor_count ?? '-' }}</td>
                     <td>
@@ -527,7 +527,7 @@
               </div>
               <div class="col-12 col-md-6">
                 <label class="form-label">Fecha de fin <span class="text-danger">*</span></label>
-                <input type="date" class="form-control" formControlName="fecha_fin" [attr.min]="anioFechaMin" [attr.max]="anioFechaMax" />
+                <input type="date" class="form-control" formControlName="fecha_fin" [attr.min]="newConvForm.get('fecha_inicio')?.value ? addOneDay(newConvForm.get('fecha_inicio')?.value) : anioFechaMin" [attr.max]="anioFechaMax" />
               </div>
               <div class="col-12">
                 <label class="form-label">Descripción</label>
@@ -592,7 +592,7 @@
               </div>
               <div class="col-12 col-md-6">
                 <label class="form-label">Fecha de fin <span class="text-danger">*</span></label>
-                <input type="date" class="form-control" formControlName="fecha_fin" [attr.min]="anioFechaMin" [attr.max]="anioFechaMax" />
+                <input type="date" class="form-control" formControlName="fecha_fin" [attr.min]="editConvForm.get('fecha_inicio')?.value ? addOneDay(editConvForm.get('fecha_inicio')?.value) : anioFechaMin" [attr.max]="anioFechaMax" />
               </div>
               <div class="col-12">
                 <label class="form-label">Descripción</label>

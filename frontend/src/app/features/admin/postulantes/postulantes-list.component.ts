@@ -3993,6 +3993,9 @@ private cargarPostulanteDesdeBD() {
     if (!this.postulanteActual?.nombres_est || !this.postulanteActual?.ap_pat) return false;
     // Modalidad seleccionada
     if (!this.modalidad) return false;
+    // Convocatoria seleccionada
+    const convOk = !!(this.convocatoriaSeleccionada?.id || this.convocatoriaIdPendiente || this.convocatoriaSeleccionadaBackupId);
+    if (!convOk) return false;
     // Validación de gestión de inicio/conclusión (si aplica)
     if (this.gestionErrorMessage) return false;
     return true;
@@ -4038,6 +4041,7 @@ private cargarPostulanteDesdeBD() {
       modalidad_nom: this.modalidad?.nombre,
       convocatoria_id: convId || null,
       nom_convocatoria: convLabel,
+      convocatoria_nom: convLabel,
       carrera: this.carreraNormalizada || this.postulanteActual.carrera || null,
       aranceles_completos: pagoCompleto,
       aranceles: arancelesSeleccionados.map((a: any) => ({
@@ -4192,6 +4196,24 @@ private cargarPostulanteDesdeBD() {
         if (inscId != null) {
           this.inscripModalidadIdActual = Number(inscId);
         }
+        // Persistir convocatoria en inscrip_modalidad (compatibilidad backend)
+        try {
+          const codForUpd = (gen || codEst) as number;
+          if (codForUpd && (convId || convLabel)) {
+            const upd: any = { convocatoria_id: convId || null };
+            if (convLabel) {
+              upd.nom_convocatoria = convLabel;
+              upd.convocatoria_nom = convLabel;
+            }
+            this.postulanteService.updateInscripModalidadByCod(codForUpd, upd).subscribe({
+              next: () => {
+                this.convocatoriaLabelPersistida = (convLabel || null) as any;
+                this.convocatoriaSeleccionadaBackupId = (convId || null) as any;
+              },
+              error: () => {}
+            });
+          }
+        } catch {}
         this.resumenVisible = false;
         // Spinner antes del modal de éxito
         this.loadingService.showModal();

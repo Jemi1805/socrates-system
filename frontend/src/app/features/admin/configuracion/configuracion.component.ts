@@ -697,11 +697,26 @@ export class ConfiguracionComponent implements OnInit {
     return (group: AbstractControl): ValidationErrors | null => {
       const inicio = group.get('fecha_inicio')?.value;
       const fin = group.get('fecha_fin')?.value;
-      if (inicio && fin && fin < inicio) {
+      if (inicio && fin && fin <= inicio) {
         return { finAntesQueInicio: true };
       }
       return null;
     };
+  }
+
+  // Utilidad para inputs date: retorna fecha_inicio + 1 día en formato YYYY-MM-DD
+  addOneDay(dateStr?: string | null): string {
+    if (!dateStr) return '';
+    try {
+      // Asegurar formato YYYY-MM-DD
+      const s = String(dateStr).slice(0, 10);
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return '';
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().slice(0, 10);
+    } catch {
+      return '';
+    }
   }
 
   toggleConvocatorias() {
@@ -755,7 +770,7 @@ export class ConfiguracionComponent implements OnInit {
     this.newConvForm.reset({
       anio: this.anioActual,
       numero_convocatoria: numero,
-      nombre: '',
+      nombre: this.formatNumeroConvocatoria(numero),
       fecha_inicio: '',
       fecha_fin: '',
       descripcion: '',

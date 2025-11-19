@@ -448,7 +448,7 @@
                 <option *ngFor="let conv of convocatorias" [ngValue]="conv.id">
                   {{ conv.numero_convocatoria }} - {{ conv.nombre }}
                   <ng-container *ngIf="conv.fecha_inicio && conv.fecha_fin">
-                    ({{ conv.fecha_inicio | date:'dd/MM/yyyy' }} - {{ conv.fecha_fin | date:'dd/MM/yyyy' }})
+                    ({{ conv.fecha_inicio | date:'dd/MM/yyyy':'UTC' }} - {{ conv.fecha_fin | date:'dd/MM/yyyy':'UTC' }})
                   </ng-container>
                 </option>
               </select>
@@ -462,7 +462,7 @@
             </div>
             <span class="summary-name">{{ convocatoriaSeleccionada.numero_convocatoria }} - {{ convocatoriaSeleccionada.nombre }}</span>
             <span class="summary-dates" *ngIf="convocatoriaSeleccionada.fecha_inicio && convocatoriaSeleccionada.fecha_fin">
-              {{ convocatoriaSeleccionada.fecha_inicio | date:'dd/MM/yyyy' }} - {{ convocatoriaSeleccionada.fecha_fin | date:'dd/MM/yyyy' }}
+              {{ convocatoriaSeleccionada.fecha_inicio | date:'dd/MM/yyyy':'UTC' }} - {{ convocatoriaSeleccionada.fecha_fin | date:'dd/MM/yyyy':'UTC' }}
             </span>
           </div>
           <ng-template #convocatoriaPlaceholder>
