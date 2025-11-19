@@ -176,6 +176,24 @@ export class PostulantesListComponent implements OnInit {
     return false;
   }
 
+  // Detecta si la ruta actual corresponde al flujo de "nuevo" (/postulantes/nuevo o /postulantes/nuevo/:cod_ceta)
+  private esRutaNuevo(): boolean {
+    const path = this.route.snapshot.routeConfig?.path || '';
+    if (path.startsWith('postulantes/nuevo')) return true;
+    try {
+      return this.router.url.includes('/postulantes/nuevo');
+    } catch { return false; }
+  }
+
+  private esRutaLista(): boolean {
+    const path = this.route.snapshot.routeConfig?.path || '';
+    if (path === 'postulantes') return true;
+    try {
+      const url = this.router.url.split('?')[0];
+      return url === '/postulantes';
+    } catch { return false; }
+  }
+
   private cargarConvocatoriasActivas() {
     this.sgaService.getConvocatoriasActivas({ with_counts: true }).subscribe({
       next: (convocatorias) => {
@@ -1471,7 +1489,7 @@ verInscripcionDesdeFila(ins: PostulanteInscrito) {
     if (modalidad) parsed.modalidad = modalidad;
     sessionStorage.setItem('datos_postulacion', JSON.stringify(parsed));
   } catch {}
-  this.router.navigate(['/postulantes', String(ins.cod_ceta)]);
+  this.router.navigate(['/postulantes/inscripcion', String(ins.cod_ceta)]);
 }
 
 generarFmdg(ins: PostulanteInscrito) {
@@ -1577,6 +1595,7 @@ verDesignacion(ins: PostulanteInscrito) {
 ngOnInit() {
   // Si viene /postulantes/:cod_ceta, preparar vista individual
   const codFromParam = this.route.snapshot.paramMap.get('cod_ceta');
+  const enRutaNuevo = this.esRutaNuevo();
   if (codFromParam) {
     const codNum = Number(codFromParam);
     if (!isNaN(codNum)) {
@@ -1589,11 +1608,21 @@ ngOnInit() {
       } catch {}
       // Estados de vista
       this.soloTabla = false;
-      this.debeEntrarVer = true;
+      // Solo activar modo ver cuando NO es la ruta de nuevo
+      if (!enRutaNuevo) this.debeEntrarVer = true;
       this.postulanteActual = { ...(this.postulanteActual || {}), cod_ceta: codNum } as any;
     }
   }
   this.cargarDatosPostulacion();
+  // Si venimos desde "Continuar con modalidad" (sin cod_ceta ni ver=1), abrir el formulario en lugar de la lista
+  try {
+    const raw = sessionStorage.getItem('datos_postulacion');
+    const tieneDatos = !!raw && (() => { try { const d = JSON.parse(raw as any); return !!(d && (d.estudiante || d.modalidad)); } catch { return false; } })();
+    const verParam = this.route.snapshot.queryParamMap.get('ver');
+    if (!codFromParam && !this.esRutaLista() && verParam !== '1' && tieneDatos) {
+      this.soloTabla = false;
+    }
+  } catch {}
   // Intentar traer el postulante desde BD para usar sus valores persistidos
   this.cargarPostulanteDesdeBD();
   this.cargarConvocatoriasActivas();
@@ -1611,7 +1640,7 @@ ngOnInit() {
   // Si venimos desde el modal con query ver=1, activar modo Ver inscripción
   const ver = this.route.snapshot.queryParamMap.get('ver');
   this.debeEntrarVer = (ver === '1') || this.debeEntrarVer;
-  if (this.debeEntrarVer && !this.viewInscripcion) {
+  if (this.debeEntrarVer && !this.viewInscripcion && !this.esRutaNuevo()) {
     // Activar modo Ver inmediatamente para que aparezcan los botones "Editar"
     this.entrarVerInscripcion();
   }
@@ -1631,18 +1660,32 @@ ngOnInit() {
           sessionStorage.setItem('datos_postulacion', JSON.stringify(parsed));
         } catch {}
         this.soloTabla = false;
-        this.debeEntrarVer = true;
+        // Solo activar modo ver cuando NO es la ruta de nuevo
+        if (!this.esRutaNuevo()) this.debeEntrarVer = true;
         this.postulanteActual = { ...(this.postulanteActual || {}), cod_ceta: codNum } as any;
         this.cargarDatosPostulacion();
-        this.entrarVerInscripcion();
+        if (!this.esRutaNuevo()) this.entrarVerInscripcion();
         this.cargarPostulanteDesdeBD();
       }
     } else {
       // Volver al modo lista si se remueve el parámetro
-      this.soloTabla = true;
-      this.viewInscripcion = false;
-      this.resumenVisible = false;
-      this.detalleVisible = false;
+      // pero respetar el flujo de "nuevo" cuando hay datos en sessionStorage
+      let tieneContextoNuevo = false;
+      try {
+        const raw = sessionStorage.getItem('datos_postulacion');
+        if (raw) {
+          const d = JSON.parse(raw);
+          tieneContextoNuevo = !!(d && (d.estudiante || d.modalidad));
+        }
+      } catch {}
+      if (tieneContextoNuevo && !this.esRutaLista()) {
+        this.soloTabla = false;
+      } else {
+        this.soloTabla = true;
+        this.viewInscripcion = false;
+        this.resumenVisible = false;
+        this.detalleVisible = false;
+      }
     }
   });
 }
@@ -3077,6 +3120,14 @@ private cargarPostulanteDesdeBD() {
             // Marcar que biográficos ya fueron guardados
             datos.bio_guardado = true;
             sessionStorage.setItem('datos_postulacion', JSON.stringify(datos));
+          } catch {}
+          // Personalizar URL: navegar a /postulantes/nuevo/:cod_ceta (sin cambiar el modo de edición)
+          try {
+            const codStr = String((res as any).cod_ceta);
+            const target = ['/postulantes/nuevo', codStr];
+            if (!this.router.url.includes(`/postulantes/nuevo/${codStr}`)) {
+              this.router.navigate(target, { replaceUrl: true });
+            }
           } catch {}
           // Con el CETA generado, cargar aranceles de material extra
           this.cargarArancelesMaterialExtra();

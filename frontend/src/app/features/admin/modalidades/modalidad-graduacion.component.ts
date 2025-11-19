@@ -1543,8 +1543,8 @@ export class ModalidadGraduacionComponent implements OnInit {
     // Cerrar el modal
     this.cerrarModal();
 
-    // Navegar a la página de postulantes
-    this.router.navigate(['/postulantes']);
+    // Navegar a la página de postulantes (nuevo)
+    this.router.navigate(['/postulantes/nuevo']);
   }
 
   // Navegar a Postulantes en modo "Ver inscripción" y pasar el estudiante en sessionStorage
@@ -1689,7 +1689,7 @@ export class ModalidadGraduacionComponent implements OnInit {
     } catch (e) {
       console.warn('No se pudo limpiar sessionStorage', e);
     }
-    this.router.navigate(['/postulantes']);
+    this.router.navigate(['/postulantes/nuevo']);
   }
 
   tieneDatosEstudiante(e: any): boolean {

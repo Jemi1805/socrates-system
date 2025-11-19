@@ -281,12 +281,12 @@ $transition: all 0.3s ease;
   overflow: visible;
 }
 .conclusion-card {
-  position: relative;
-  z-index: 12; // por debajo de inicio pero suficiente
-  overflow: visible;
-}
+    position: relative;
+    z-index: 12; 
+    overflow: visible;
+  }
 
-// Ajustes responsivos para el dropdown (evitar desbordes en pantallas pequeñas)
+  // Ajustes responsivos para el dropdown (evitar desbordes en pantallas pequeñas)
 @media (max-width: 576px) {
   .datos-carrera-container {
     .gestion-dropdown-menu {
@@ -299,9 +299,13 @@ $transition: all 0.3s ease;
 }
 
 .content-wrapper {
-  max-width: 1800px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 2rem 1rem;
+}
+
+.content-wrapper.table-view {
+  max-width: 1800px;
 }
 
 .content-wrapper.form-view {
