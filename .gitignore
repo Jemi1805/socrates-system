@@ -20,5 +20,5 @@ src/storage/framework/views/
 
 # === Docker y bases de datos ===
 docker-compose.override.yml
-mysql_data/
+/mysql_data/
 .docker/
