@@ -3076,6 +3076,14 @@ private cargarPostulanteDesdeBD() {
             this.cargarArancelesMaterialExtra();
             this.editAranceles = false;
             this.hasChangesInView = false;
+            // Persistir estado_arancel y aranceles_completos en inscrip_modalidad según el switch y selección actual
+            try {
+              const tieneSel = (this.selectedAranceles || []).length > 0;
+              const estadoAr = tieneSel ? (this.pagoCompletoSeleccionados ? 'completo' : 'parcial') : 'sin_pagos';
+              const arCompl = (tieneSel && this.pagoCompletoSeleccionados) ? 1 : 0;
+              this.postulanteService.updateInscripModalidadByCod(cod as number, { estado_arancel: estadoAr, aranceles_completos: arCompl } as any)
+                .subscribe({ next: () => {}, error: () => {} });
+            } catch {}
             // Mostrar resumen específico si existe; si no hay diferencias, mostrar el comparador general
             if (cambiosResumen.length) {
               this.mostrarModalCambios(cambiosResumen);
@@ -4017,6 +4025,31 @@ private cargarPostulanteDesdeBD() {
     const nombres = this.postulanteActual?.nombres_est || '';
     const apellidos = [this.postulanteActual?.ap_pat || '', this.postulanteActual?.ap_mat || ''].filter(Boolean).join(' ');
 
+    // Resolver modalidad: asegurar que el ID sea válido en catálogo
+    let modalidadId: number | null = null;
+    let modalidadNom: string | null = this.modalidad?.nombre || null;
+    if (this.modalidad) {
+      const idNum = Number((this.modalidad as any).id);
+      if (!isNaN(idNum) && idNum > 0) {
+        modalidadId = idNum;
+      } else {
+        // Buscar por nombre en el catálogo cargado
+        const nombreBuscado = (this.modalidad as any)?.nombre
+          ? String((this.modalidad as any).nombre).trim().toLowerCase()
+          : String(this.modalidad).trim().toLowerCase();
+        const found = (this.modalidades || []).find(m => String(m?.nombre || '').trim().toLowerCase() === nombreBuscado);
+        if (found && Number(found.id) > 0) {
+          modalidadId = Number(found.id);
+          modalidadNom = found.nombre;
+          this.modalidad = found;
+        }
+      }
+    }
+    if (!modalidadId || !(this.modalidades || []).some(m => Number(m.id) === Number(modalidadId))) {
+      this.inscripcionError = 'Seleccione una modalidad válida antes de registrar.';
+      return;
+    }
+
     const arancelesSeleccionados = Array.isArray(this.selectedAranceles) ? this.selectedAranceles : [];
     const tieneAranceles = arancelesSeleccionados.length > 0;
     const pagoCompleto = tieneAranceles && !!this.pagoCompletoSeleccionados;
@@ -4037,8 +4070,8 @@ private cargarPostulanteDesdeBD() {
       cod_ceta_est: codEst,
       nombres_est: nombres,
       apellidos_est: apellidos,
-      modalidad_id: this.modalidad?.id,
-      modalidad_nom: this.modalidad?.nombre,
+      modalidad_id: modalidadId,
+      modalidad_nom: modalidadNom,
       convocatoria_id: convId || null,
       nom_convocatoria: convLabel,
       convocatoria_nom: convLabel,
@@ -4199,13 +4232,19 @@ private cargarPostulanteDesdeBD() {
         // Persistir convocatoria en inscrip_modalidad (compatibilidad backend)
         try {
           const codForUpd = (gen || codEst) as number;
-          if (codForUpd && (convId || convLabel)) {
-            const upd: any = { convocatoria_id: convId || null };
-            if (convLabel) {
-              upd.nom_convocatoria = convLabel;
-              upd.convocatoria_nom = convLabel;
+          if (codForUpd) {
+            const upd: any = {};
+            if (convId || convLabel) {
+              upd.convocatoria_id = convId || null;
+              if (convLabel) {
+                upd.nom_convocatoria = convLabel;
+                upd.convocatoria_nom = convLabel;
+              }
             }
-            this.postulanteService.updateInscripModalidadByCod(codForUpd, upd).subscribe({
+            const estadoAr = tieneAranceles ? (pagoCompleto ? 'completo' : 'parcial') : 'sin_pagos';
+            upd.estado_arancel = estadoAr;
+            upd.aranceles_completos = pagoCompleto ? 1 : 0;
+            this.postulanteService.updateInscripModalidadByCod(codForUpd, upd as any).subscribe({
               next: () => {
                 this.convocatoriaLabelPersistida = (convLabel || null) as any;
                 this.convocatoriaSeleccionadaBackupId = (convId || null) as any;
