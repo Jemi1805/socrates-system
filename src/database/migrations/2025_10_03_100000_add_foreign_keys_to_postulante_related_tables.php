@@ -79,7 +79,8 @@ class AddForeignKeysToPostulanteRelatedTables extends Migration
         }
 
         // Agregar FK en grados_bach_extranjero -> diploma_bachiller
-        if (Schema::hasTable('grados_bach_extranjero') && Schema::hasTable('diploma_bachiller')) {
+        // Solo si 'diploma_bachiller' ya tiene la columna 'id' (esquemas antiguos no la tenían)
+        if (Schema::hasTable('grados_bach_extranjero') && Schema::hasTable('diploma_bachiller') && Schema::hasColumn('diploma_bachiller', 'id')) {
             $fk = 'grados_bach_extranjero_diploma_bachiller_id_foreign';
             if (!$this->fkExists('grados_bach_extranjero', $fk)) {
                 Schema::table('grados_bach_extranjero', function (Blueprint $table) use ($fk) {
