@@ -290,11 +290,37 @@ export class DesignarTutorComponent implements OnInit {
   // Cargar tutores registrados (de la carrera)
   private loadTutores() {
     this.loadingTutores = true;
-    const carrCode = this.carreraKeyToCode(this.carreraKey);
-    this.sga.getTutores({ carrera: carrCode }).subscribe({
+    const target = this.carreraKeyToCode(this.carreraKey);
+    this.sga.getTutores().subscribe({
       next: (resp) => {
         this.loadingTutores = false;
-        this.tutores = resp?.data || [];
+        const list = Array.isArray(resp?.data) ? resp.data : [];
+        const toCode = (raw: any): 'EEA' | 'MEA' | 'EEA/MEA' | null => {
+          const s = (raw || '').toString().trim().toUpperCase();
+          if (!s) return null;
+          if (s.includes('/')) {
+            const parts = s.split('/').map((p: string) => p.trim());
+            const mapped = parts.map((p: string) => toCode(p)).filter(Boolean) as Array<'EEA'|'MEA'|'EEA/MEA'>;
+            if (mapped.includes('EEA/MEA')) return 'EEA/MEA';
+            const hasE = mapped.includes('EEA');
+            const hasM = mapped.includes('MEA');
+            if (hasE && hasM) return 'EEA/MEA';
+            return mapped[0] ?? null;
+          }
+          const hasMea = /MEA|MECANICA/.test(s);
+          const hasEea = /EEA|ELECTRICIDAD/.test(s);
+          if (hasMea && hasEea) return 'EEA/MEA';
+          if (hasEea) return 'EEA';
+          if (hasMea) return 'MEA';
+          return null;
+        };
+        const filtered = list.filter((t: any) => {
+          if (!target) return true;
+          const code = toCode(t?.cod_carrera || t?.carrera || t?.carrera_nombre);
+          if (code === 'EEA/MEA') return true; // tutor multi-carrera disponible para ambas
+          return code === target;
+        });
+        this.tutores = filtered;
         this.applyFilter();
       },
       error: () => {

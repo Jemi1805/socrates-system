@@ -1162,6 +1162,22 @@ export class TutoresHomeComponent implements OnInit {
     this.editingDocente.apellido_p = this.toTitleCase(this.sanitizeNameChars(((this.editingDocente.apellido_p || '') as string).replace(/\s+/g, ' ').trim())) as any;
     this.editingDocente.apellido_m = this.toTitleCase(this.sanitizeNameChars(((this.editingDocente.apellido_m || '') as string).replace(/\s+/g, ' ').trim())) as any;
     this.editingDocente.celular = ((this.editingDocente.celular || '') as string).replace(/\D/g, '').slice(0, 8) as any;
+    // Si no hay carrera válida seleccionada, inferirla desde las pertinencias
+    if (!this.isCarreraModalValida(this.modalCarreraCode)) {
+      const idsSel = (this.selectedPertIds || []).map(Number);
+      if (idsSel.length) {
+        const src = Array.isArray(this.allPertinencias) && this.allPertinencias.length ? this.allPertinencias : (this.pertinencias || []);
+        let hasEEA = false, hasMEA = false;
+        for (const p of src) {
+          if (!idsSel.includes(Number(p.id))) continue;
+          const cod = (((p as any)?.cod_carrera || '') as string).toString().toUpperCase();
+          if (!cod) { hasEEA = true; hasMEA = true; continue; }
+          if (cod === 'EEA') hasEEA = true;
+          if (cod === 'MEA') hasMEA = true;
+        }
+        this.modalCarreraCode = hasEEA && hasMEA ? 'EEA/MEA' : (hasEEA ? 'EEA' : (hasMEA ? 'MEA' : null));
+      }
+    }
     this.showFieldErrors = true; // activar estilos de error
     // Validaciones requeridas
     const missing = this.getMissingRequiredFields();
@@ -1172,31 +1188,75 @@ export class TutoresHomeComponent implements OnInit {
     const ci = (this.editingDocente.ci || '').toString().trim();
     const nombre = (this.editingDocente.nombre || '').toString().trim();
     const celular = (this.editingDocente.celular || '').toString().trim();
-    const codCarr = (this.modalCarreraCode === 'MEA' || this.modalCarreraCode === 'EEA') ? this.modalCarreraCode : undefined;
-    const primaryPertId = this.selectedPertIds?.[0] ?? null;
-    const pertNom = (this.pertinencias || [])
-      .filter(p => this.selectedPertIds.includes(p.id))
-      .map(p => p.nombre_pert)
-      .join(', ');
     const tipoTutorId = this.selectedTipoTutorId ?? null;
-    const item = {
+
+    // Armar items según carrera seleccionada (MEA, EEA o EEA/MEA)
+    const buildBase = (codCarr: 'MEA' | 'EEA', ids: number[], nombres: string[]) => ({
       ci,
       nombre,
-      apellido_p: this.editingDocente.apellido_p || undefined,
-      apellido_m: this.editingDocente.apellido_m || undefined,
+      apellido_p: this.editingDocente!.apellido_p || undefined,
+      apellido_m: this.editingDocente!.apellido_m || undefined,
       celular,
-      profesion: this.editingDocente.profesion || undefined,
-      titulo: this.editingDocente.profesion || undefined,
-      titulo_academico: this.editingDocente.titulo_academico || undefined,
+      profesion: this.editingDocente!.profesion || undefined,
+      titulo: this.editingDocente!.profesion || undefined,
+      titulo_academico: this.editingDocente!.titulo_academico || undefined,
       cod_carrera: codCarr,
-      pertinencia_acad_id: primaryPertId,
-      pertinencia_acad_ids: this.selectedPertIds,
-      pertinencia: pertNom || undefined,
+      pertinencia_acad_id: ids?.[0] ?? null,
+      pertinencia_acad_ids: ids,
+      pertinencia: (nombres || []).join(', ') || undefined,
       tipo_tutor_id: tipoTutorId ?? undefined,
       activo: true,
-    } as any;
+    });
+
+    const selectedIds = (this.selectedPertIds || []).map(Number);
+    const lookup = new Map<number, { id: number; nombre: string; cod: string }>();
+    const source = Array.isArray(this.allPertinencias) && this.allPertinencias.length ? this.allPertinencias : (this.pertinencias || []);
+    for (const p of source) {
+      const cod = ((p as any)?.cod_carrera || '').toString().toUpperCase();
+      lookup.set(Number(p.id), { id: Number(p.id), nombre: String(p.nombre_pert || ''), cod });
+    }
+    const idsEEA: number[] = [];
+    const idsMEA: number[] = [];
+    for (const id of selectedIds) {
+      const info = lookup.get(Number(id));
+      const cod = (info?.cod || '').toUpperCase();
+      // Sin cod_carrera => aplicar a ambas
+      if (!cod) { idsEEA.push(Number(id)); idsMEA.push(Number(id)); continue; }
+      if (cod === 'EEA') idsEEA.push(Number(id));
+      if (cod === 'MEA') idsMEA.push(Number(id));
+    }
+    const namesEEA = idsEEA.map(i => lookup.get(i)?.nombre || '').filter(Boolean);
+    const namesMEA = idsMEA.map(i => lookup.get(i)?.nombre || '').filter(Boolean);
+
+    const items: any[] = [];
+    if (this.modalCarreraCode === 'EEA') {
+      items.push(buildBase('EEA', selectedIds, (this.pertinencias || []).filter(p => selectedIds.includes(p.id)).map(p => p.nombre_pert)));
+    } else if (this.modalCarreraCode === 'MEA') {
+      items.push(buildBase('MEA', selectedIds, (this.pertinencias || []).filter(p => selectedIds.includes(p.id)).map(p => p.nombre_pert)));
+    } else if (this.modalCarreraCode === 'EEA/MEA') {
+      // Registrar un único item con cod_carrera 'EEA/MEA' y TODAS las pertinencias seleccionadas
+      const allNames = (this.pertinencias || []).filter(p => selectedIds.includes(p.id)).map(p => p.nombre_pert);
+      const combined = {
+        ci,
+        nombre,
+        apellido_p: this.editingDocente!.apellido_p || undefined,
+        apellido_m: this.editingDocente!.apellido_m || undefined,
+        celular,
+        profesion: this.editingDocente!.profesion || undefined,
+        titulo: this.editingDocente!.profesion || undefined,
+        titulo_academico: this.editingDocente!.titulo_academico || undefined,
+        cod_carrera: 'EEA/MEA',
+        pertinencia_acad_id: selectedIds?.[0] ?? null,
+        pertinencia_acad_ids: selectedIds,
+        pertinencia: (allNames || []).join(', ') || undefined,
+        tipo_tutor_id: tipoTutorId ?? undefined,
+        activo: true,
+      };
+      items.push(combined);
+    }
+
     this.savingDocente = true;
-    this.sga.registerTutoresBulk([item]).subscribe({
+    this.sga.registerTutoresBulk(items).subscribe({
       next: (resp) => {
         this.savingDocente = false;
         if (resp?.success) {
@@ -1287,7 +1347,7 @@ export class TutoresHomeComponent implements OnInit {
     const tituloAcademico = (this.editingDocente?.titulo_academico || '').toString().trim();
     const hasAnyPert = (this.selectedPertIds?.length || 0) > 0;
     const tipoTutor = this.selectedTipoTutorId;
-    if (!(cod === 'MEA' || cod === 'EEA')) miss.push('Carrera');
+    if (!this.isCarreraModalValida(cod)) miss.push('Carrera');
     if (!nombre) miss.push('Nombres');
     if (!apPat) miss.push('Apellido paterno');
     if (!ci) miss.push('CI');
@@ -1931,32 +1991,79 @@ export class TutoresHomeComponent implements OnInit {
     this.loadingTutores = true;
     this.errorTutores = null;
     this.tutores = [];
-    const params: any = {};
-    if (this.carreraFiltroCode) params.carrera = this.carreraFiltroCode;
+    const params: any = { gestion: this.gestionActual };
+    const filterCode = this.carreraFiltroCode;
     this.sga.getTutores(params).subscribe({
       next: (resp) => {
         this.loadingTutores = false;
         if (resp?.success && Array.isArray(resp.data)) {
-          const incoming = resp.data as TutorReg[];
-          if (this.tutores.length) {
-            const byId = new Map<number, TutorReg>();
-            for (const existing of this.tutores) {
-              if (existing?.id != null) byId.set(existing.id, existing);
+          const incoming = (resp.data as TutorReg[]).map(t => ({ ...t, activo: !!(t as any).activo }));
+          const toCode = (raw: string): 'EEA' | 'MEA' | 'EEA/MEA' | null => {
+            const s = (raw || '').toString().trim().toUpperCase();
+            if (!s) return null;
+            if (s.includes('/')) {
+              const parts = s.split('/').map((p: string) => p.trim());
+              const mapped = parts.map((p: string) => toCode(p)).filter(Boolean) as Array<'EEA'|'MEA'|'EEA/MEA'>;
+              if (mapped.includes('EEA/MEA')) return 'EEA/MEA';
+              const hasE = mapped.includes('EEA');
+              const hasM = mapped.includes('MEA');
+              if (hasE && hasM) return 'EEA/MEA';
+              return mapped[0] ?? null;
             }
-            const merged: TutorReg[] = [];
+            const hasMea = /MEA|MECANICA/.test(s);
+            const hasEea = /EEA|ELECTRICIDAD/.test(s);
+            if (hasMea && hasEea) return 'EEA/MEA';
+            if (hasEea) return 'EEA';
+            if (hasMea) return 'MEA';
+            return null;
+          };
+
+          if (!filterCode) {
+            this.tutores = incoming;
+            return;
+          }
+
+          if (filterCode === 'EEA' || filterCode === 'MEA') {
+            // Incluir tutores de la carrera seleccionada o multi-carrera
+            this.tutores = incoming.filter((it: any) => {
+              const cRaw = (it?.cod_carrera || it?.carrera || it?.carrera_nombre) as string;
+              const code = toCode(cRaw);
+              return code === filterCode || code === 'EEA/MEA';
+            });
+            return;
+          }
+
+          if (filterCode === 'EEA/MEA') {
+            // Mostrar tutores que pertenezcan a ambas carreras (dos registros) o que tengan código combinado
+            const byCi = new Map<string, TutorReg[]>();
             for (const item of incoming) {
-              if (item?.id != null && byId.has(item.id)) {
-                const target = byId.get(item.id)!;
-                Object.assign(target, item, { activo: !!item.activo });
-                merged.push(target);
-              } else {
-                merged.push({ ...item, activo: !!item.activo });
+              const ci = (item.ci || '').toString().trim();
+              if (!ci) continue;
+              const list = byCi.get(ci) || [];
+              list.push(item);
+              byCi.set(ci, list);
+            }
+            const result: TutorReg[] = [];
+            for (const [, list] of byCi.entries()) {
+              const codes = new Set((list || []).map((x: any) => toCode(((x as any)?.cod_carrera || (x as any)?.carrera || (x as any)?.carrera_nombre) as string)).filter(Boolean) as Array<'EEA'|'MEA'|'EEA/MEA'>);
+              const hasEEA = codes.has('EEA');
+              const hasMEA = codes.has('MEA');
+              const hasCombined = codes.has('EEA/MEA');
+              if ((hasEEA && hasMEA) || hasCombined) {
+                for (const it of list) {
+                  const cRaw = ((it as any)?.cod_carrera || (it as any)?.carrera || (it as any)?.carrera_nombre) as string;
+                  const nc = toCode(cRaw);
+                  if (hasCombined || nc === 'EEA' || nc === 'MEA') {
+                    result.push(it);
+                  }
+                }
               }
             }
-            this.tutores = merged;
-          } else {
-            this.tutores = incoming.map(t => ({ ...t, activo: !!t.activo }));
+            this.tutores = result;
+            return;
           }
+
+          this.tutores = incoming;
         } else {
           this.tutores = [];
         }
@@ -2223,17 +2330,29 @@ export class TutoresHomeComponent implements OnInit {
     // Limpiar selección de pertinencia para evitar inconsistencia
     if (this.editingDocente) this.editingDocente.pertinencia_acad_id = null;
     this.selectedPertIds = [];
+    if (code === 'EEA/MEA') {
+      this.sga.getPertinencias().subscribe({
+        next: (resp) => {
+          const all = Array.isArray(resp?.data) ? resp.data : [];
+          const allowed = new Set(['EEA', 'MEA']);
+          this.pertinencias = all.filter((p: any) => {
+            const c = ((p?.cod_carrera ?? '') as string).toString().toUpperCase();
+            if (!c) return true;
+            return allowed.has(c as any);
+          });
+          this.pertDropdownOpen = true;
+        },
+        error: () => { this.pertinencias = []; }
+      });
+      return;
+    }
     let carreraStr: 'mecanica' | 'electricidad' | undefined = undefined;
     if (code === 'MEA') carreraStr = 'mecanica';
     if (code === 'EEA') carreraStr = 'electricidad';
-    if (!carreraStr) {
-      this.pertinencias = [];
-      return;
-    }
+    if (!carreraStr) { this.pertinencias = []; return; }
     this.sga.getPertinencias(carreraStr).subscribe({
       next: (resp) => {
-        if (resp?.success) this.pertinencias = resp.data || []; else this.pertinencias = [];
-        // abrir el dropdown al cargar opciones
+        this.pertinencias = resp?.success ? (resp.data || []) : [];
         this.pertDropdownOpen = true;
       },
       error: () => { this.pertinencias = []; }
