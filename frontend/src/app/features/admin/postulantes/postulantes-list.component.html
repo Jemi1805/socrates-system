@@ -104,10 +104,13 @@
                         <div class="tutor-cel ellipsis-1" *ngIf="ins.designacion?.tutor_celular">Cel: {{ ins.designacion?.tutor_celular }}</div>
                       </ng-container>
                       <ng-template #noTutorTpl>
-                        <button type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irDesignarTutor(ins)">
+                        <button *ngIf="tieneProyecto(ins)" type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irDesignarTutor(ins)">
                           <i class="bi bi-person-plus"></i>
                           <span class="ms-1">Designar</span>
                         </button>
+                        <div *ngIf="!tieneProyecto(ins)" class="mt-1">
+                          <span class="badge rounded-pill bg-warning text-dark">Falta registro de tema</span>
+                        </div>
                       </ng-template>
                     </div>
                     <ng-container *ngIf="tieneDesignacion(ins)">
@@ -129,7 +132,7 @@
                     </ul>
                   </ng-container>
                   <ng-template #noDocsTpl>
-                    <span class="text-muted">Documentos no generados</span>
+                    <span class="badge rounded-pill bg-info">Documentos no generados</span>
                   </ng-template>
                 </td>
               </tr>
@@ -170,7 +173,7 @@
                   <div *ngIf="detalleData?.area"><span class="text-muted">Área:</span> {{ detalleData?.area }}</div>
                   <div *ngIf="detalleData?.numero_documento"><span class="text-muted">Documento:</span> {{ detalleData?.numero_documento }}</div>
                   <div *ngIf="detalleData?.cite"><span class="text-muted">CITE:</span> {{ detalleData?.cite }}</div>
-                  <div *ngIf="!detalleData?.tutor" class="mt-2">
+                  <div *ngIf="!detalleData?.tutor && tieneProyecto(detalleData?.__src)" class="mt-2">
                     <button type="button" class="btn btn-outline-primary btn-sm" (click)="irDesignarTutor(detalleData?.__src)"><i class="bi bi-person-plus me-1"></i>Designar</button>
                   </div>
                 </div>
@@ -183,6 +186,7 @@
         </div>
       </div>
     </div>
+    
   </div>
 
   <!-- Resumen debajo del navbar (mismo ancho que las cards internas) -->

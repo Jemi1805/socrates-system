@@ -179,9 +179,10 @@ export class PostulantesListComponent implements OnInit {
   // Detecta si la ruta actual corresponde al flujo de "nuevo" (/postulantes/nuevo o /postulantes/nuevo/:cod_ceta)
   private esRutaNuevo(): boolean {
     const path = this.route.snapshot.routeConfig?.path || '';
-    if (path.startsWith('postulantes/nuevo')) return true;
+    if (path.startsWith('postulantes/nuevo') || path.startsWith('postulantes/registro_nuevo')) return true;
     try {
-      return this.router.url.includes('/postulantes/nuevo');
+      const url = this.router.url || '';
+      return url.includes('/postulantes/nuevo') || url.includes('/postulantes/registro_nuevo');
     } catch { return false; }
   }
 
@@ -1129,6 +1130,7 @@ temaObjetivoUI(ins: PostulanteInscrito): string {
 
 cargarPostulantesInscritos() {
   this.loadingInscritos = true;
+  this.loadingService.showModal();
   this.postulanteService.getInscritos({ per_page: 200 }).subscribe({
     next: (resp: any) => {
       const payload = resp?.data ?? resp;
@@ -1161,11 +1163,16 @@ cargarPostulantesInscritos() {
         carrera: row?.carrera ?? row?.carrera_nombre ?? null,
       })).filter((row: PostulanteInscrito) => !!row.cod_ceta);
       this.loadingInscritos = false;
-      // Enriquecer filas con tema y designación
-      this.cargarDetallesTabla();
+      // Enriquecer filas con tema y designación si hay datos
+      if (this.postulantesInscritos.length > 0) {
+        this.cargarDetallesTabla();
+      } else {
+        this.loadingService.hideModal();
+      }
     },
     error: () => {
       this.loadingInscritos = false;
+      this.loadingService.hideModal();
     }
   });
 }
@@ -1190,7 +1197,7 @@ cargarDetallesTabla() {
   this.loadingDetalles = true;
   const items = this.postulantesInscritos.slice();
   let remaining = items.length * 5; // proyecto + designación + postulante(SGA) + inscripciones + aranceles
-  const done = () => { remaining--; if (remaining <= 0) this.loadingDetalles = false; };
+  const done = () => { remaining--; if (remaining <= 0) { this.loadingDetalles = false; this.loadingService.hideModal(); } };
   for (const ins of items) {
     const cod = ins.cod_ceta;
     // Proyecto (tema/objetivo)
@@ -1450,6 +1457,7 @@ verRegistroTemaResumen(ins: PostulanteInscrito) {
 irDesignarTutor(ins: PostulanteInscrito) {
   const cod = ins?.cod_ceta;
   if (!cod) return;
+  if (!this.tieneProyecto(ins)) return;
   const carreraKey = this.normalizeCarreraKey(ins?.carrera || null) || undefined;
   this.router.navigate(['/tutores/designar'], { queryParams: { cod_ceta: String(cod), carrera: carreraKey } });
 }
@@ -1613,6 +1621,13 @@ ngOnInit() {
       this.postulanteActual = { ...(this.postulanteActual || {}), cod_ceta: codNum } as any;
     }
   }
+  // Si estamos en la ruta de registro nuevo sin parámetro, abrir el formulario vacío
+  if (!codFromParam && enRutaNuevo) {
+    this.soloTabla = false;
+    this.viewInscripcion = false;
+    this.debeEntrarVer = false;
+    this.esNuevoPostulante = true;
+  }
   this.cargarDatosPostulacion();
   // Si venimos desde "Continuar con modalidad" (sin cod_ceta ni ver=1), abrir el formulario en lugar de la lista
   try {
@@ -1678,7 +1693,7 @@ ngOnInit() {
           tieneContextoNuevo = !!(d && (d.estudiante || d.modalidad));
         }
       } catch {}
-      if (tieneContextoNuevo && !this.esRutaLista()) {
+      if (this.esRutaNuevo() || (tieneContextoNuevo && !this.esRutaLista())) {
         this.soloTabla = false;
       } else {
         this.soloTabla = true;
@@ -3129,11 +3144,11 @@ private cargarPostulanteDesdeBD() {
             datos.bio_guardado = true;
             sessionStorage.setItem('datos_postulacion', JSON.stringify(datos));
           } catch {}
-          // Personalizar URL: navegar a /postulantes/nuevo/:cod_ceta (sin cambiar el modo de edición)
+          // Personalizar URL: navegar a /postulantes/registro_nuevo/:cod_ceta (sin cambiar el modo de edición)
           try {
             const codStr = String((res as any).cod_ceta);
-            const target = ['/postulantes/nuevo', codStr];
-            if (!this.router.url.includes(`/postulantes/nuevo/${codStr}`)) {
+            const target = ['/postulantes/registro_nuevo', codStr];
+            if (!this.router.url.includes(`/postulantes/registro_nuevo/${codStr}`)) {
               this.router.navigate(target, { replaceUrl: true });
             }
           } catch {}
@@ -4216,7 +4231,8 @@ private cargarPostulanteDesdeBD() {
           };
           this.postulanteService.create(datosBio as Postulante).subscribe({
             next: () => {
-              this.esNuevoPostulante = false;
+              // Si es flujo de registro nuevo, mantener esNuevoPostulante en true para habilitar el formulario completo
+              this.esNuevoPostulante = this.esRutaNuevo() ? true : false;
             },
             error: (e) => {
               console.error('No se pudo persistir biográficos tras generar CETA:', e);

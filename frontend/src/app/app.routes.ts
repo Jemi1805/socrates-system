@@ -15,6 +15,8 @@ export const routes: Routes = [
   { path: 'modalidad-graduacion', component: ModalidadGraduacionComponent, canActivate: [authGuard] },
   { path: 'postulantes/nuevo', component: PostulantesListComponent, canActivate: [authGuard] },
   { path: 'postulantes/nuevo/:cod_ceta', component: PostulantesListComponent, canActivate: [authGuard] },
+  { path: 'postulantes/registro_nuevo', component: PostulantesListComponent, canActivate: [authGuard] },
+  { path: 'postulantes/registro_nuevo/:cod_ceta', component: PostulantesListComponent, canActivate: [authGuard] },
   { path: 'postulantes/inscripcion/:cod_ceta', component: PostulantesListComponent, canActivate: [authGuard] },
   { path: 'postulantes/:cod_ceta', component: PostulantesListComponent, canActivate: [authGuard] },
   { path: 'postulantes', component: PostulantesListComponent, canActivate: [authGuard] },
