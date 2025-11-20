@@ -113,6 +113,23 @@ const formatFechaLatam = (fecha?: string | Date | number | null): string | null 
         return null;
       }
 
+      // Manejar YYYY-MM-DD como fecha local para evitar desfase por zona horaria
+      const isoYMD = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (isoYMD) {
+        const year = Number(isoYMD[1]);
+        const month = Number(isoYMD[2]) - 1;
+        const day = Number(isoYMD[3]);
+        const candidate = new Date(year, month, day);
+        if (
+          candidate.getFullYear() === year &&
+          candidate.getMonth() === month &&
+          candidate.getDate() === day
+        ) {
+          return candidate;
+        }
+        return null;
+      }
+
       const parsed = new Date(trimmed);
       return Number.isNaN(parsed.getTime()) ? null : parsed;
     }
@@ -138,6 +155,8 @@ const formatFechaLatam = (fecha?: string | Date | number | null): string | null 
 export class PdfService {
   private verdanaReady = false;
   private verdanaUnavailable = true;
+  private bookmanReady = false;
+  private bookmanTried = false;
 
   private async arrayBufferToBase64(buf: ArrayBuffer): Promise<string> {
     let binary = '';
@@ -216,6 +235,40 @@ export class PdfService {
     if (this.verdanaUnavailable) return false;
     if (this.verdanaReady) return true;
     return false;
+  }
+  private async ensureBookman(doc: jsPDF): Promise<boolean> {
+    if (this.bookmanReady) return true;
+    if (this.bookmanTried) return false;
+    this.bookmanTried = true;
+    try {
+      const res = await fetch('assets/fonts/BookmanOldStyle.ttf');
+      if (!res.ok) throw new Error('Bookman normal not found');
+      const buf = await res.arrayBuffer();
+      const b64 = await this.arrayBufferToBase64(buf);
+      doc.addFileToVFS('BookmanOldStyle.ttf', b64);
+      doc.addFont('BookmanOldStyle.ttf', 'BookmanOldStyle', 'normal');
+      try {
+        const resB = await fetch('assets/fonts/BookmanOldStyle-Bold.ttf');
+        if (!resB.ok) throw new Error('Bookman bold not found');
+        const bufB = await resB.arrayBuffer();
+        const b64B = await this.arrayBufferToBase64(bufB);
+        doc.addFileToVFS('BookmanOldStyle-Bold.ttf', b64B);
+        doc.addFont('BookmanOldStyle-Bold.ttf', 'BookmanOldStyle', 'bold');
+      } catch {
+        doc.addFont('BookmanOldStyle.ttf', 'BookmanOldStyle', 'bold');
+      }
+      this.bookmanReady = true;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  private safeSetFont(doc: jsPDF, family: string, style: 'normal' | 'bold' = 'normal') {
+    try {
+      doc.setFont(family, style);
+    } catch {
+      doc.setFont('helvetica', style);
+    }
   }
   private async loadImageDataUrl(url: string): Promise<string> {
     // Carga imagen y la convierte a DataURL para jsPDF
@@ -608,9 +661,27 @@ export class PdfService {
     }
 
     const toDate = (value?: string | Date | null): Date | null => {
-      if (!value) return null;
+      if (value == null) return null;
       if (value instanceof Date) return value;
-      const parsed = new Date(value);
+      const s = String(value).trim();
+      if (!s) return null;
+      // dd/mm/yyyy (local)
+      const m1 = s.match(/^([0-3]?\d)\/(0[1-9]|1[0-2])\/(\d{4})$/);
+      if (m1) {
+        const d = Number(m1[1]);
+        const m = Number(m1[2]) - 1;
+        const y = Number(m1[3]);
+        return new Date(y, m, d);
+      }
+      // yyyy-mm-dd (local)
+      const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m2) {
+        const y = Number(m2[1]);
+        const m = Number(m2[2]) - 1;
+        const d = Number(m2[3]);
+        return new Date(y, m, d);
+      }
+      const parsed = new Date(s);
       return Number.isFinite(parsed.getTime()) ? parsed : null;
     };
 
@@ -991,6 +1062,25 @@ export class PdfService {
       cursorY += 2;
     };
 
+    const normalizeCarrera = (value?: any): string | undefined => {
+      const raw = (value == null ? '' : String(value)).trim();
+      if (!raw) return undefined;
+      const upper = raw.toUpperCase();
+      if (upper === 'EEA') return 'Electricidad y Electrónica Automotriz';
+      if (upper === 'MEA') return 'Mecánica Automotriz';
+      if (upper.includes('EEA') && upper.includes('MEA')) return undefined;
+      const norm = raw
+        .normalize('NFD')
+        .replace(/\p{Diacritic}+/gu, '')
+        .toLowerCase();
+      const hasElec = /\belect/.test(norm) || /\beea\b/.test(norm);
+      const hasMec = /\bmec/.test(norm) || /\bmea\b/.test(norm);
+      if (hasElec && hasMec) return undefined;
+      if (hasElec) return 'Electricidad y Electrónica Automotriz';
+      if (hasMec) return 'Mecánica Automotriz';
+      return raw;
+    };
+
     // Sección "Para"
     if (resolvedParaNombre) {
       const indent = drawLabelValue('Para:', resolvedParaNombre, { uppercase: false, boldValue: false, labelWidthOverride: 24, tabStop: 25, labelBold: true, rightMargin: labelRightMargin });
@@ -1018,9 +1108,10 @@ export class PdfService {
     const renderStudents = (students: TutorDesignacionEstudiante[]) => {
       students.forEach((est, idx) => {
         ensureSpace(18);
+        const carreraVal = normalizeCarrera(est.carrera) || normalizeCarrera((data as any)?.carrera) || '-';
         const fields: Array<{ label: string; value?: string | null; bold?: boolean }> = [
           { label: 'Nombre:', value: est.nombre || '-', bold: true },
-          { label: 'Carrera:', value: est.carrera || '-', bold: true },
+          { label: 'Carrera:', value: carreraVal, bold: true },
           { label: 'Modalidad:', value: est.modalidad || data.modalidad || '-', bold: true },
           { label: 'Área:', value: est.area || '-', bold: true },
           { label: 'Tema:', value: est.tema || '-', bold: true },
@@ -1100,6 +1191,8 @@ export class PdfService {
       const topY = mx;
       const boxW = pageWidth - 2 * mx;
       const boxH = (pageHeight - 2 * mx) / 2; // media hoja
+      const hasBookman = await this.ensureBookman(doc);
+      const bookmanFont = hasBookman ? 'BookmanOldStyle' : baseFont;
 
       // Marco con bordes redondeados
       doc.setDrawColor(36, 114, 55);
@@ -1112,10 +1205,11 @@ export class PdfService {
 
       // Encabezado institucional
       doc.setTextColor(5, 37, 68);
-      doc.setFont(baseFont, 'bold');
+      this.safeSetFont(doc, bookmanFont, 'bold');
       doc.setFontSize(12);
       doc.text('INSTITUTO TECNOLÓGICO DE ENSEÑANZA AUTOMOTRIZ', pageWidth / 2, topY + 10, { align: 'center' });
       doc.setTextColor(215, 25, 32);
+      this.safeSetFont(doc, bookmanFont, 'bold');
       doc.setFontSize(14);
       doc.text('"CETA"', pageWidth / 2, topY + 16, { align: 'center' });
 
@@ -1151,59 +1245,165 @@ export class PdfService {
       const postNum = (postNumRaw !== undefined && postNumRaw !== null && String(postNumRaw).trim() !== '') ? String(postNumRaw) : '-';
       doc.setFont(baseFont, 'bold');
       doc.setTextColor(215, 25, 32);
+      doc.setFont(baseFont, 'bold');
       doc.setFontSize(14);
       doc.text('GESTIÓN:', rightX, rightY);
       doc.setTextColor(5, 37, 68);
-      doc.setFontSize(16);
+      doc.setFont(baseFont, 'bold');
+      doc.setFontSize(18);
       doc.text(gestion || '-', rightX + 2, rightY + 8);
       doc.setTextColor(215, 25, 32);
+      doc.setFont(baseFont, 'bold');
       doc.setFontSize(14);
-      doc.text('POST.:', rightX, rightY + 18);
+      const postLabel = 'POST.:';
+      doc.text(postLabel, rightX, rightY + 18);
       doc.setTextColor(5, 37, 68);
-      doc.setFontSize(18);
-      doc.text(postNum, rightX + 15, rightY + 18);
+      doc.setFont(baseFont, 'bold');
+      doc.setFontSize(20);
+      const postValueX = rightX + doc.getTextWidth(postLabel) + 2; // más espacio entre label y número
+      doc.text(postNum, postValueX, rightY + 18);
 
       // Título del proyecto
       const titleY = topY + 60;
       doc.setTextColor(215, 25, 32);
-      doc.setFont(baseFont, 'bold');
+      this.safeSetFont(doc, bookmanFont, 'bold');
       doc.setFontSize(16);
       doc.text('TÍTULO DEL PROYECTO', pageWidth / 2, titleY, { align: 'center' });
 
       const temaTexto = ((data as any).proyectoNombre || '').toString().trim();
       doc.setTextColor(0, 0, 0);
-      doc.setFont(baseFont, 'bold');
+      this.safeSetFont(doc, bookmanFont, 'bold');
       doc.setFontSize(11);
       const temaWrapped = doc.splitTextToSize(temaTexto || '-', pageWidth - 2 * (mx + 20));
       doc.text(temaWrapped as any, pageWidth / 2, titleY + 8, { align: 'center' });
 
       // Filas informativas: POSTULANTE, TUTOR, CARRERA, ÁREA
-      const infoStartY = titleY + 24 + (Array.isArray(temaWrapped) ? Math.max(0, (temaWrapped.length - 1) * 5) : 0);
+      const infoStartY = titleY + 18 + (Array.isArray(temaWrapped) ? Math.max(0, (temaWrapped.length - 1) * 5) : 0);
       const labelColor: [number, number, number] = [215, 25, 32];
       const valueColor: [number, number, number] = [5, 37, 68];
       const drawRow = (label: string, value: string, yPos: number) => {
-        doc.setFont(baseFont, 'bold');
+        this.safeSetFont(doc, bookmanFont, 'bold');
         doc.setFontSize(12);
         doc.setTextColor(...labelColor);
-        doc.text(label, mx + 18, yPos);
+        const labelX = mx + 18;
+        doc.text(label, labelX, yPos);
         doc.setTextColor(...valueColor);
-        doc.setFont(baseFont, 'normal');
+        this.safeSetFont(doc, bookmanFont, 'normal');
         doc.setFontSize(11);
         const val = (value || '-').toString();
-        doc.text(val, mx + 18 + doc.getTextWidth(label) + 2, yPos);
+        const valueX = labelX + doc.getTextWidth(label) + 4; // más espacio entre etiqueta y valor
+        doc.text(val, valueX, yPos);
       };
 
       const postulanteNombre = ((data as any).estudianteNombre || '').toString().trim();
       drawRow('POSTULANTE:', postulanteNombre || '-', infoStartY);
 
-      const tutorNom = (data as any).caratulaTutor ? String((data as any).caratulaTutor) : ((data as any).tutorNombre || '-');
-      drawRow('TUTOR:', tutorNom || '-', infoStartY + 10);
+      const tutorNomCaratula = (data as any).caratulaTutor
+        ? String((data as any).caratulaTutor)
+        : (resolvedParaNombre || (data as any).tutorNombre || '-');
+      drawRow('TUTOR:', tutorNomCaratula || '-', infoStartY + 8);
 
-      drawRow('CARRERA:', ((data as any).carrera || '-').toString(), infoStartY + 20);
+      const carreraCaratula = normalizeCarrera((data as any).carrera) || '-';
+      drawRow('CARRERA:', carreraCaratula.toString(), infoStartY + 16);
 
       const areaNom = (data as any).caratulaArea ? String((data as any).caratulaArea) : ((data as any).area || '-');
-      drawRow('ÁREA:', areaNom || '-', infoStartY + 30);
-    } catch {}
+      drawRow('ÁREA:', areaNom || '-', infoStartY + 24);
+      doc.setTextColor(5, 37, 68);
+      this.safeSetFont(doc, bookmanFont, 'bold');
+      doc.setFontSize(12);
+      doc.text('COCHABAMBA - BOLIVIA', pageWidth / 2, topY + boxH - 8, { align: 'center' });
+    } catch (e) {
+      try { console.error('Error renderizando carátula:', e); } catch {}
+      // Fallback de emergencia: dibujar carátula simple con Helvetica
+      try {
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const mx = 15;
+        const topY = mx;
+        const boxW = pageWidth - 2 * mx;
+        const boxH = (pageHeight - 2 * mx) / 2;
+        doc.setDrawColor(36, 114, 55);
+        doc.setLineWidth(2.0);
+        if ((doc as any).roundedRect) {
+          (doc as any).roundedRect(mx, topY, boxW, boxH, 6, 6);
+        } else {
+          doc.rect(mx, topY, boxW, boxH);
+        }
+        // Encabezado simple
+        doc.setTextColor(5, 37, 68);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text('INSTITUTO TECNOLÓGICO DE ENSEÑANZA AUTOMOTRIZ', pageWidth / 2, topY + 10, { align: 'center' });
+        doc.setTextColor(215, 25, 32);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('"CETA"', pageWidth / 2, topY + 16, { align: 'center' });
+        // Gestión y Post.
+        const rightX = pageWidth - mx - 65;
+        const rightY = topY + 20;
+        doc.setTextColor(215, 25, 32);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('GESTIÓN:', rightX, rightY);
+        doc.setTextColor(5, 37, 68);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(18);
+        const gestionTxt = 'I/' + new Date().getFullYear();
+        doc.text(gestionTxt, rightX + 2, rightY + 8);
+        doc.setTextColor(215, 25, 32);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        const postLabel = 'POST.:';
+        doc.text(postLabel, rightX, rightY + 18);
+        doc.setTextColor(5, 37, 68);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(20);
+        const postValueX = rightX + doc.getTextWidth(postLabel) + 2;
+        const postNum = String((data as any).caratulaPostulanteNumero || '-');
+        doc.text(postNum, postValueX, rightY + 18);
+        // Título
+        const titleY = topY + 60;
+        doc.setTextColor(215, 25, 32);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.text('TÍTULO DEL PROYECTO', pageWidth / 2, titleY, { align: 'center' });
+        const temaTexto = ((data as any).proyectoNombre || '').toString().trim();
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        const temaWrapped = doc.splitTextToSize(temaTexto || '-', pageWidth - 2 * (mx + 20));
+        doc.text(temaWrapped as any, pageWidth / 2, titleY + 8, { align: 'center' });
+        // Filas
+        const infoStartY = titleY + 24 + (Array.isArray(temaWrapped) ? Math.max(0, (temaWrapped.length - 1) * 5) : 0);
+        const labelColor: [number, number, number] = [215, 25, 32];
+        const valueColor: [number, number, number] = [5, 37, 68];
+        const drawRow = (label: string, value: string, yPos: number) => {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(12);
+          doc.setTextColor(...labelColor);
+          const labelX = mx + 18;
+          doc.text(label, labelX, yPos);
+          doc.setTextColor(...valueColor);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(11);
+          const val = (value || '-').toString();
+          const valueX = labelX + doc.getTextWidth(label) + 4;
+          doc.text(val, valueX, yPos);
+        };
+        const postulanteNombre = ((data as any).estudianteNombre || '').toString().trim();
+        drawRow('POSTULANTE:', postulanteNombre || '-', infoStartY);
+        const tutorNom = (data as any).caratulaTutor ? String((data as any).caratulaTutor) : ((data as any).tutorNombre || '-');
+        drawRow('TUTOR:', tutorNom || '-', infoStartY + 12);
+        const carreraCaratula = ((data as any).carrera || '-').toString();
+        drawRow('CARRERA:', carreraCaratula, infoStartY + 24);
+        const areaNom = (data as any).caratulaArea ? String((data as any).caratulaArea) : ((data as any).area || '-');
+        drawRow('ÁREA:', areaNom || '-', infoStartY + 36);
+        doc.setTextColor(5, 37, 68);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text('COCHABAMBA - BOLIVIA', pageWidth / 2, topY + boxH - 8, { align: 'center' });
+      } catch {}
+    }
 
     const fileName = options?.fileName || `designacion-tutor-${(data.numeroDocumento || data.tutorNombre || 'documento')}.pdf`;
     if (options?.behavior === 'view') {

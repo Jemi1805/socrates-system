@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
 import { SgaService, Docente, ApiResponse, Pertinencia, TutorReg, TutorTipo, Convocatoria, TutorDesignacionItem } from '../../../shared/services/sga.service';
 import { ProyectoService } from '../proyectos/proyecto.service';
+import { PostulanteService } from '../postulantes/postulante.service';
 import { PdfService } from '../../../shared/services/pdf.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { LoadingService } from '../../../core/services/loading.service';
@@ -109,7 +110,7 @@ export class TutoresHomeComponent implements OnInit {
     }
   }
 
-  constructor(private sga: SgaService, private router: Router, private pdfService: PdfService, private auth: AuthService, private loadingService: LoadingService, private proyectoService: ProyectoService) {}
+  constructor(private sga: SgaService, private router: Router, private pdfService: PdfService, private auth: AuthService, private loadingService: LoadingService, private proyectoService: ProyectoService, private postulanteService: PostulanteService) {}
 
   ngOnInit(): void {
     this.loadTutorTipos();
@@ -301,15 +302,58 @@ export class TutoresHomeComponent implements OnInit {
     return map[idNum] || null;
   }
 
-  private resolveEstudianteCarreraFromRaw(raw: any, tutor: TutorDesignacionItem): string | undefined {
+  private resolveEstudianteCarreraFromRaw(raw: any, _tutor: TutorDesignacionItem): string | undefined {
+    // Solo datos del postulante (no del tutor) para evitar códigos combinados EEA/MEA
     return this.resolveFirstNonEmpty(
       raw?.carrera,
       raw?.carrera_nombre,
       raw?.carrera_label,
-      raw?.carrera_estudiante,
-      tutor.carrera_nombre,
-      tutor.cod_carrera
+      raw?.carrera_estudiante
     ) || undefined;
+  }
+
+  private carreraNombreFromAny(value?: string | null): string | undefined {
+    const raw = (value == null ? '' : String(value)).trim();
+    if (!raw) return undefined;
+    const upper = raw.toUpperCase();
+    if (upper === 'EEA') return 'Electricidad y Electrónica Automotriz';
+    if (upper === 'MEA') return 'Mecánica Automotriz';
+    if (upper === 'EEA/MEA' || upper === 'MEA/EEA') return undefined; // no usar combinación
+    const norm = raw
+      .normalize('NFD')
+      .replace(/\p{Diacritic}+/gu, '')
+      .toLowerCase();
+    const hasElec = /\belect|\beea/.test(norm);
+    const hasMec = /\bmec|\bmea/.test(norm);
+    if (hasElec && hasMec) return undefined; // ambiguo -> forzar fallback
+    if (hasElec && !hasMec) return 'Electricidad y Electrónica Automotriz';
+    if (hasMec && !hasElec) return 'Mecánica Automotriz';
+    return raw; // ya es un nombre descriptivo
+  }
+
+  private resolveCarreraPreferida(mergedRaw: any, sgaRaw?: any): string | undefined {
+    const candidates: Array<any> = [
+      mergedRaw?.carrera,
+      mergedRaw?.carrera_nombre,
+      mergedRaw?.carrera_label,
+      mergedRaw?.carrera_estudiante,
+      mergedRaw?.cod_carrera,
+      mergedRaw?.carrera_cod,
+      sgaRaw?.carrera,
+      sgaRaw?.carrera_nombre,
+      sgaRaw?.cod_carrera,
+      sgaRaw?.carrera_cod,
+    ];
+    for (const v of candidates) {
+      const mapped = this.carreraNombreFromAny(v);
+      if (mapped && mapped.toString().trim().length) return mapped;
+      const upper = (v == null ? '' : String(v)).trim().toUpperCase();
+      if (upper === 'EEA' || upper === 'MEA') {
+        const full = this.carreraNombreFromAny(upper);
+        if (full) return full;
+      }
+    }
+    return undefined;
   }
 
   private resolveEstudianteAreaFromRaw(raw: any, tutorArea?: string | null, fallbackArea?: string | null): string | undefined {
@@ -779,6 +823,20 @@ export class TutoresHomeComponent implements OnInit {
         tutor.cronograma_fin = this.resolveFirstNonEmpty(docData.cronograma_fin, tutor.cronograma_fin);
       }
 
+      // Enriquecer con datos del SGA del postulante (para carrera exacta)
+      const sgaByCod = new Map<number, any>();
+      for (const est of estudiantesSeleccionados) {
+        const cod = Number(est.cod_ceta);
+        if (!Number.isFinite(cod)) continue;
+        try {
+          const sgaResp = await firstValueFrom(this.sga.getPostulanteById(cod));
+          let sgaData: any = (sgaResp as any)?.data ?? sgaResp;
+          if (Array.isArray(sgaData?.data)) sgaData = sgaData.data[0];
+          if (sgaData && sgaData.data && typeof sgaData.data === 'object') sgaData = sgaData.data;
+          sgaByCod.set(cod, sgaData || {});
+        } catch {}
+      }
+
       const resumenDocLookup = this.buildResumenLookup(this.extractResumenFromDocData(docData));
 
       const normalizados = estudiantesSeleccionados.map(est => {
@@ -789,6 +847,7 @@ export class TutoresHomeComponent implements OnInit {
           ...(est || {}),
           ...(respData || {}),
           ...(docItem || {}),
+          sga: sgaByCod.get(cod) || {},
         };
         const normalized = this.normalizeEstudianteData(merged);
         if (respData?.fecha_designacion) {
@@ -804,6 +863,18 @@ export class TutoresHomeComponent implements OnInit {
 
       const fechaDocumento = normalizados[0]?.fechaDesignacion
         || (primaryData?.fecha_designacion ? new Date(primaryData.fecha_designacion) : new Date());
+
+      // Obtener/Asignar número de postulante (por convocatoria) para carátula del primero
+      let caratulaPostNum: string | undefined;
+      try {
+        const firstCod = Number(estudiantesSeleccionados[0]?.cod_ceta);
+        if (Number.isFinite(firstCod)) {
+          const asign = await firstValueFrom(this.postulanteService.assignPostulanteNum({ cod_ceta_est: firstCod }));
+          if (asign && (asign as any).nro_postulante != null) {
+            caratulaPostNum = String((asign as any).nro_postulante);
+          }
+        }
+      } catch {}
 
       // Actualizar información local de estudiantes (fecha de designación)
       for (const est of estudiantesSeleccionados) {
@@ -861,6 +932,15 @@ export class TutoresHomeComponent implements OnInit {
 
       const fechaGeneracion = new Date();
 
+      // Datos de carátula y carrera desde el primer estudiante seleccionado
+      const firstN = normalizados[0];
+      const mergedFirstRaw = { ...(docData || {}), ...((firstN && firstN.raw) ? firstN.raw : {}) } as any;
+      const sgaFirst = sgaByCod.get(Number(firstN?.cod_ceta)) || {};
+      const firstCarreraNombre = this.resolveCarreraPreferida(mergedFirstRaw, sgaFirst);
+      const firstPostNum = caratulaPostNum || (firstN?.cod_ceta != null ? String(firstN.cod_ceta) : undefined);
+      const firstTema = this.resolveEstudianteTemaFromRaw(mergedFirstRaw, firstN?.tema) || firstN?.tema || undefined;
+      const firstNombre = firstN?.nombre || undefined;
+
       await this.pdfService.generarDesignacionTutorPdf({
         tutorNombre: tutorDisplayName,
         tutorTipo: tutor.tipo_tutor_nombre || undefined,
@@ -869,7 +949,7 @@ export class TutoresHomeComponent implements OnInit {
         tutorTitulo: tutor.tutor_titulo || undefined,
         tutorTituloAcademico: tutor.tutor_titulo_academico || undefined,
         area: docData?.area || docData?.designacion_area || tutor.area || tutor.tutor_titulo || undefined,
-        carrera: docData?.carrera_nombre || docData?.carrera || tutor.carrera_nombre || tutor.cod_carrera || undefined,
+        carrera: firstCarreraNombre || undefined,
         convocatoria: tutor.convocatoria_label || undefined,
         convocatoriaFechaInicio: tutor.convocatoria_fecha_inicio || undefined,
         convocatoriaFechaFin: tutor.convocatoria_fecha_fin || undefined,
@@ -885,18 +965,18 @@ export class TutoresHomeComponent implements OnInit {
         cite: tutor.cite || docData?.cite || undefined,
         elaboradoPor: docData?.elaborado_por || userNombre,
         cargoElaborador: 'Responsable de Modalidad de Graduación',
+        estudianteNombre: firstNombre || undefined,
+        proyectoNombre: firstTema || undefined,
+        caratulaPostulanteNumero: firstPostNum || undefined,
         estudiantes: normalizados.map((est) => {
           const raw = (est && est.raw) ? est.raw as any : {};
           const mergedRaw = { ...(docData || {}), ...raw };
+          const sgaRaw = sgaByCod.get(Number(est.cod_ceta)) || {};
+          const carreraNombre = this.resolveCarreraPreferida(mergedRaw, sgaRaw);
           return {
             nombre: est.nombre || '-',
             codigo: est.cod_ceta ? String(est.cod_ceta) : undefined,
-            carrera: this.resolveEstudianteCarreraFromRaw(mergedRaw, tutor)
-              || docData?.carrera_nombre
-              || docData?.carrera
-              || tutor.carrera_nombre
-              || tutor.cod_carrera
-              || undefined,
+            carrera: carreraNombre || undefined,
             modalidad: this.resolveEstudianteModalidadFromRaw(mergedRaw)
               || est.modalidad
               || modalidadGeneral,

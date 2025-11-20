@@ -5,6 +5,7 @@ import { HeaderComponent } from '../../../shared/components/header/header.compon
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { SgaService, Pertinencia, TutorReg, Convocatoria, InscripModalidad, ApiResponse } from '../../../shared/services/sga.service';
 import { ProyectoService } from '../proyectos/proyecto.service';
+import { PostulanteService } from '../postulantes/postulante.service';
 import { LoadingService } from '../../../core/services/loading.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { PdfService } from '../../../shared/services/pdf.service';
@@ -60,6 +61,39 @@ export class DesignarTutorComponent implements OnInit {
     const text = String(value).replace(/\s+/g, ' ').trim();
     if (!text.length) return undefined;
     return text;
+  }
+
+  private carreraNombreFromAny(value?: string | null): string | undefined {
+    const raw = (value == null ? '' : String(value)).trim();
+    if (!raw) return undefined;
+    const upper = raw.toUpperCase();
+    if (upper === 'EEA') return 'Electricidad y Electrónica Automotriz';
+    if (upper === 'MEA') return 'Mecánica Automotriz';
+    if (upper === 'EEA/MEA' || upper === 'MEA/EEA') return undefined; // no mostrar combinaciones
+    const norm = raw
+      .normalize('NFD')
+      .replace(/\p{Diacritic}+/gu, '')
+      .toLowerCase();
+    const hasElec = /\belect|\beea/.test(norm);
+    const hasMec = /\bmec|\bmea/.test(norm);
+    if (hasElec && hasMec) return undefined; // ambiguo -> forzar fallback
+    if (hasElec && !hasMec) return 'Electricidad y Electrónica Automotriz';
+    if (hasMec && !hasElec) return 'Mecánica Automotriz';
+    return raw; // ya descriptivo
+  }
+
+  private resolveCarreraPreferidaDesignar(...candidates: Array<any>): string | undefined {
+    for (const v of candidates) {
+      if (v === null || v === undefined) continue;
+      const mapped = this.carreraNombreFromAny(v);
+      if (mapped && mapped.toString().trim().length) return mapped;
+      const upper = String(v).trim().toUpperCase();
+      if (upper === 'EEA' || upper === 'MEA') {
+        const full = this.carreraNombreFromAny(upper);
+        if (full) return full;
+      }
+    }
+    return undefined;
   }
 
   private isGenericProyectoDeGrado(value: string): boolean {
@@ -170,6 +204,7 @@ export class DesignarTutorComponent implements OnInit {
     private router: Router,
     private sga: SgaService,
     private proyectoService: ProyectoService,
+    private postulanteService: PostulanteService,
     private loadingService: LoadingService,
     private auth: AuthService,
     private pdfService: PdfService,
@@ -800,12 +835,37 @@ export class DesignarTutorComponent implements OnInit {
           }
         } catch {}
       }
+      let sgaEst: any = null;
+      try {
+        if (Number.isFinite(Number(codCetaForDoc))) {
+          const resp = await lastValueFrom(this.sga.getPostulanteById(Number(codCetaForDoc)));
+          let data: any = (resp as any)?.data ?? resp;
+          if (Array.isArray(data?.data)) data = data.data[0];
+          if (data && data.data && typeof data.data === 'object') data = data.data;
+          sgaEst = data || null;
+        }
+      } catch {}
+      let caratulaPostNum: string | undefined;
+      try {
+        if (Number.isFinite(Number(codCetaForDoc))) {
+          const asign = await lastValueFrom(this.postulanteService.assignPostulanteNum({ cod_ceta_est: Number(codCetaForDoc) }));
+          if (asign && (asign as any).nro_postulante != null) {
+            caratulaPostNum = String((asign as any).nro_postulante);
+          }
+        }
+      } catch {}
       const modalidadGeneral = this.modalidadNombre || 'Proyecto de Grado';
       const paraCargo = (designation?.doc_para_cargo
         || designation?.tutor_cargo
         || (tutor as any)?.cargo
         || (tutor as any)?.tipo_tutor_nombre
         || 'DOCENTE TÉCNICO')?.toString().trim();
+      const carreraPreferida = this.resolveCarreraPreferidaDesignar(
+        designation?.carrera_nombre,
+        this.estudiante?.carrera,
+        this.proyecto?.carrera,
+        sgaEst?.carrera || sgaEst?.carrera_nombre || sgaEst?.cod_carrera
+      );
       await this.pdfService.generarDesignacionTutorPdf({
         tutorNombre,
         tutorApellidoP: tutor?.apellido_p || undefined,
@@ -819,7 +879,7 @@ export class DesignarTutorComponent implements OnInit {
         area: area || undefined,
         estudianteNombre,
         estudianteCodigo: estudianteCodigo ? String(estudianteCodigo) : undefined,
-        carrera: carrera || undefined,
+        carrera: carreraPreferida || undefined,
         modalidad: modalidadGeneral,
         proyectoNombre: proyectoNombre || undefined,
         convocatoria: convocatoria || undefined,
@@ -842,9 +902,16 @@ export class DesignarTutorComponent implements OnInit {
         elaboradoPor: userName,
         cargoElaborador: 'Responsable de Modalidad de Graduación',
         pieNotas: ['BJB', 'CC: REC/DA'],
+        caratulaPostulanteNumero: caratulaPostNum || undefined,
         estudiantes: (designation?.estudiantes || this.lastDesignationEstudiantes())
           ?.map((est: any) => {
             const resolvedModalidad = this.resolveEstudianteModalidad(est, modalidadGeneral);
+            const carreraEst = this.resolveCarreraPreferidaDesignar(
+              est?.carrera,
+              this.estudiante?.carrera,
+              this.proyecto?.carrera,
+              sgaEst?.carrera || sgaEst?.carrera_nombre || sgaEst?.cod_carrera
+            );
             return {
               nombre: this.formatNombreApellidosPrimero(
                 est.apellido_p,
@@ -852,7 +919,7 @@ export class DesignarTutorComponent implements OnInit {
                 est.nombres,
                 est.estudiante_nombre || this.estudianteNombre()
               ) || this.estudianteNombre(),
-              carrera: est.carrera || carrera || undefined,
+              carrera: carreraEst || carreraPreferida || undefined,
               modalidad: resolvedModalidad || 'Proyecto de Grado',
               area,
               tema: est.proyecto_nombre || proyectoNombre || undefined,
