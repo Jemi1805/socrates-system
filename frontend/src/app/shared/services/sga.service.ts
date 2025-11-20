@@ -471,6 +471,13 @@ export class SgaService {
       .pipe(catchError(this.handleError));
   }
 
+  // --- TUTORES: generar documento de designación on-demand ---
+  generarDocDesignacion(payload: { tutor_id: number; cod_ceta: number; seleccionados_cod_ceta?: number[] }): Observable<ApiResponse<{ designacion_id: number; numero_documento?: string; cite?: string }>> {
+    return this.http
+      .post<ApiResponse<{ designacion_id: number; numero_documento?: string; cite?: string }>>(`${environment.apiUrl}/tutores/generar-doc-designacion`, payload)
+      .pipe(catchError(this.handleError));
+  }
+
   // --- PERTINENCIAS ACADÉMICAS ---
   getPertinencias(carrera?: string): Observable<ApiResponse<Pertinencia[]>> {
     let params = new HttpParams();

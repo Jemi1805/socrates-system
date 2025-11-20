@@ -98,6 +98,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:inscrip_modalidad.actualizar');
     Route::post('inscrip_modalidad/upsert_by_cod', [InscripModalidadController::class, 'upsertByCod'])
         ->middleware('permission:inscrip_modalidad.actualizar');
+    Route::post('inscrip_modalidad/assign_postulante_num', [InscripModalidadController::class, 'assignPostulanteNum'])
+        ->middleware('permission:inscrip_modalidad.actualizar');
 
     Route::get('convocatorias/activas', [ConvocatoriaController::class, 'activas'])
         ->middleware('permission:convocatorias.leer');
@@ -162,6 +164,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('tutores/doc-designaciones/{correlativo}', [TutorController::class, 'docDesignacionesByCorrelativo'])
         ->where(['correlativo' => '[0-9A-Za-z\-]+'])
         ->middleware('permission:tutores.leer');
+    // Tutores: generar documento de designación on-demand (crea correlativo si no existe)
+    Route::post('tutores/generar-doc-designacion', [TutorController::class, 'generarDocDesignacion'])
+        ->middleware('permission:tutores.designar');
     // Tutores: catálogo de tipos
     Route::get('tutores/tipos', [TutorController::class, 'tipos'])
         ->middleware('permission:tutores.leer');

@@ -121,12 +121,12 @@
                   </div>
                 </td>
                 <td class="docs-cell">
-                  <ng-container *ngIf="ins?.proyecto?.nombre || ins?.designacion?.tutor_nombre; else noDocsTpl">
+                  <ng-container *ngIf="ins?.proyecto?.nombre || ins?.designacion?.numero_documento; else noDocsTpl">
                     <ul class="docs-list">
                       <li *ngIf="ins?.proyecto?.nombre">
                         <a href="" (click)="verFmdg(ins); $event.preventDefault()">FDMG-1</a>
                       </li>
-                      <li *ngIf="ins?.designacion?.tutor_nombre">
+                      <li *ngIf="ins?.designacion?.numero_documento">
                         <a href="" (click)="verDesignacion(ins); $event.preventDefault()">Designación</a>
                       </li>
                     </ul>

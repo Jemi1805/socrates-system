@@ -274,6 +274,11 @@ export class PostulanteService {
     return this.http.get<any>(`${this.baseUrl}/inscrip_modalidad`, { params });
   }
 
+  // Asignar y obtener número de postulante por convocatoria
+  assignPostulanteNum(payload: { inscrip_modalidad_id?: number | string; cod_ceta_est?: number | string }): Observable<{ nro_postulante: number }> {
+    return this.http.post<{ nro_postulante: number }>(`${this.baseUrl}/inscrip_modalidad/assign_postulante_num`, payload);
+  }
+
   // Actualiza la fila de inscrip_modalidad por ID (por ejemplo, para sincronizar modalidad_nom)
   updateInscripModalidad(id: number | string, payload: { modalidad_nom?: string; modalidad_id?: number | string; estado?: string | null; convocatoria_id?: number | string | null; nom_convocatoria?: string | null }): Observable<any> {
     return this.http.patch<any>(`${this.baseUrl}/inscrip_modalidad/${id}`, payload);
@@ -283,6 +288,23 @@ export class PostulanteService {
   updateInscripModalidadByCod(codCeta: number | string, payload: { modalidad_nom?: string; modalidad_id?: number | string; estado?: string | null; convocatoria_id?: number | string | null; nom_convocatoria?: string | null }): Observable<any> {
     const body = { cod_ceta_est: codCeta, ...payload } as any;
     return this.http.post<any>(`${this.baseUrl}/inscrip_modalidad/upsert_by_cod`, body);
+  }
+
+  // --- Convocatorias ---
+  getConvocatoriaById(id: number | string): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/convocatorias/${id}`);
+  }
+
+  // --- Designaciones de tutores ---
+  getDesignaciones(params: { convocatoria_id?: number | string | null; cod_ceta?: number | string | null; search?: string | null } = {}): Observable<any> {
+    const httpParams = Object.entries(params).reduce((p, [k, v]) => {
+      const val = (v as any);
+      if (val !== undefined && val !== null && `${val}`.trim() !== '') {
+        return p.set(k, String(val));
+      }
+      return p;
+    }, new HttpParams());
+    return this.http.get<any>(`${this.baseUrl}/tutores/designaciones`, { params: httpParams });
   }
 
   getInscritos(params: { per_page?: number; carrera?: string; estado?: string; search?: string } = {}): Observable<any> {

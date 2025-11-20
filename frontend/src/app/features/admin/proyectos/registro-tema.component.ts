@@ -639,8 +639,11 @@ export class RegistroTemaComponent implements OnInit {
     if (this.generandoFmdg) return;
     this.generandoFmdg = true;
     this.loadingService.showModal();
-    // Construir datos desde el estado actual y delegar al servicio PDF
-    const data = {
+    let caratulaPostulanteNumero: number | string | undefined;
+    let caratulaGestion: string | undefined;
+    let caratulaTutor: string | undefined;
+    let caratulaArea: string | undefined;
+    const buildData = () => ({
       codCeta: this.codCeta,
       nombreCompleto: `${this.nombres || ''} ${this.apellidos || ''}`.trim(),
       nombres: this.nombres,
@@ -659,31 +662,106 @@ export class RegistroTemaComponent implements OnInit {
       modalidad: this.proyectoGuardado?.tipo || this.modalidadNombre || '-',
       tema: this.proyectoGuardado?.nombre || this.tema || '-',
       objetivo: this.proyectoGuardado?.objetivo || this.objetivos || '',
-    };
-    // Permitir que Angular pinte el spinner antes de la tarea pesada
-    setTimeout(() => {
-      const finalize = () => {
-        this.generandoFmdg = false;
-        this.loadingService.hideModal();
-      };
-      try {
-        const result = this.pdfService.generarFMDG1(data, { logoWidthMm: 24, logoMaxHeightMm: 24, logoFormat: 'JPEG', logoBgColor: '#FFFFFF' });
-        if (result && typeof (result as Promise<void>)?.then === 'function') {
-          (result as Promise<void>).then(() => finalize()).catch((err) => {
-            console.error('Error generando FMDG-1', err);
-            this.error = 'No fue posible generar el PDF.';
-            finalize();
-          });
+      caratulaPostulanteNumero,
+      caratulaGestion,
+      caratulaTutor,
+      caratulaArea,
+    });
+
+    const doGenerate = () => {
+      const data = buildData();
+      setTimeout(() => {
+        const finalize = () => {
+          this.generandoFmdg = false;
+          this.loadingService.hideModal();
+        };
+        try {
+          const result = this.pdfService.generarFMDG1(data, { logoWidthMm: 24, logoMaxHeightMm: 24, logoFormat: 'JPEG', logoBgColor: '#FFFFFF' });
+          if (result && typeof (result as Promise<void>)?.then === 'function') {
+            (result as Promise<void>).then(() => finalize()).catch((err) => {
+              console.error('Error generando FMDG-1', err);
+              this.error = 'No fue posible generar el PDF.';
+              finalize();
+            });
+            return;
+          }
+        } catch (e) {
+          console.error('Error generando FMDG-1', e);
+          this.error = 'No fue posible generar el PDF.';
+          finalize();
           return;
         }
-      } catch (e) {
-        console.error('Error generando FMDG-1', e);
-        this.error = 'No fue posible generar el PDF.';
         finalize();
-        return;
-      }
-      finalize();
-    }, 0);
+      }, 0);
+    };
+
+    const cod = this.codCeta;
+    const computeGestion = (fechaIni?: any, fechaFin?: any): string | undefined => {
+      const parse = (v: any): Date | null => {
+        if (!v) return null;
+        const d = new Date(v);
+        return isNaN(d.getTime()) ? null : d;
+      };
+      const d = parse(fechaIni) || parse(fechaFin);
+      if (!d) return undefined;
+      const m = d.getMonth() + 1;
+      const y = d.getFullYear();
+      if (m >= 2 && m <= 7) return `I/${y}`;
+      return `II/${y}`;
+    };
+
+    if (cod) {
+      this.postulanteService.getInscripModalidadByCodCeta(cod).subscribe({
+        next: (res: any) => {
+          const row = this.extractFirstRow(res);
+          const rawNum = row?.nro_postulante ?? row?.numero_postulante ?? row?.nro ?? null;
+          const n = Number(rawNum);
+          if (Number.isFinite(n)) caratulaPostulanteNumero = n;
+          const convId = row?.convocatoria_id ?? row?.convocatoria ?? null;
+          if (convId) {
+            this.postulanteService.getConvocatoriaById(convId).subscribe({
+              next: (c: any) => {
+                caratulaGestion = computeGestion(c?.fecha_inicio, c?.fecha_fin);
+                this.postulanteService.getDesignaciones({ cod_ceta: cod, convocatoria_id: convId }).subscribe({
+                  next: (d: any) => {
+                    const arr = Array.isArray(d?.data) ? d.data : [];
+                    if (arr.length) {
+                      const pick = arr[0];
+                      const tnom = (pick?.tutor_nombre || pick?.designacion_tutor_nom || '').toString().trim();
+                      const area = (pick?.area || pick?.designacion_area || '').toString().trim();
+                      if (tnom) caratulaTutor = tnom;
+                      if (area) caratulaArea = area;
+                    }
+                    doGenerate();
+                  },
+                  error: () => { doGenerate(); }
+                });
+              },
+              error: () => { doGenerate(); }
+            });
+          } else {
+            this.postulanteService.getDesignaciones({ cod_ceta: cod }).subscribe({
+              next: (d: any) => {
+                const arr = Array.isArray(d?.data) ? d.data : [];
+                if (arr.length) {
+                  const pick = arr[0];
+                  const tnom = (pick?.tutor_nombre || pick?.designacion_tutor_nom || '').toString().trim();
+                  const area = (pick?.area || pick?.designacion_area || '').toString().trim();
+                  if (tnom) caratulaTutor = tnom;
+                  if (area) caratulaArea = area;
+                }
+                doGenerate();
+              },
+              error: () => { doGenerate(); }
+            });
+          }
+        },
+        error: () => { doGenerate(); }
+      });
+      return;
+    }
+
+    doGenerate();
   }
 
   // Valor consolidado del nombre del tema para el resumen (evita depender de una sola clave)

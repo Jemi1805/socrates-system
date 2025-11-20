@@ -21,6 +21,7 @@ class InscripModalidad extends Model
         'estado',
         'convocatoria_id',
         'nom_convocatoria',
+        'nro_postulante',
         'aranceles_completos',
         'estado_arancel',
     ];
@@ -28,6 +29,7 @@ class InscripModalidad extends Model
     protected $casts = [
         'fecha_inscripcion' => 'date',
         'convocatoria_id' => 'integer',
+        'nro_postulante' => 'integer',
         'aranceles_completos' => 'boolean',
         'estado_arancel' => 'string',
     ];

@@ -31,7 +31,6 @@ class InscripModalidadController extends CrudController
         if ($request->filled('cod_ceta_est')) {
             $query->where('cod_ceta_est', (int) $request->query('cod_ceta_est'));
         }
-
         if ($request->filled('modalidad_id')) {
             $query->where('modalidad_id', (int) $request->query('modalidad_id'));
         }
@@ -46,6 +45,75 @@ class InscripModalidadController extends CrudController
         }
 
         return $query->paginate($perPage);
+    }
+
+    public function assignPostulanteNum(Request $request)
+    {
+        $data = $request->validate([
+            'inscrip_modalidad_id' => 'nullable|integer|exists:inscrip_modalidad,id',
+            'cod_ceta_est' => 'nullable|integer',
+        ]);
+
+        if (empty($data['inscrip_modalidad_id']) && empty($data['cod_ceta_est'])) {
+            return response()->json(['message' => 'Se requiere inscrip_modalidad_id o cod_ceta_est'], 422);
+        }
+
+        return DB::transaction(function () use ($data) {
+            // 1) Localizar inscripción
+            $query = DB::table('inscrip_modalidad');
+            if (!empty($data['inscrip_modalidad_id'])) {
+                $query->where('id', (int)$data['inscrip_modalidad_id']);
+            } else {
+                $query->where('cod_ceta_est', (int)$data['cod_ceta_est'])->orderByDesc('id');
+            }
+            $ins = $query->lockForUpdate()->first();
+            if (!$ins) {
+                return response()->json(['message' => 'Inscripción no encontrada'], 404);
+            }
+
+            // Si ya tiene número, devolverlo
+            if (isset($ins->nro_postulante) && $ins->nro_postulante !== null) {
+                return response()->json(['nro_postulante' => (int)$ins->nro_postulante]);
+            }
+
+            // 2) Determinar convocatoria
+            $convId = isset($ins->convocatoria_id) ? (int)$ins->convocatoria_id : null;
+            if (!$convId) {
+                return response()->json(['message' => 'La inscripción no tiene convocatoria asociada'], 422);
+            }
+
+            // 3) Obtener/incrementar secuencia por convocatoria
+            $seqRow = DB::table('postulante_num_secuencias')
+                ->where('convocatoria_id', $convId)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$seqRow) {
+                DB::table('postulante_num_secuencias')->insert([
+                    'convocatoria_id' => $convId,
+                    'last_numero' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $seqRow = DB::table('postulante_num_secuencias')
+                    ->where('convocatoria_id', $convId)
+                    ->lockForUpdate()
+                    ->first();
+            }
+
+            $next = ((int)$seqRow->last_numero) + 1;
+
+            DB::table('postulante_num_secuencias')
+                ->where('id', $seqRow->id)
+                ->update(['last_numero' => $next, 'updated_at' => now()]);
+
+            // 4) Persistir en inscripción
+            DB::table('inscrip_modalidad')
+                ->where('id', $ins->id)
+                ->update(['nro_postulante' => $next, 'updated_at' => now()]);
+
+            return response()->json(['nro_postulante' => $next]);
+        });
     }
     /**
      * Sanitiza números de serie/resoluciones: permite solo A-Z, 0-9, guion -, comillas dobles " y símbolo °, y devuelve en MAYÚSCULAS.

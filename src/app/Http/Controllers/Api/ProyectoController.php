@@ -76,6 +76,44 @@ class ProyectoController extends CrudController
                     $ins->save();
                 }
             }
+
+            try {
+                DB::transaction(function () use ($inscId) {
+                    $ins = DB::table('inscrip_modalidad')
+                        ->where('id', (int)$inscId)
+                        ->lockForUpdate()
+                        ->first();
+                    if (!$ins) return;
+                    $already = isset($ins->nro_postulante) && $ins->nro_postulante !== null;
+                    $convId = isset($ins->convocatoria_id) ? (int)$ins->convocatoria_id : null;
+                    if ($already || !$convId) return;
+
+                    $seq = DB::table('postulante_num_secuencias')
+                        ->where('convocatoria_id', $convId)
+                        ->lockForUpdate()
+                        ->first();
+                    if (!$seq) {
+                        DB::table('postulante_num_secuencias')->insert([
+                            'convocatoria_id' => $convId,
+                            'last_numero' => 0,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                        $seq = DB::table('postulante_num_secuencias')
+                            ->where('convocatoria_id', $convId)
+                            ->lockForUpdate()
+                            ->first();
+                    }
+                    $next = ((int)$seq->last_numero) + 1;
+                    DB::table('postulante_num_secuencias')
+                        ->where('id', $seq->id)
+                        ->update(['last_numero' => $next, 'updated_at' => now()]);
+                    DB::table('inscrip_modalidad')
+                        ->where('id', $ins->id)
+                        ->update(['nro_postulante' => $next, 'updated_at' => now()]);
+                });
+            } catch (\Throwable $e) {
+            }
         }
 
         return response()->json($model, 201);
@@ -93,6 +131,9 @@ class ProyectoController extends CrudController
             if (!empty($cod)) {
                 $inscId = $this->resolveInscripModalidadId($cod);
             }
+        }
+        if (empty($inscId) && !empty($model->inscrip_modalidad_id)) {
+            $inscId = $model->inscrip_modalidad_id;
         }
         if (!empty($inscId)) {
             $data['inscrip_modalidad_id'] = $inscId;
@@ -112,6 +153,45 @@ class ProyectoController extends CrudController
                     $ins->modalidad_id = $modalidadId; // booted() sincroniza modalidad_nom
                     $ins->save();
                 }
+            }
+
+            // Asignar nro_postulante si aún no existe (actualización de tema)
+            try {
+                DB::transaction(function () use ($inscId) {
+                    $ins = DB::table('inscrip_modalidad')
+                        ->where('id', (int)$inscId)
+                        ->lockForUpdate()
+                        ->first();
+                    if (!$ins) return;
+                    $already = isset($ins->nro_postulante) && $ins->nro_postulante !== null;
+                    $convId = isset($ins->convocatoria_id) ? (int)$ins->convocatoria_id : null;
+                    if ($already || !$convId) return;
+
+                    $seq = DB::table('postulante_num_secuencias')
+                        ->where('convocatoria_id', $convId)
+                        ->lockForUpdate()
+                        ->first();
+                    if (!$seq) {
+                        DB::table('postulante_num_secuencias')->insert([
+                            'convocatoria_id' => $convId,
+                            'last_numero' => 0,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                        $seq = DB::table('postulante_num_secuencias')
+                            ->where('convocatoria_id', $convId)
+                            ->lockForUpdate()
+                            ->first();
+                    }
+                    $next = ((int)$seq->last_numero) + 1;
+                    DB::table('postulante_num_secuencias')
+                        ->where('id', $seq->id)
+                        ->update(['last_numero' => $next, 'updated_at' => now()]);
+                    DB::table('inscrip_modalidad')
+                        ->where('id', $ins->id)
+                        ->update(['nro_postulante' => $next, 'updated_at' => now()]);
+                });
+            } catch (\Throwable $e) {
             }
         }
 

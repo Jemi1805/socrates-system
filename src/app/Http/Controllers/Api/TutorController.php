@@ -707,7 +707,7 @@ class TutorController extends Controller
         return json_last_error() === JSON_ERROR_NONE ? $decoded : null;
     }
 
-    private function ensureDocDesignacion($row, $tutorNombreResolved, $estudianteNombreResolved, ?array $seleccionadosCodCeta = null)
+    private function ensureDocDesignacion($row, $tutorNombreResolved, $estudianteNombreResolved, $seleccionadosCodCeta = null)
     {
         $docType = $this->resolveDocumentoTipo(isset($row->tipo_tutor_nombre) ? $row->tipo_tutor_nombre : null);
         $year = $this->extractYear(isset($row->fecha_designacion) ? $row->fecha_designacion : null);
@@ -868,7 +868,7 @@ class TutorController extends Controller
         if (!$doc) {
             $sequenceResult = $this->fetchSequenceFromSga($docType, $year, $row, $carreraSlug);
             if ($sequenceResult['source'] !== 'sga') {
-                throw new \RuntimeException('No se pudo obtener correlativo del SGA para el documento.');
+                \Log::warning('Usando fallback local para correlativo de designación (SGA no disponible)');
             }
 
             $numeroInt = $sequenceResult['numeroInt'];
@@ -957,7 +957,7 @@ class TutorController extends Controller
         if (!$numeroStr) {
             $sequenceResult = $this->fetchSequenceFromSga($docType, $year, $row, $carreraSlug);
             if ($sequenceResult['source'] !== 'sga') {
-                throw new \RuntimeException('No se pudo obtener correlativo del SGA para actualizar el documento.');
+                \Log::warning('Usando fallback local para correlativo de designación (actualización) (SGA no disponible)');
             }
 
             $numeroInt = $sequenceResult['numeroInt'];
@@ -1098,7 +1098,7 @@ class TutorController extends Controller
         );
     }
 
-    private function buildEstudiantesResumenForContext(int $tutorId, ?int $convocatoriaId, ?int $year)
+    private function buildEstudiantesResumenForContext(int $tutorId, $convocatoriaId, $year)
     {
         $query = DB::table('designacion_tutor as dt')
             ->where('dt.tutor_id', $tutorId)
@@ -1168,9 +1168,9 @@ class TutorController extends Controller
         })->toArray();
     }
 
-    private function hasResumenChanged(array $existing, array $candidate): bool
+    private function hasResumenChanged(array $existing, array $candidate)
     {
-        $normalize = function (array $items): array {
+        $normalize = function (array $items) {
             $normalized = array_map(function ($row) {
                 return [
                     'cod_ceta' => isset($row['cod_ceta']) ? (string) $row['cod_ceta'] : '',
@@ -1370,7 +1370,7 @@ class TutorController extends Controller
         return 'CETA/DA/';
     }
 
-    private function fetchSequenceFromSga($docType, $year, $designacionRow = null, ?string $carreraSlug = null)
+    private function fetchSequenceFromSga($docType, $year, $designacionRow = null, $carreraSlug = null)
     {
         $now = Carbon::now();
         $abreviatura = $this->resolveDocTypeForSga($docType);
@@ -1419,7 +1419,7 @@ class TutorController extends Controller
             $overrides['target_slug'] = $targetSlug;
         }
 
-        $finalTargetSlug = $overrides['target_slug'] ?? $targetSlug;
+        $finalTargetSlug = isset($overrides['target_slug']) ? $overrides['target_slug'] : $targetSlug;
 
         $response = $socratesApi->getCorrelativoAbreviatura(
             $abreviatura,
@@ -1473,7 +1473,7 @@ class TutorController extends Controller
         );
     }
 
-    private function resolveSgaCorrelativoOverrides($codCeta = null, $carreraHint = null, $contextSlug = null): array
+    private function resolveSgaCorrelativoOverrides($codCeta = null, $carreraHint = null, $contextSlug = null)
     {
         $overrides = [];
 
@@ -1494,7 +1494,7 @@ class TutorController extends Controller
         return $overrides;
     }
 
-    private function resolveSgaConfigParameter($config, string $column, ?string $envKey = null): ?string
+    private function resolveSgaConfigParameter($config, string $column, $envKey = null)
     {
         if ($config && Schema::hasTable('sga_config') && Schema::hasColumn('sga_config', $column)) {
             $value = isset($config->$column) ? $config->$column : null;
@@ -1513,7 +1513,7 @@ class TutorController extends Controller
         return null;
     }
 
-    private function resolveCarreraSlugForRow($row): ?string
+    private function resolveCarreraSlugForRow($row)
     {
         if (!$row) {
             return null;
@@ -1549,7 +1549,7 @@ class TutorController extends Controller
         return null;
     }
 
-    private function mapCarreraFromCodigo($cod): ?string
+    private function mapCarreraFromCodigo($cod)
     {
         if ($cod === null) {
             return null;
@@ -1669,7 +1669,7 @@ class TutorController extends Controller
         return [$numero, $normalized, $cite];
     }
 
-    private function buildSequenceResult(array $sequence, ?string $cite, string $source): array
+    private function buildSequenceResult(array $sequence, $cite, string $source): array
     {
         return [
             'numeroInt' => $sequence[0],
@@ -1887,6 +1887,92 @@ class TutorController extends Controller
         }
     }
 
+    public function generarDocDesignacion(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'tutor_id' => 'required|integer|exists:tutores,id',
+            'cod_ceta' => 'required|integer|exists:postulantes,cod_ceta',
+            'seleccionados_cod_ceta' => 'nullable|array',
+            'seleccionados_cod_ceta.*' => 'integer',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Datos inválidos',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $data = $validator->validated();
+
+        $seleccionadosCodCeta = null;
+        if (isset($data['seleccionados_cod_ceta']) && is_array($data['seleccionados_cod_ceta'])) {
+            $seleccionadosCodCeta = array_values(array_unique(array_map(function ($value) {
+                return (int) $value;
+            }, $data['seleccionados_cod_ceta'])));
+        }
+
+        DB::beginTransaction();
+        try {
+            $baseRow = DB::table('designacion_tutor as dt')
+                ->leftJoin('tutores as t', 'dt.tutor_id', '=', 't.id')
+                ->leftJoin('tipo_tutor as tt', 't.tipo_tutor_id', '=', 'tt.id')
+                ->leftJoin('proyecto', 'dt.proyecto_id', '=', 'proyecto.id')
+                ->leftJoin('convocatorias as conv', 'dt.convocatoria_id', '=', 'conv.id')
+                ->select(
+                    'dt.*',
+                    'tt.nombre as tipo_tutor_nombre',
+                    't.titulo as tutor_titulo_base',
+                    'proyecto.nombre as proyecto_nombre',
+                    'conv.fecha_inicio as convocatoria_fecha_inicio',
+                    'conv.fecha_fin as convocatoria_fecha_fin'
+                )
+                ->where('dt.tutor_id', $data['tutor_id'])
+                ->where('dt.cod_ceta', $data['cod_ceta'])
+                ->first();
+
+            if (!$baseRow) {
+                throw new \RuntimeException('No existe designación previa para generar documento.');
+            }
+
+            $p = DB::table('postulantes')->where('cod_ceta', $data['cod_ceta'])
+                ->first(['nombres_est', 'ap_pat', 'ap_mat']);
+            $t = DB::table('tutores')->where('id', $data['tutor_id'])
+                ->first(['nombre', 'apellido_p', 'apellido_m']);
+            $estNombre = $p ? trim(implode(' ', array_filter([$p->nombres_est, $p->ap_pat, $p->ap_mat]))) : '';
+            $tutNombre = $t ? trim(implode(' ', array_filter([$t->nombre, $t->apellido_p, $t->apellido_m]))) : '';
+
+            [$docRecord, $numeroDocumento, $cite] = $this->ensureDocDesignacion(
+                $baseRow,
+                $tutNombre,
+                $estNombre,
+                $seleccionadosCodCeta
+            );
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'designacion_id' => $baseRow->id,
+                    'numero_documento' => $numeroDocumento,
+                    'cite' => $cite,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Error al generar documento de designación', [
+                'payload' => $request->all(),
+                'exception' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'No se pudo generar el documento de designación',
+            ], 500);
+        }
+    }
+
     /** Actualizar datos del tutor (incluye tipo_tutor_id obligatorio para activación) */
     public function update(Request $request, int $id)
     {
@@ -1954,6 +2040,8 @@ class TutorController extends Controller
             'area' => 'nullable|string|max:255',
             'user_id' => 'nullable|integer',
             'user_name' => 'nullable|string|max:150',
+            'generar_documento' => 'nullable|boolean',
+            'refrescar_correlativo' => 'nullable|boolean',
             'seleccionados_cod_ceta' => 'nullable|array',
             'seleccionados_cod_ceta.*' => 'integer',
         ]);
@@ -2089,13 +2177,18 @@ class TutorController extends Controller
                 $seleccionadosCodCeta[] = (int) $data['cod_ceta'];
             }
 
-            $docRecordResult = $this->ensureDocDesignacion(
-                $baseRow,
-                $tutNombre ? $tutNombre : '',
-                $estNombre ? $estNombre : '',
-                $seleccionadosCodCeta
-            );
-            [$docRecord, $numeroDocumento, $cite] = $docRecordResult;
+            $docRecord = null;
+            $numeroDocumento = null;
+            $cite = null;
+            if ($request->boolean('generar_documento', false)) {
+                $docRecordResult = $this->ensureDocDesignacion(
+                    $baseRow,
+                    $tutNombre ? $tutNombre : '',
+                    $estNombre ? $estNombre : '',
+                    $seleccionadosCodCeta
+                );
+                [$docRecord, $numeroDocumento, $cite] = $docRecordResult;
+            }
 
             DB::commit();
 

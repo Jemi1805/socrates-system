@@ -8,6 +8,7 @@ import { ProyectoService } from '../proyectos/proyecto.service';
 import { LoadingService } from '../../../core/services/loading.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { PdfService } from '../../../shared/services/pdf.service';
+import { lastValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-designar-tutor',
@@ -493,8 +494,6 @@ export class DesignarTutorComponent implements OnInit {
       tutor_id: Number(this.selectedTutor.id),
       cod_ceta: codNumeric,
       proyecto_id: proyectoId,
-      generar_documento: true,
-      refrescar_correlativo: true,
     };
     const areaSeleccionada = this.confirmArea || this.resolveTutorAreaLabel(this.selectedTutor, this.selectedPertinenciaId);
     if (areaSeleccionada) {
@@ -784,6 +783,23 @@ export class DesignarTutorComponent implements OnInit {
       || undefined;
     this.generatingPdf = true;
     try {
+      // Asegurar documento y correlativo justo antes de generar el PDF
+      const tutorIdForDoc = tutorId != null ? Number(tutorId) : null;
+      const codCetaForDoc = estudianteCodigo ? Number(estudianteCodigo) : (this.codCeta ? Number(this.codCeta) : null);
+      if (Number.isFinite(tutorIdForDoc as any) && Number.isFinite(codCetaForDoc as any)) {
+        try {
+          const genResp = await lastValueFrom(this.sga.generarDocDesignacion({ tutor_id: Number(tutorIdForDoc), cod_ceta: Number(codCetaForDoc) } as any));
+          const dataDoc: any = (genResp as any)?.data ?? null;
+          if (dataDoc) {
+            if (!designation.numero_documento && dataDoc.numero_documento) {
+              (designation as any).numero_documento = dataDoc.numero_documento;
+            }
+            if (!designation.cite && dataDoc.cite) {
+              (designation as any).cite = dataDoc.cite;
+            }
+          }
+        } catch {}
+      }
       const modalidadGeneral = this.modalidadNombre || 'Proyecto de Grado';
       const paraCargo = (designation?.doc_para_cargo
         || designation?.tutor_cargo
@@ -810,7 +826,7 @@ export class DesignarTutorComponent implements OnInit {
         convocatoriaFechaInicio: convocatoriaInicio || undefined,
         convocatoriaFechaFin: convocatoriaFin || undefined,
         numeroDocumento: (designation?.numero_documento ?? numeroDocumento ?? null)?.toString() || undefined,
-        cite: designation?.cite || this.lastDesignation?.cite || undefined,
+        cite: designation?.cite || undefined,
         fecha: new Date().toISOString(),
         fechaGeneracion: new Date().toISOString(),
         formatoCodigo: '«F3»',

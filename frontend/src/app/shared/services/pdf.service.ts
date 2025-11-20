@@ -13,9 +13,15 @@ export interface Fmdg1Data {
   celular?: string;
   instituto?: string;
   carrera?: string;
+  postulanteNumero?: number | string;
   modalidad?: string;
   tema?: string;
   objetivo?: string;
+  // Datos opcionales para carátula (segunda página)
+  caratulaPostulanteNumero?: number | string;
+  caratulaGestion?: string;
+  caratulaTutor?: string;
+  caratulaArea?: string;
 }
 
 export interface TutorDesignacionPdfData {
@@ -59,6 +65,11 @@ export interface TutorDesignacionPdfData {
   pieNotas?: string[];
   estudiantes?: TutorDesignacionEstudiante[];
   fechaGeneracion?: string | Date;
+  // Campos opcionales para carátula adjunta
+  caratulaPostulanteNumero?: number | string;
+  caratulaGestion?: string;
+  caratulaTutor?: string;
+  caratulaArea?: string;
 }
 
 export interface TutorDesignacionEstudiante {
@@ -549,6 +560,8 @@ export class PdfService {
     cx += wPrefix;
     doc.setFont('helvetica', 'italic');
     doc.text(notaResto, cx, yMiddle);
+
+    
 
     if (options?.behavior === 'view') {
       try {
@@ -1077,6 +1090,120 @@ export class PdfService {
     }
 
     refreshHeaders();
+
+    // ----- Carátula adjunta (media hoja) al final, sin encabezado -----
+    try {
+      doc.addPage();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const mx = 15;
+      const topY = mx;
+      const boxW = pageWidth - 2 * mx;
+      const boxH = (pageHeight - 2 * mx) / 2; // media hoja
+
+      // Marco con bordes redondeados
+      doc.setDrawColor(36, 114, 55);
+      doc.setLineWidth(2.0);
+      if ((doc as any).roundedRect) {
+        (doc as any).roundedRect(mx, topY, boxW, boxH, 6, 6);
+      } else {
+        doc.rect(mx, topY, boxW, boxH);
+      }
+
+      // Encabezado institucional
+      doc.setTextColor(5, 37, 68);
+      doc.setFont(baseFont, 'bold');
+      doc.setFontSize(12);
+      doc.text('INSTITUTO TECNOLÓGICO DE ENSEÑANZA AUTOMOTRIZ', pageWidth / 2, topY + 10, { align: 'center' });
+      doc.setTextColor(215, 25, 32);
+      doc.setFontSize(14);
+      doc.text('"CETA"', pageWidth / 2, topY + 16, { align: 'center' });
+
+      // Logo centrado
+      try {
+        const meta2 = await this.loadImageWithMeta('assets/images/LOGO.png');
+        const desiredW = 32;
+        const aspect2 = meta2.naturalHeight ? meta2.naturalWidth / meta2.naturalHeight : 1;
+        const finalW2 = desiredW;
+        const finalH2 = desiredW / (aspect2 || 1);
+        const cx = pageWidth / 2 - finalW2 / 2;
+        const cy = topY + 20;
+        const flatLogo = await this.flattenToPng(meta2.dataUrl, '#FFFFFF');
+        doc.addImage(flatLogo, 'PNG', cx, cy, finalW2, finalH2, undefined, 'FAST');
+      } catch {}
+
+      // Bloque Gestión y Post.
+      const rightX = pageWidth - mx - 65;
+      const rightY = topY + 20;
+      const computeGestion = (): string => {
+        const si = (data as any).convocatoriaFechaInicio;
+        const sf = (data as any).convocatoriaFechaFin;
+        const d = toDate ? (toDate(si) || toDate(sf)) : (si ? new Date(si) : (sf ? new Date(sf) : null));
+        if (d && !Number.isNaN(d.getTime())) {
+          const m = d.getMonth() + 1;
+          const y = d.getFullYear();
+          return (m >= 2 && m <= 7) ? `I/${y}` : `II/${y}`;
+        }
+        return '';
+      };
+      const gestion = (data as any).caratulaGestion ? String((data as any).caratulaGestion).trim() : computeGestion();
+      const postNumRaw = (data as any).caratulaPostulanteNumero;
+      const postNum = (postNumRaw !== undefined && postNumRaw !== null && String(postNumRaw).trim() !== '') ? String(postNumRaw) : '-';
+      doc.setFont(baseFont, 'bold');
+      doc.setTextColor(215, 25, 32);
+      doc.setFontSize(14);
+      doc.text('GESTIÓN:', rightX, rightY);
+      doc.setTextColor(5, 37, 68);
+      doc.setFontSize(16);
+      doc.text(gestion || '-', rightX + 2, rightY + 8);
+      doc.setTextColor(215, 25, 32);
+      doc.setFontSize(14);
+      doc.text('POST.:', rightX, rightY + 18);
+      doc.setTextColor(5, 37, 68);
+      doc.setFontSize(18);
+      doc.text(postNum, rightX + 15, rightY + 18);
+
+      // Título del proyecto
+      const titleY = topY + 60;
+      doc.setTextColor(215, 25, 32);
+      doc.setFont(baseFont, 'bold');
+      doc.setFontSize(16);
+      doc.text('TÍTULO DEL PROYECTO', pageWidth / 2, titleY, { align: 'center' });
+
+      const temaTexto = ((data as any).proyectoNombre || '').toString().trim();
+      doc.setTextColor(0, 0, 0);
+      doc.setFont(baseFont, 'bold');
+      doc.setFontSize(11);
+      const temaWrapped = doc.splitTextToSize(temaTexto || '-', pageWidth - 2 * (mx + 20));
+      doc.text(temaWrapped as any, pageWidth / 2, titleY + 8, { align: 'center' });
+
+      // Filas informativas: POSTULANTE, TUTOR, CARRERA, ÁREA
+      const infoStartY = titleY + 24 + (Array.isArray(temaWrapped) ? Math.max(0, (temaWrapped.length - 1) * 5) : 0);
+      const labelColor: [number, number, number] = [215, 25, 32];
+      const valueColor: [number, number, number] = [5, 37, 68];
+      const drawRow = (label: string, value: string, yPos: number) => {
+        doc.setFont(baseFont, 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(...labelColor);
+        doc.text(label, mx + 18, yPos);
+        doc.setTextColor(...valueColor);
+        doc.setFont(baseFont, 'normal');
+        doc.setFontSize(11);
+        const val = (value || '-').toString();
+        doc.text(val, mx + 18 + doc.getTextWidth(label) + 2, yPos);
+      };
+
+      const postulanteNombre = ((data as any).estudianteNombre || '').toString().trim();
+      drawRow('POSTULANTE:', postulanteNombre || '-', infoStartY);
+
+      const tutorNom = (data as any).caratulaTutor ? String((data as any).caratulaTutor) : ((data as any).tutorNombre || '-');
+      drawRow('TUTOR:', tutorNom || '-', infoStartY + 10);
+
+      drawRow('CARRERA:', ((data as any).carrera || '-').toString(), infoStartY + 20);
+
+      const areaNom = (data as any).caratulaArea ? String((data as any).caratulaArea) : ((data as any).area || '-');
+      drawRow('ÁREA:', areaNom || '-', infoStartY + 30);
+    } catch {}
 
     const fileName = options?.fileName || `designacion-tutor-${(data.numeroDocumento || data.tutorNombre || 'documento')}.pdf`;
     if (options?.behavior === 'view') {
