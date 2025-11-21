@@ -49,6 +49,7 @@ class PostulanteController extends Controller
                 'inscrip_modalidad.estado',
                 'inscrip_modalidad.fecha_inscripcion',
                 'inscrip_modalidad.estado_arancel',
+                'inscrip_modalidad.nro_postulante',
                 DB::raw('proj.celular as celular'),
             ])
             ->joinSub($latestInscripciones, 'latest_insc', function ($join) {

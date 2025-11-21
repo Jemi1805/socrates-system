@@ -75,12 +75,22 @@ interface PostulanteInscrito {
   modo?: string | null;
   carrera?: string | null;
   proyecto?: { nombre?: string | null; objetivo?: string | null } | null;
-  designacion?: { tutor_nombre?: string | null; area?: string | null; numero_documento?: string | null; cite?: string | null; tutor_celular?: string | null } | null;
+  designacion?: {
+    tutor_nombre?: string | null;
+    area?: string | null;
+    numero_documento?: string | null;
+    cite?: string | null;
+    tutor_celular?: string | null;
+    tutor_titulo_academico?: string | null;
+    convocatoria_fecha_inicio?: string | null;
+    convocatoria_fecha_fin?: string | null;
+  } | null;
   primera_inscripcion?: string | null;
   fecha_inscripcion?: string | null;
   estado?: string | null;
   pago_estado?: 'sin_pagos' | 'parcial' | 'completo' | null;
   estado_arancel?: 'sin_pagos' | 'parcial' | 'completo' | null;
+  nro_postulante?: number | null;
 }
 
 @Component({
@@ -1161,6 +1171,7 @@ cargarPostulantesInscritos() {
           return s as any;
         })(),
         carrera: row?.carrera ?? row?.carrera_nombre ?? null,
+        nro_postulante: row?.nro_postulante ?? null,
       })).filter((row: PostulanteInscrito) => !!row.cod_ceta);
       this.loadingInscritos = false;
       // Enriquecer filas con tema y designación si hay datos
@@ -1243,7 +1254,19 @@ cargarDetallesTabla() {
           const numeroDoc = (found as any)?.numero_documento ?? null;
           const cite = (found as any)?.cite ?? null;
           const tutorCel = (found as any)?.tutor_celular ?? (found as any)?.tutor_cel ?? (found as any)?.celular ?? (found?.tutor?.celular ?? null);
-          ins.designacion = { tutor_nombre: tutorNombre || null, area: area || null, numero_documento: numeroDoc, cite, tutor_celular: tutorCel || null };
+          const tituloAcad = (found as any)?.tutor_titulo_academico ?? (found as any)?.tutor_titulo ?? (found?.tutor as any)?.tutor_titulo_academico ?? null;
+          const convInicio = (found as any)?.convocatoria_fecha_inicio ?? null;
+          const convFin = (found as any)?.convocatoria_fecha_fin ?? null;
+          ins.designacion = {
+            tutor_nombre: tutorNombre || null,
+            area: area || null,
+            numero_documento: numeroDoc,
+            cite,
+            tutor_celular: tutorCel || null,
+            tutor_titulo_academico: tituloAcad ? String(tituloAcad) : null,
+            convocatoria_fecha_inicio: convInicio ? String(convInicio) : null,
+            convocatoria_fecha_fin: convFin ? String(convFin) : null,
+          };
         } else {
           ins.designacion = null;
         }
@@ -1575,22 +1598,38 @@ verFmdg(ins: PostulanteInscrito) {
 
 verDesignacion(ins: PostulanteInscrito) {
   if (!ins?.designacion) return;
+  console.log('INS COMPLETO', ins);
+  console.log('INS DESIGNACION', ins.designacion);
   try {
     const nombres = (ins as any)?.nombres_est || '';
     const apPat = (ins as any)?.ap_pat || '';
     const apMat = (ins as any)?.ap_mat || '';
     const estudianteNombre = `${apPat} ${apMat} ${nombres}`.trim();
+    const nroPost = (ins as any)?.nro_postulante;
+    const tituloAcad = ins.designacion?.tutor_titulo_academico || (ins as any)?.tutor_titulo_academico || '';
+    const nombreTutorPlano = ins.designacion?.tutor_nombre || 'Tutor designado';
+    const nombreTutorConTitulo = tituloAcad
+      ? `${tituloAcad.trim()} ${nombreTutorPlano}`.trim()
+      : nombreTutorPlano;
     const data: any = {
-      tutorNombre: ins.designacion?.tutor_nombre || 'Tutor designado',
+      tutorNombre: nombreTutorConTitulo,
       area: ins.designacion?.area || undefined,
       estudianteNombre,
       estudianteCodigo: String(ins.cod_ceta || ''),
       carrera: this.getCarreraLabel(ins) || (ins as any)?.carrera || undefined,
-      modalidad: ins?.modo || 'Proyecto de Grado',
+      modalidad: ins?.modo || '-',
       proyectoNombre: (ins as any)?.proyecto?.nombre || undefined,
       convocatoria: undefined,
       numeroDocumento: ins.designacion?.numero_documento || undefined,
       cite: ins.designacion?.cite || undefined,
+      tutorTituloAcademico: tituloAcad || undefined,
+      convocatoriaFechaInicio: ins.designacion?.convocatoria_fecha_inicio || (ins as any)?.convocatoria_fecha_inicio || undefined,
+      convocatoriaFechaFin: ins.designacion?.convocatoria_fecha_fin || (ins as any)?.convocatoria_fecha_fin || undefined,
+      tutorCelular: ins.designacion?.tutor_celular || undefined,
+      caratulaPostulanteNumero: nroPost ? String(nroPost) : String(ins.cod_ceta || ''),
+      // Encabezado "Para"
+      paraNombre: nombreTutorConTitulo,
+      paraCargo: 'DOCENTE TÉCNICO',
     };
     this.pdfService.generarDesignacionTutorPdf(data, { fileName: `designacion-tutor-${ins.cod_ceta}.pdf`, behavior: 'view' });
   } catch (e) {

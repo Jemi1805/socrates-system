@@ -113,8 +113,8 @@ const formatFechaLatam = (fecha?: string | Date | number | null): string | null 
         return null;
       }
 
-      // Manejar YYYY-MM-DD como fecha local para evitar desfase por zona horaria
-      const isoYMD = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      // Manejar YYYY-MM-DD o YYYY-MM-DDTHH:MM:SS como fecha local para evitar desfase por zona horaria
+      const isoYMD = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/);
       if (isoYMD) {
         const year = Number(isoYMD[1]);
         const month = Number(isoYMD[2]) - 1;
