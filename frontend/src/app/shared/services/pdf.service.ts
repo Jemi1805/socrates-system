@@ -1187,10 +1187,11 @@ export class PdfService {
       doc.addPage();
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      const mx = 15;
+      const mx = 12; // margen un poco menor para acercar al borde
       const topY = mx;
       const boxW = pageWidth - 2 * mx;
-      const boxH = (pageHeight - 2 * mx) / 2; // media hoja
+      const usableH = pageHeight - 2 * mx;
+      const boxH = usableH * 0.55; // solo un poco más alto que media hoja
       const hasBookman = await this.ensureBookman(doc);
       const bookmanFont = hasBookman ? 'BookmanOldStyle' : baseFont;
 
@@ -1206,17 +1207,17 @@ export class PdfService {
       // Encabezado institucional
       doc.setTextColor(5, 37, 68);
       this.safeSetFont(doc, bookmanFont, 'bold');
-      doc.setFontSize(12);
+      doc.setFontSize(17);
       doc.text('INSTITUTO TECNOLÓGICO DE ENSEÑANZA AUTOMOTRIZ', pageWidth / 2, topY + 10, { align: 'center' });
       doc.setTextColor(215, 25, 32);
       this.safeSetFont(doc, bookmanFont, 'bold');
-      doc.setFontSize(14);
+      doc.setFontSize(17);
       doc.text('"CETA"', pageWidth / 2, topY + 16, { align: 'center' });
 
       // Logo centrado
       try {
         const meta2 = await this.loadImageWithMeta('assets/images/LOGO.png');
-        const desiredW = 32;
+        const desiredW = 44; // ~4.39 cm de ancho
         const aspect2 = meta2.naturalHeight ? meta2.naturalWidth / meta2.naturalHeight : 1;
         const finalW2 = desiredW;
         const finalH2 = desiredW / (aspect2 || 1);
@@ -1227,8 +1228,8 @@ export class PdfService {
       } catch {}
 
       // Bloque Gestión y Post.
-      const rightX = pageWidth - mx - 65;
-      const rightY = topY + 20;
+      const rightX = pageWidth - mx - 55;
+      const rightY = topY + 30; // bajar bloque gestión/post
       const computeGestion = (): string => {
         const si = (data as any).convocatoriaFechaInicio;
         const sf = (data as any).convocatoriaFechaFin;
@@ -1243,53 +1244,77 @@ export class PdfService {
       const gestion = (data as any).caratulaGestion ? String((data as any).caratulaGestion).trim() : computeGestion();
       const postNumRaw = (data as any).caratulaPostulanteNumero;
       const postNum = (postNumRaw !== undefined && postNumRaw !== null && String(postNumRaw).trim() !== '') ? String(postNumRaw) : '-';
-      doc.setFont(baseFont, 'bold');
-      doc.setTextColor(215, 25, 32);
-      doc.setFont(baseFont, 'bold');
-      doc.setFontSize(14);
-      doc.text('GESTIÓN:', rightX, rightY);
-      doc.setTextColor(5, 37, 68);
-      doc.setFont(baseFont, 'bold');
-      doc.setFontSize(18);
-      doc.text(gestion || '-', rightX + 2, rightY + 8);
-      doc.setTextColor(215, 25, 32);
-      doc.setFont(baseFont, 'bold');
-      doc.setFontSize(14);
-      const postLabel = 'POST.:';
-      doc.text(postLabel, rightX, rightY + 18);
-      doc.setTextColor(5, 37, 68);
-      doc.setFont(baseFont, 'bold');
-      doc.setFontSize(20);
-      const postValueX = rightX + doc.getTextWidth(postLabel) + 2; // más espacio entre label y número
-      doc.text(postNum, postValueX, rightY + 18);
 
-      // Título del proyecto
-      const titleY = topY + 60;
+      // Centro del bloque de gestión/post
+      const blockCenterX = rightX + 22;
+
+      // Etiqueta GESTIÓN (rojo, fuente base)
+      doc.setTextColor(215, 25, 32);
+      doc.setFont(baseFont, 'bold');
+      doc.setFontSize(14);
+      doc.text('GESTIÓN:', blockCenterX, rightY, { align: 'center' });
+
+      // Valor de gestión (azul, Bookman bold)
+      doc.setTextColor(5, 37, 68);
+      this.safeSetFont(doc, bookmanFont, 'bold');
+      doc.setFontSize(18);
+      doc.text(gestion || '-', blockCenterX, rightY + 8, { align: 'center' });
+
+      // POST.: etiqueta + número en la misma línea, centrados como bloque
+      const postY = rightY + 18;
+      const postLabel = 'POST.:';
+      doc.setFont(baseFont, 'bold');
+      doc.setFontSize(14);
+      const postLabelWidth = doc.getTextWidth(postLabel);
+
+      this.safeSetFont(doc, bookmanFont, 'bold');
+      doc.setFontSize(18);
+      const postNumWidth = doc.getTextWidth(postNum || '-');
+      const gap = 3; // espacio entre etiqueta y número
+      const totalPostWidth = postLabelWidth + gap + postNumWidth;
+      const startX = blockCenterX - totalPostWidth / 2;
+
+      // Dibuja etiqueta POST. en rojo
+      doc.setTextColor(215, 25, 32);
+      doc.setFont(baseFont, 'bold');
+      doc.setFontSize(14);
+      doc.text(postLabel, startX, postY);
+
+      // Dibuja número en azul Bookman bold al lado
+      doc.setTextColor(5, 37, 68);
+      this.safeSetFont(doc, bookmanFont, 'bold');
+      doc.setFontSize(18);
+      const numX = startX + postLabelWidth + gap;
+      doc.text(postNum, numX, postY);
+
+      // Título del proyecto (un poco más abajo para liberar aire arriba)
+      const titleY = topY + 70;
       doc.setTextColor(215, 25, 32);
       this.safeSetFont(doc, bookmanFont, 'bold');
-      doc.setFontSize(16);
+      doc.setFontSize(20);
       doc.text('TÍTULO DEL PROYECTO', pageWidth / 2, titleY, { align: 'center' });
 
       const temaTexto = ((data as any).proyectoNombre || '').toString().trim();
       doc.setTextColor(0, 0, 0);
       this.safeSetFont(doc, bookmanFont, 'bold');
-      doc.setFontSize(11);
-      const temaWrapped = doc.splitTextToSize(temaTexto || '-', pageWidth - 2 * (mx + 20));
+      doc.setFontSize(16);
+      // Más ancho: menos margen izquierdo/derecho, manteniendo centrado
+      const temaWrapped = doc.splitTextToSize(temaTexto || '-', pageWidth - 2 * (mx + 12));
       doc.text(temaWrapped as any, pageWidth / 2, titleY + 8, { align: 'center' });
 
       // Filas informativas: POSTULANTE, TUTOR, CARRERA, ÁREA
-      const infoStartY = titleY + 18 + (Array.isArray(temaWrapped) ? Math.max(0, (temaWrapped.length - 1) * 5) : 0);
+      const infoStartY = titleY + 22 + (Array.isArray(temaWrapped) ? Math.max(0, (temaWrapped.length - 1) * 4) : 0);
       const labelColor: [number, number, number] = [215, 25, 32];
       const valueColor: [number, number, number] = [5, 37, 68];
       const drawRow = (label: string, value: string, yPos: number) => {
         this.safeSetFont(doc, bookmanFont, 'bold');
-        doc.setFontSize(12);
+        doc.setFontSize(16);
         doc.setTextColor(...labelColor);
-        const labelX = mx + 18;
+        const labelX = mx + 8; // desplazar un poco hacia la izquierda
         doc.text(label, labelX, yPos);
         doc.setTextColor(...valueColor);
         this.safeSetFont(doc, bookmanFont, 'normal');
-        doc.setFontSize(11);
+        doc.setFontSize(16);
         const val = (value || '-').toString();
         const valueX = labelX + doc.getTextWidth(label) + 4; // más espacio entre etiqueta y valor
         doc.text(val, valueX, yPos);
@@ -1301,17 +1326,19 @@ export class PdfService {
       const tutorNomCaratula = (data as any).caratulaTutor
         ? String((data as any).caratulaTutor)
         : (resolvedParaNombre || (data as any).tutorNombre || '-');
-      drawRow('TUTOR:', tutorNomCaratula || '-', infoStartY + 8);
+      drawRow('TUTOR:', tutorNomCaratula || '-', infoStartY + 7);
 
       const carreraCaratula = normalizeCarrera((data as any).carrera) || '-';
-      drawRow('CARRERA:', carreraCaratula.toString(), infoStartY + 16);
+      drawRow('CARRERA:', carreraCaratula.toString(), infoStartY + 14);
 
       const areaNom = (data as any).caratulaArea ? String((data as any).caratulaArea) : ((data as any).area || '-');
-      drawRow('ÁREA:', areaNom || '-', infoStartY + 24);
+      drawRow('ÁREA:', areaNom || '-', infoStartY + 21);
+
+      // Ubicar "COCHABAMBA - BOLIVIA" cerca del borde inferior verde
       doc.setTextColor(5, 37, 68);
       this.safeSetFont(doc, bookmanFont, 'bold');
-      doc.setFontSize(12);
-      doc.text('COCHABAMBA - BOLIVIA', pageWidth / 2, topY + boxH - 8, { align: 'center' });
+      doc.setFontSize(16);
+      doc.text('COCHABAMBA - BOLIVIA', pageWidth / 2, topY + boxH - 6, { align: 'center' });
     } catch (e) {
       try { console.error('Error renderizando carátula:', e); } catch {}
       // Fallback de emergencia: dibujar carátula simple con Helvetica
