@@ -25,6 +25,8 @@ class PostulanteController extends Controller
         $estado = $request->query('estado');
         $carrera = $request->query('carrera');
         $search = trim((string) $request->query('search', ''));
+        $year = $request->query('year');
+        $convocatoriaId = $request->query('convocatoria_id');
 
         $latestInscripciones = DB::table('inscrip_modalidad')
             ->select('cod_ceta_est', DB::raw('MAX(id) as last_id'))
@@ -50,6 +52,8 @@ class PostulanteController extends Controller
                 'inscrip_modalidad.fecha_inscripcion',
                 'inscrip_modalidad.estado_arancel',
                 'inscrip_modalidad.nro_postulante',
+                'inscrip_modalidad.convocatoria_id',
+                'inscrip_modalidad.nom_convocatoria',
                 DB::raw('proj.celular as celular'),
             ])
             ->joinSub($latestInscripciones, 'latest_insc', function ($join) {
@@ -78,6 +82,14 @@ class PostulanteController extends Controller
                         ->orWhereRaw('LOWER(postulantes.carrera_nombre) = ?', [$normalized]);
                 });
             }
+        }
+
+        if ($year !== null && $year !== '') {
+            $query->whereYear('inscrip_modalidad.fecha_inscripcion', (int) $year);
+        }
+
+        if ($convocatoriaId !== null && $convocatoriaId !== '') {
+            $query->where('inscrip_modalidad.convocatoria_id', $convocatoriaId);
         }
 
         if ($search !== '') {

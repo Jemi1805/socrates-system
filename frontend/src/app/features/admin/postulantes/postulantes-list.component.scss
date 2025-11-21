@@ -819,13 +819,57 @@ input {
 }
 
 .inscritos-head {
-  border-bottom: 2px solid $primary-color;
-  padding-bottom: 10px;
-}
-.inscritos-head .card-title {
-  border-bottom: 0;
-  padding-bottom: 0;
-  margin-bottom: 0;
+  .card-title {
+    border-bottom: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+
+  .filters-bar {
+    padding: 0.25rem 0.75rem;
+    border-radius: $border-radius;
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(5, 37, 68, 0.08);
+
+    .head-filter {
+      display: flex;
+      flex-direction: column;
+      min-width: 160px;
+
+      .filter-label {
+        font-size: 0.8rem;
+        color: $text-light;
+        margin-bottom: 0.15rem;
+      }
+
+      .form-select {
+        font-size: 0.85rem;
+        padding-block: 0.25rem;
+      }
+    }
+
+    .total-text {
+      font-size: 0.9rem;
+      color: $text-dark-blue;
+      white-space: nowrap;
+    }
+
+    .btn {
+      border-radius: $border-radius;
+      padding-inline: 0.9rem;
+      background-color: #ffffff;
+      border-color: rgba(76, 157, 189, 0.6);
+      font-size: 0.85rem;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .filters-bar {
+      border-radius: $border-radius;
+      flex-direction: column;
+      align-items: flex-start !important;
+    }
+  }
 }
 
 // Estilos de tabla para Aranceles (basados en Modalidad de Graduación)

@@ -91,6 +91,8 @@ interface PostulanteInscrito {
   pago_estado?: 'sin_pagos' | 'parcial' | 'completo' | null;
   estado_arancel?: 'sin_pagos' | 'parcial' | 'completo' | null;
   nro_postulante?: number | null;
+  convocatoria_id?: number | null;
+  nom_convocatoria?: string | null;
 }
 
 @Component({
@@ -109,6 +111,12 @@ export class PostulantesListComponent implements OnInit {
   postulantesInscritos: PostulanteInscrito[] = [];
   loadingInscritos: boolean = false;
   loadingDetalles: boolean = false;
+  usandoModalCargaInscritos: boolean = false;
+  // Filtros de lista (Postulantes inscritos)
+  filtroAnio: string | null = null;
+  filtroConvocatoriaId: string | null = null;
+  aniosDisponibles: string[] = [];
+  convocatoriasFiltro: Array<{ id: string; label: string }> = [];
   // Modal de detalle de procesos
   detalleVisible: boolean = false;
   detalleTipo: 'inscripcion' | 'tema' | 'designacion' | null = null;
@@ -208,19 +216,44 @@ export class PostulantesListComponent implements OnInit {
   private cargarConvocatoriasActivas() {
     this.sgaService.getConvocatoriasActivas({ with_counts: true }).subscribe({
       next: (convocatorias) => {
-        this.convocatorias = Array.isArray(convocatorias)
-          ? convocatorias.filter(c => c?.es_activo)
-          : [];
-        if (this.convocatoriaSeleccionada) {
-          const reemplazo = this.convocatorias.find(c => Number(c.id) === Number(this.convocatoriaSeleccionada?.id));
-          if (reemplazo) {
-            this.convocatoriaSeleccionada = reemplazo;
+        const lista = Array.isArray(convocatorias) ? convocatorias : [];
+        // Mantener todas las convocatorias (activas e inactivas)
+        this.convocatorias = lista.slice();
+
+        const currentId = this.convocatoriaIdPendiente
+          || (this.convocatoriaSeleccionada ? Number(this.convocatoriaSeleccionada.id) : null)
+          || (this.inscripModalidadIdActual && (this as any).inscripModalidad?.convocatoria_id ? Number((this as any).inscripModalidad.convocatoria_id) : null);
+
+        // Si hay una convocatoria asociada (aunque esté inactiva) que no esté en la lista activa, traerla por ID
+        if (currentId && !this.convocatorias.some(c => Number(c.id) === Number(currentId))) {
+          this.postulanteService.getConvocatoriaById(currentId).subscribe({
+            next: (convInactiva) => {
+              if (convInactiva && !this.convocatorias.some(c => Number(c.id) === Number(convInactiva.id))) {
+                // Marcar como inactiva explícitamente
+                (convInactiva as any).es_activo = false;
+                this.convocatorias = [...this.convocatorias, convInactiva];
+              }
+              this.syncConvocatoriaSeleccionadaDesdeId(currentId);
+              this.actualizarConvocatoriasFiltroDesdeLista();
+            },
+            error: () => {
+              this.actualizarConvocatoriasFiltroDesdeLista();
+            }
+          });
+        } else {
+          if (this.convocatoriaSeleccionada) {
+            const reemplazo = this.convocatorias.find(c => Number(c.id) === Number(this.convocatoriaSeleccionada?.id));
+            if (reemplazo) {
+              this.convocatoriaSeleccionada = reemplazo;
+            }
           }
+          this.syncConvocatoriaSeleccionadaDesdeId(this.convocatoriaIdPendiente);
+          this.actualizarConvocatoriasFiltroDesdeLista();
         }
-        this.syncConvocatoriaSeleccionadaDesdeId(this.convocatoriaIdPendiente);
       },
       error: () => {
         this.convocatorias = [];
+        this.actualizarConvocatoriasFiltroDesdeLista();
       }
     });
   }
@@ -282,6 +315,16 @@ export class PostulantesListComponent implements OnInit {
     if (numero && nombre) return `${numero} - ${nombre}`;
     if (numero) return `Convocatoria ${numero}`;
     return nombre || '';
+  }
+
+  private actualizarConvocatoriasFiltroDesdeLista() {
+    if (!Array.isArray(this.convocatorias)) {
+      this.convocatoriasFiltro = [];
+      return;
+    }
+    this.convocatoriasFiltro = this.convocatorias
+      .map(c => ({ id: String(c.id), label: this.formatConvocatoriaLabel(c) || String(c.id) }))
+      .sort((a, b) => a.label.localeCompare(b.label));
   }
 
   guardarConvocatoriaSeleccionada() {
@@ -1138,10 +1181,20 @@ temaObjetivoUI(ins: PostulanteInscrito): string {
   return (v || '').toString();
 }
 
-cargarPostulantesInscritos() {
+cargarPostulantesInscritos(showModal: boolean = true) {
   this.loadingInscritos = true;
-  this.loadingService.showModal();
-  this.postulanteService.getInscritos({ per_page: 200 }).subscribe({
+  this.usandoModalCargaInscritos = !!showModal;
+  if (showModal) {
+    this.loadingService.showModal();
+  }
+  const params: any = { per_page: 200 };
+  if (this.filtroAnio) {
+    params.year = this.filtroAnio;
+  }
+  if (this.filtroConvocatoriaId) {
+    params.convocatoria_id = this.filtroConvocatoriaId;
+  }
+  this.postulanteService.getInscritos(params).subscribe({
     next: (resp: any) => {
       const payload = resp?.data ?? resp;
       const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
@@ -1172,8 +1225,12 @@ cargarPostulantesInscritos() {
         })(),
         carrera: row?.carrera ?? row?.carrera_nombre ?? null,
         nro_postulante: row?.nro_postulante ?? null,
+        convocatoria_id: row?.convocatoria_id != null ? Number(row.convocatoria_id) : null,
+        nom_convocatoria: row?.nom_convocatoria ?? null,
       })).filter((row: PostulanteInscrito) => !!row.cod_ceta);
+      this.reconstruirOpcionesFiltrosDesdeFilas();
       this.loadingInscritos = false;
+      this.usandoModalCargaInscritos = false;
       // Enriquecer filas con tema y designación si hay datos
       if (this.postulantesInscritos.length > 0) {
         this.cargarDetallesTabla();
@@ -1183,9 +1240,45 @@ cargarPostulantesInscritos() {
     },
     error: () => {
       this.loadingInscritos = false;
-      this.loadingService.hideModal();
+      this.usandoModalCargaInscritos = false;
+      if (showModal) {
+        this.loadingService.hideModal();
+      }
     }
   });
+}
+
+onFiltroListaChange() {
+  if (!this.filtroAnio) {
+    this.filtroConvocatoriaId = null;
+  }
+  const debeMostrarModal = !!this.filtroAnio && !!this.filtroConvocatoriaId;
+  this.cargarPostulantesInscritos(debeMostrarModal);
+}
+
+onClickActualizarInscritos() {
+  const debeMostrarModal = !!this.filtroAnio && !!this.filtroConvocatoriaId;
+  this.cargarPostulantesInscritos(debeMostrarModal);
+}
+
+private reconstruirOpcionesFiltrosDesdeFilas() {
+  const anios = new Set<string>();
+  const convocatorias = new Map<string, { id: string; label: string }>();
+
+  for (const ins of this.postulantesInscritos) {
+    const fecha = ins.primera_inscripcion || ins.fecha_inscripcion;
+    if (fecha) {
+      const d = new Date(fecha);
+      const y = d.getFullYear();
+      if (!isNaN(y)) {
+        anios.add(String(y));
+      }
+    }
+
+  }
+
+  this.aniosDisponibles = Array.from(anios).sort((a, b) => Number(b) - Number(a));
+  // Lista de convocatorias para filtros se construye desde this.convocatorias
 }
 
 //

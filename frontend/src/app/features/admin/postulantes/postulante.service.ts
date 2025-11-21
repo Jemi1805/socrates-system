@@ -307,7 +307,7 @@ export class PostulanteService {
     return this.http.get<any>(`${this.baseUrl}/tutores/designaciones`, { params: httpParams });
   }
 
-  getInscritos(params: { per_page?: number; carrera?: string; estado?: string; search?: string } = {}): Observable<any> {
+  getInscritos(params: { per_page?: number; carrera?: string; estado?: string; search?: string; year?: number | string; convocatoria_id?: number | string } = {}): Observable<any> {
     let httpParams = new HttpParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && `${value}`.trim() !== '') {

@@ -13,29 +13,53 @@
   <div class="content-wrapper table-view" *ngIf="soloTabla">
     <div class="card table-card">
       <div class="card-body">
-        <div class="inscritos-head d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-          <h5 class="card-title mb-0 d-flex align-items-center gap-2">
-            <i class="bi bi-people-fill text-success"></i>
-            Postulantes inscritos ({{ postulantesInscritos.length }})
-          </h5>
-          <button
-            type="button"
-            class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2"
-            (click)="cargarPostulantesInscritos()"
-            [disabled]="loadingInscritos">
-            <i class="bi" [ngClass]="loadingInscritos ? 'bi-arrow-clockwise spin' : 'bi-arrow-repeat'"></i>
-            Actualizar lista
-          </button>
+        <div class="inscritos-head mb-3">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+            <h5 class="card-title mb-0 d-flex align-items-center gap-2">
+              <i class="bi bi-people-fill text-success"></i>
+              Postulantes inscritos
+            </h5>
+          </div>
+          <div class="filters-bar d-flex align-items-end justify-content-between flex-wrap gap-3">
+            <div class="d-flex align-items-end gap-3 flex-wrap">
+              <div class="head-filter">
+                <label class="filter-label">Año</label>
+                <select class="form-select form-select-sm" [(ngModel)]="filtroAnio" (ngModelChange)="onFiltroListaChange()">
+                  <option [ngValue]="null">Todos</option>
+                  <option *ngFor="let anio of aniosDisponibles" [ngValue]="anio">{{ anio }}</option>
+                </select>
+              </div>
+              <div class="head-filter">
+                <label class="filter-label">Convocatoria</label>
+                <select
+                  class="form-select form-select-sm"
+                  [(ngModel)]="filtroConvocatoriaId"
+                  (ngModelChange)="onFiltroListaChange()"
+                  [disabled]="!filtroAnio"
+                >
+                  <option [ngValue]="null">Todas</option>
+                  <option *ngFor="let conv of convocatoriasFiltro" [ngValue]="conv.id">{{ conv.label }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+              <span class="total-text">Total: <strong>{{ postulantesInscritos.length }}</strong></span>
+              <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2"
+                (click)="onClickActualizarInscritos()"
+                [disabled]="loadingInscritos">
+                <i class="bi" [ngClass]="loadingInscritos ? 'bi-arrow-clockwise spin' : 'bi-arrow-repeat'"></i>
+                Actualizar
+              </button>
+            </div>
+          </div>
         </div>
         <div *ngIf="!loadingInscritos && postulantesInscritos.length === 0" class="alert alert-info mb-0">
           <i class="bi bi-info-circle me-2"></i>
           No hay postulantes inscritos registrados en la base de datos local.
         </div>
-        <div *ngIf="loadingInscritos" class="text-center py-4 text-muted">
-          <i class="bi bi-arrow-clockwise spin fs-4 me-2"></i>
-          Cargando postulantes inscritos...
-        </div>
-        <div class="table-responsive" *ngIf="!loadingInscritos && postulantesInscritos.length > 0">
+        <div class="table-responsive" *ngIf="postulantesInscritos.length > 0">
           <table class="table table-hover table-sm align-middle table-fixed">
             <thead class="table-dark">
               <tr>
@@ -449,7 +473,10 @@
                 [disabled]="viewInscripcion && !editConvocatoria"
               >
                 <option [ngValue]="null">Seleccione una convocatoria</option>
-                <option *ngFor="let conv of convocatorias" [ngValue]="conv.id">
+                <option
+                  *ngFor="let conv of convocatorias"
+                  [ngValue]="conv.id"
+                  [disabled]="(viewInscripcion && editConvocatoria) && !conv.es_activo && conv.id !== convocatoriaSeleccionada?.id">
                   {{ conv.numero_convocatoria }} - {{ conv.nombre }}
                   <ng-container *ngIf="conv.fecha_inicio && conv.fecha_fin">
                     ({{ conv.fecha_inicio | date:'dd/MM/yyyy':'UTC' }} - {{ conv.fecha_fin | date:'dd/MM/yyyy':'UTC' }})
