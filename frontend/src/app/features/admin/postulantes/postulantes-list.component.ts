@@ -1572,7 +1572,8 @@ generarDesignacionPdf(ins: PostulanteInscrito) {
   }
 }
 
-verFmdg(ins: PostulanteInscrito) {
+async verFmdg(ins: PostulanteInscrito) {
+  this.loadingService.showModal();
   try {
     const nombres = (ins as any)?.nombres_est || '';
     const apPat = (ins as any)?.ap_pat || '';
@@ -1590,16 +1591,19 @@ verFmdg(ins: PostulanteInscrito) {
       tema: this.temaNombreUI(ins) || '',
       objetivo: this.temaObjetivoUI(ins) || '',
     };
-    this.pdfService.generarFMDG1(data, { logoWidthMm: 24, logoMaxHeightMm: 24, logoFormat: 'JPEG', logoBgColor: '#FFFFFF', behavior: 'view' });
+    await this.pdfService.generarFMDG1(data, { logoWidthMm: 24, logoMaxHeightMm: 24, logoFormat: 'JPEG', logoBgColor: '#FFFFFF', behavior: 'view' });
   } catch (e) {
     console.error('No fue posible previsualizar FMDG-1', e);
+  } finally {
+    this.loadingService.hideModal();
   }
 }
 
-verDesignacion(ins: PostulanteInscrito) {
+async verDesignacion(ins: PostulanteInscrito) {
   if (!ins?.designacion) return;
   console.log('INS COMPLETO', ins);
   console.log('INS DESIGNACION', ins.designacion);
+  this.loadingService.showModal();
   try {
     const nombres = (ins as any)?.nombres_est || '';
     const apPat = (ins as any)?.ap_pat || '';
@@ -1631,9 +1635,11 @@ verDesignacion(ins: PostulanteInscrito) {
       paraNombre: nombreTutorConTitulo,
       paraCargo: 'DOCENTE TÉCNICO',
     };
-    this.pdfService.generarDesignacionTutorPdf(data, { fileName: `designacion-tutor-${ins.cod_ceta}.pdf`, behavior: 'view' });
+    await this.pdfService.generarDesignacionTutorPdf(data, { fileName: `designacion-tutor-${ins.cod_ceta}.pdf`, behavior: 'view' });
   } catch (e) {
     console.error('No fue posible previsualizar el documento de designación', e);
+  } finally {
+    this.loadingService.hideModal();
   }
 }
 
