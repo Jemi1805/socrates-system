@@ -322,8 +322,11 @@ export class PostulantesListComponent implements OnInit {
       this.convocatoriasFiltro = [];
       return;
     }
-    this.convocatoriasFiltro = this.convocatorias
-      .map(c => ({ id: String(c.id), label: this.formatConvocatoriaLabel(c) || String(c.id) }))
+    const year = this.filtroAnio ? Number(this.filtroAnio) : null;
+    const soloActivas = (this.convocatorias || []).filter(c => !!(c as any)?.es_activo);
+    const porAnio = year ? soloActivas.filter(c => Number((c as any)?.anio) === year) : soloActivas;
+    this.convocatoriasFiltro = porAnio
+      .map(c => ({ id: String((c as any).id), label: this.formatConvocatoriaLabel(c) || String((c as any).id) }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }
 
@@ -1253,8 +1256,18 @@ cargarPostulantesInscritos(showModal: boolean = true) {
 }
 
 onFiltroListaChange() {
+  // Actualizar opciones de convocatoria acorde al año y estado activo
+  this.actualizarConvocatoriasFiltroDesdeLista();
   if (!this.filtroAnio) {
     this.filtroConvocatoriaId = null;
+  } else {
+    // Si la convocatoria seleccionada ya no corresponde al año o está inactiva, resetear
+    if (
+      this.filtroConvocatoriaId &&
+      !this.convocatoriasFiltro.some(o => String(o.id) === String(this.filtroConvocatoriaId))
+    ) {
+      this.filtroConvocatoriaId = null;
+    }
   }
   const debeMostrarModal = !!this.filtroAnio && !!this.filtroConvocatoriaId;
   this.cargarPostulantesInscritos(debeMostrarModal);
@@ -1265,9 +1278,9 @@ onClickActualizarInscritos() {
   this.cargarPostulantesInscritos(debeMostrarModal);
 }
 
-private reconstruirOpcionesFiltrosDesdeFilas() {
-  const anios = new Set<string>();
-  const convocatorias = new Map<string, { id: string; label: string }>();
+  private reconstruirOpcionesFiltrosDesdeFilas() {
+    const anios = new Set<string>();
+    const convocatorias = new Map<string, { id: string; label: string }>();
 
   for (const ins of this.postulantesInscritos) {
     const fecha = ins.primera_inscripcion || ins.fecha_inscripcion;
@@ -1280,7 +1293,8 @@ private reconstruirOpcionesFiltrosDesdeFilas() {
     }
 
   }
-
+  // Asegurar que el año actual esté presente aunque no haya registros
+  try { anios.add(String(new Date().getFullYear())); } catch {}
   this.aniosDisponibles = Array.from(anios).sort((a, b) => Number(b) - Number(a));
   // Lista de convocatorias para filtros se construye desde this.convocatorias
 }
@@ -1771,6 +1785,7 @@ ngOnInit() {
     this.esNuevoPostulante = true;
   }
   this.cargarDatosPostulacion();
+  try { const y = String(new Date().getFullYear()); if (!this.filtroAnio) { this.filtroAnio = y; } } catch {}
   // Si venimos desde "Continuar con modalidad" (sin cod_ceta ni ver=1), abrir el formulario en lugar de la lista
   try {
     const raw = sessionStorage.getItem('datos_postulacion');
