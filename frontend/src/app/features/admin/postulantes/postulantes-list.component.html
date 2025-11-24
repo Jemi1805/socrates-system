@@ -153,6 +153,14 @@
                       <li *ngIf="ins?.designacion?.numero_documento">
                         <a href="" (click)="verDesignacion(ins); $event.preventDefault()">Designación Tutor</a>
                       </li>
+                      <li *ngIf="ins?.designacion?.numero_documento">
+                        <span class="docs-inline">
+                          <span>Planilla de Seguimiento</span>
+                          <button type="button" class="btn btn-success btn-icon-xs ms-1" (click)="descargarPlanillaSeguimiento(ins)" title="Descargar">
+                            <i class="bi bi-download" aria-hidden="true"></i>
+                          </button>
+                        </span>
+                      </li>
                     </ul>
                   </ng-container>
                   <ng-template #noDocsTpl>

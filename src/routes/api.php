@@ -164,6 +164,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('tutores/doc-designaciones/{correlativo}', [TutorController::class, 'docDesignacionesByCorrelativo'])
         ->where(['correlativo' => '[0-9A-Za-z\-]+'])
         ->middleware('permission:tutores.leer');
+    Route::get('tutores/planilla-seguimiento/{codCeta}', [TutorController::class, 'planillaSeguimientoDocx'])
+        ->where(['codCeta' => '[0-9A-Za-z\-]+'])
+        ->middleware('permission:tutores.leer');
     // Tutores: generar documento de designación on-demand (crea correlativo si no existe)
     Route::post('tutores/generar-doc-designacion', [TutorController::class, 'generarDocDesignacion'])
         ->middleware('permission:tutores.designar');

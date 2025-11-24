@@ -478,6 +478,19 @@ export class SgaService {
       .pipe(catchError(this.handleError));
   }
 
+  // --- TUTORES: Planilla de Seguimiento DOCX ---
+  downloadPlanillaSeguimiento(codCeta: number | string) {
+    const cod = encodeURIComponent(String(codCeta));
+    return this.http.get(`${environment.apiUrl}/tutores/planilla-seguimiento/${cod}`,
+      { observe: 'response', responseType: 'blob' as 'json' }
+    );
+  }
+
+  getPlanillaSeguimientoUrl(codCeta: number | string): string {
+    const cod = encodeURIComponent(String(codCeta));
+    return `${environment.apiUrl}/tutores/planilla-seguimiento/${cod}`;
+  }
+
   // --- PERTINENCIAS ACADÉMICAS ---
   getPertinencias(carrera?: string): Observable<ApiResponse<Pertinencia[]>> {
     let params = new HttpParams();

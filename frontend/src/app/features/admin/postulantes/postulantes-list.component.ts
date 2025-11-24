@@ -194,6 +194,44 @@ export class PostulantesListComponent implements OnInit {
     return false;
   }
 
+  descargarPlanillaSeguimiento(ins: PostulanteInscrito) {
+    if (!ins?.designacion || !ins?.cod_ceta) return;
+    this.loadingService.showModal();
+    this.sgaService.downloadPlanillaSeguimiento(ins.cod_ceta)
+      .pipe(finalize(() => this.loadingService.hideModal()))
+      .subscribe({
+        next: (resp: any) => {
+          const ct = resp?.headers?.get?.('Content-Type') || resp?.headers?.get?.('content-type') || '';
+          const cd = resp?.headers?.get?.('Content-Disposition') || resp?.headers?.get?.('content-disposition') || '';
+          const body = resp?.body as Blob | undefined;
+          // Si no luce como DOCX válido, no redireccionar: solo registrar error
+          if (!body || !(ct.includes('officedocument.wordprocessingml.document') || ct.includes('application/octet-stream') || body.size > 0)) {
+            console.error('Respuesta inválida para DOCX de Planilla de Seguimiento', { ct, bodySize: body?.size });
+            return;
+          }
+          // Derivar nombre de archivo desde Content-Disposition si existe
+          let fileName = `planilla-seguimiento-${ins.cod_ceta}.docx`;
+          const match = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(cd || '');
+          if (match) {
+            const encoded = match[1] || match[2];
+            try { fileName = decodeURIComponent(encoded); } catch { fileName = encoded; }
+          }
+          const blob = new Blob([body], { type: ct || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+        },
+        error: (err) => {
+          console.error('Error al descargar Planilla de Seguimiento', err);
+        },
+      });
+  }
+
   // Detecta si la ruta actual corresponde al flujo de "nuevo" (/postulantes/nuevo o /postulantes/nuevo/:cod_ceta)
   private esRutaNuevo(): boolean {
     const path = this.route.snapshot.routeConfig?.path || '';

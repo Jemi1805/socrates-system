@@ -500,14 +500,14 @@ $transition: all 0.3s ease;
     }
   }
   
-  &.btn-secondary {
+  &.btn-secondary{
     background-color: white;
     color : #052544;
     border-color: #4C9DBD;
 
     &:hover {
     color: white !important;
-    background-color: #4C9DBD;
+    background-color: #4C9DBD !important;
 
       .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
           color: white !important;
@@ -821,8 +821,22 @@ input {
   .docs-list {
     margin: 0;
     padding-left: 1.1rem; // viñetas
-    li { margin-bottom: .1rem; }
+    list-style: disc outside;
+    li {
+      margin-bottom: .1rem;
+      list-style: disc outside;
+    }
   }
+  .btn-icon-xs {
+    padding: 0.1rem 0.25rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+  }
+  .btn-icon-xs svg { width: 12px; height: 12px; }
+  .btn-icon-xs i { font-size: 0.75rem; line-height: 1; }
 }
 
 .inscritos-head {

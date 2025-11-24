@@ -14,6 +14,10 @@ use App\Models\PertinenciaAcad;
 use App\Models\TipoTutor;
 use App\Models\DesignacionTutor;
 use App\Services\SocratesApiService;
+use PhpOffice\PhpWord\PhpWord;
+use PhpOffice\PhpWord\IOFactory;
+use PhpOffice\PhpWord\Shared\Converter;
+use PhpOffice\PhpWord\TemplateProcessor;
 
 class TutorController extends Controller
 {
@@ -168,6 +172,303 @@ class TutorController extends Controller
         ];
 
         return response()->json($response);
+    }
+
+    public function planillaSeguimientoDocx($codCeta)
+    {
+        $select = [
+            'dt.cod_ceta',
+            'dt.area',
+            'dt.tutor_nombre',
+            'dt.fecha_designacion',
+            'p.nombres_est',
+            'p.ap_pat',
+            'p.ap_mat',
+            'p.apellidos_est',
+            'pr.nombre as proyecto_nombre',
+            't.titulo_academico as tutor_titulo_academico',
+            't.nombre as t_nom',
+            't.apellido_p as t_ap',
+            't.apellido_m as t_am',
+            DB::raw('COALESCE(p.carrera, carrera.nombre_carrera) as carrera_nombre'),
+            'c.anio as convocatoria_anio',
+            'c.numero_convocatoria as convocatoria_numero',
+            'c.fecha_fin as convocatoria_fecha_fin',
+        ];
+        $celParts = [];
+        if (Schema::hasColumn('postulantes', 'celular')) {
+            $celParts[] = 'p.celular';
+        }
+        if (Schema::hasColumn('proyecto', 'celular')) {
+            $celParts[] = 'pr.celular';
+        }
+        if (!empty($celParts)) {
+            $expr = count($celParts) > 1 ? ('COALESCE(' . implode(', ', $celParts) . ')') : $celParts[0];
+            $select[] = DB::raw($expr . ' as postulante_celular');
+        }
+        if (Schema::hasTable('inscrip_modalidad') && Schema::hasColumn('inscrip_modalidad', 'nro_postulante')) {
+            $select[] = DB::raw('im.nro_postulante as nro_postulante');
+        }
+        $row = DB::table('designacion_tutor as dt')
+            ->leftJoin('postulantes as p', 'dt.cod_ceta', '=', 'p.cod_ceta')
+            ->leftJoin('proyecto as pr', 'dt.proyecto_id', '=', 'pr.id')
+            ->leftJoin('tutores as t', 'dt.tutor_id', '=', 't.id')
+            ->leftJoin('carrera', 't.cod_carrera', '=', 'carrera.cod_carrera')
+            ->leftJoin('inscrip_modalidad as im', 'im.cod_ceta_est', '=', 'dt.cod_ceta')
+            ->leftJoin('convocatorias as c', 'dt.convocatoria_id', '=', 'c.id')
+            ->select($select)
+            ->where('dt.cod_ceta', is_numeric($codCeta) ? (int)$codCeta : $codCeta)
+            ->orderByDesc('dt.id')
+            ->first();
+
+        if (!$row) {
+            return response()->json(['message' => 'Designación no encontrada'], 404);
+        }
+
+        $estNombre = null;
+        if (isset($row->ap_pat) || isset($row->ap_mat)) {
+            $estNombre = trim(implode(' ', array_filter([$row->ap_pat ?? '', $row->ap_mat ?? '', $row->nombres_est ?? ''])));
+        } elseif (isset($row->apellidos_est)) {
+            $estNombre = trim(implode(' ', array_filter([$row->apellidos_est ?? '', $row->nombres_est ?? ''])));
+        } else {
+            $estNombre = (string) ($row->nombres_est ?? '');
+        }
+
+        $tutorPlano = $row->tutor_nombre ?: trim(implode(' ', array_filter([$row->t_nom ?? null, $row->t_ap ?? null, $row->t_am ?? null])));
+        $tutorNombre = $row->tutor_titulo_academico ? trim($row->tutor_titulo_academico . ' ' . $tutorPlano) : $tutorPlano;
+
+        $gestion = null;
+        if (isset($row->convocatoria_anio) && isset($row->convocatoria_numero)) {
+            $roman = ((int)$row->convocatoria_numero) === 1 ? 'I' : 'II';
+            $gestion = $roman . '/' . (string)$row->convocatoria_anio;
+        }
+
+        $defensaMes = null;
+        try {
+            $fechaBase = $row->convocatoria_fecha_fin ?: $row->fecha_designacion;
+            if ($fechaBase) {
+                $defensaMes = \Carbon\Carbon::parse($fechaBase)->locale('es')->isoFormat('MMMM');
+                $defensaMes = mb_strtoupper($defensaMes, 'UTF-8');
+            }
+        } catch (\Throwable $e) {
+        }
+
+        // Celular del postulante: prioridad DB (postulantes/proyecto) y fallback al SGA
+        $postulanteCel = '';
+        if (isset($row->postulante_celular)) {
+            $postulanteCel = trim((string)$row->postulante_celular);
+        }
+        if ($postulanteCel === '') {
+            try {
+                /** @var SocratesApiService $sga */
+                $sga = app(\App\Services\SocratesApiService::class);
+                $carreraNombre = isset($row->carrera_nombre) ? (string)$row->carrera_nombre : null;
+                $res = $sga->getEstudianteByCodigo((string)$row->cod_ceta, $carreraNombre);
+                if (is_array($res) && !empty($res['success']) && !empty($res['data']) && is_array($res['data'])) {
+                    $first = $res['data'][0] ?? [];
+                    if (is_array($first)) {
+                        $cand = isset($first['celular']) ? trim((string)$first['celular']) : '';
+                        if ($cand !== '') { $postulanteCel = $cand; }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Ignorar errores del SGA; nos quedamos con vacío si no hay datos
+            }
+        }
+
+        // Intentar generar desde plantilla si existe
+        $nroPostulante = isset($row->nro_postulante) ? $row->nro_postulante : null;
+        $apellidosDoc = trim(implode(' ', array_filter([$row->ap_pat ?? '', $row->ap_mat ?? '', $row->apellidos_est ?? ''])));
+        $templatePath = resource_path('templates/planilla_seguimiento.docx');
+        if (is_string($templatePath) && file_exists($templatePath)) {
+            try {
+                $tpl = new TemplateProcessor($templatePath);
+                $tpl->setValue('NOMBRES', (string)($row->nombres_est ?? ''));
+                $tpl->setValue('APELLIDOS', (string)$apellidosDoc);
+                $tpl->setValue('CODIGO_CETA', (string)$row->cod_ceta);
+                $tpl->setValue('NRO_POSTULANTE', (string)($nroPostulante ?? ''));
+                $tpl->setValue('AREA_INVESTIGACION', (string)($row->area ?? ''));
+                $tpl->setValue('GESTION', (string)($gestion ?? ''));
+                $tpl->setValue('CARRERA', (string)($row->carrera_nombre ?? ''));
+                $tpl->setValue('CEL', (string)$postulanteCel);
+                $tpl->setValue('DEFENSA_MES', (string)($defensaMes ?? ''));
+                $tpl->setValue('TITULO_PROYECTO', (string)($row->proyecto_nombre ?? ''));
+                $tpl->setValue('TUTOR', (string)$tutorNombre);
+
+                // Logo opcional si en la plantilla existe el marcador ${LOGO}
+                $logoPath = null;
+                foreach ([public_path('images/logo_ceta.png'), public_path('logo_ceta.png'), storage_path('app/public/logo_ceta.png')] as $candidate) {
+                    if ($logoPath === null && is_string($candidate) && file_exists($candidate)) {
+                        $logoPath = $candidate;
+                    }
+                }
+                if ($logoPath && method_exists($tpl, 'setImageValue')) {
+                    try { $tpl->setImageValue('LOGO', ['path' => $logoPath, 'width' => 90]); } catch (\Throwable $e) {}
+                }
+
+                $path = storage_path('app/tmp');
+                if (!is_dir($path)) { @mkdir($path, 0777, true); }
+                $fileName = 'planilla-seguimiento-' . (string)$row->cod_ceta . '.docx';
+                $temp = $path . DIRECTORY_SEPARATOR . $fileName;
+                $tpl->saveAs($temp);
+                return response()->download($temp, $fileName, [
+                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                ])->deleteFileAfterSend(true);
+            } catch (\Throwable $e) {
+                // Si falla la plantilla, continuar con el generador programático
+            }
+        }
+
+        $phpWord = new PhpWord();
+        $phpWord->setDefaultFontName('Calibri');
+        $phpWord->setDefaultFontSize(10);
+
+        $section = $phpWord->addSection([
+            'marginLeft' => Converter::cmToTwip(3),
+            'marginRight' => Converter::cmToTwip(2.5),
+            'marginTop' => Converter::cmToTwip(2),
+            'marginBottom' => Converter::cmToTwip(2),
+        ]);
+
+        // Encabezado: banda azul con logo (opcional) a la izquierda y títulos centrados
+        $headerBand = $section->addTable(['borderSize' => 6, 'borderColor' => '0b2a56', 'cellMargin' => 80]);
+        $headerBand->addRow(1000);
+        $leftHeaderCell = $headerBand->addCell(1400, ['bgColor' => '0b2a56', 'valign' => 'center']);
+        // Buscar logo en rutas conocidas (no obligatorio)
+        $logoPath = null;
+        foreach ([public_path('images/logo_ceta.png'), public_path('logo_ceta.png'), storage_path('app/public/logo_ceta.png')] as $candidate) {
+            if ($logoPath === null && is_string($candidate) && file_exists($candidate)) {
+                $logoPath = $candidate;
+            }
+        }
+        if ($logoPath) {
+            try { $leftHeaderCell->addImage($logoPath, ['width' => 90, 'alignment' => 'left']); } catch (\Throwable $e) {}
+        }
+        $rightHeaderCell = $headerBand->addCell(7600, ['bgColor' => '0b2a56', 'valign' => 'center']);
+        $rightHeaderCell->addText('PLANILLA DE SEGUIMIENTO DE AVANCE', ['bold' => false, 'size' => 20, 'color' => 'FFFFFF'], ['alignment' => 'center']);
+        $rightHeaderCell->addText('DEFENSA DE GRADO', ['bold' => false, 'size' => 20, 'color' => 'FFFFFF'], ['alignment' => 'center']);
+
+        $header = $section->addTable(['borderSize' => 6, 'borderColor' => 'b9c2cf', 'cellMargin' => 80]);
+        $labelStyle = ['bold' => true, 'size' => 10,'color' => '0b2a56'];
+        $wLabel = 1400; $wVal = 1600; // 1400+1600 = 3000 x 3 pares = 9000
+
+        // Fila 1: NOMBRES | CÓDIGO CETA | N° DE POSTULANTE
+        $header->addRow();
+        $header->addCell($wLabel)->addText('NOMBRES:', $labelStyle);
+        $header->addCell($wVal)->addText((string)($row->nombres_est ?? ''));
+        $header->addCell($wLabel)->addText('CÓDIGO CETA:', $labelStyle);
+        $header->addCell($wVal)->addText((string)$row->cod_ceta);
+        $header->addCell($wLabel)->addText('N° DE POSTULANTE:', $labelStyle);
+        $header->addCell($wVal)->addText((string)($nroPostulante ?? ''));
+
+        // Fila 2: APELLIDOS | ÁREA DE INVESTIGACIÓN | GESTIÓN
+        $apellidos = trim(implode(' ', array_filter([$row->ap_pat ?? '', $row->ap_mat ?? '', $row->apellidos_est ?? ''])));
+        $header->addRow();
+        $header->addCell($wLabel)->addText('APELLIDOS:', $labelStyle);
+        $header->addCell($wVal)->addText($apellidos);
+        $header->addCell($wLabel)->addText('ÁREA DE INVESTIGACIÓN:', $labelStyle);
+        $header->addCell($wVal)->addText((string)($row->area ?? ''));
+        $header->addCell($wLabel)->addText('GESTIÓN:', $labelStyle);
+        $header->addCell($wVal)->addText((string)($gestion ?? ''));
+
+        // Fila 3: CARRERA | CEL. | DEFENSA CORRESPONDIENTE A
+        $header->addRow();
+        $header->addCell($wLabel)->addText('CARRERA:', $labelStyle);
+        $header->addCell($wVal)->addText((string)($row->carrera_nombre ?? ''));
+        $header->addCell($wLabel)->addText('CEL.:', $labelStyle);
+        $header->addCell($wVal)->addText((string)$postulanteCel);
+        $header->addCell($wLabel)->addText('DEFENSA CORRESPONDIENTE A:', $labelStyle);
+        $header->addCell($wVal)->addText((string)($defensaMes ?? ''));
+
+        // Título del proyecto (encabezado gris + contenido en gris claro)
+        $projTbl = $section->addTable(['borderSize' => 6, 'borderColor' => 'b9c2cf', 'cellMargin' => 80]);
+        $projTbl->addRow();
+        $projTbl->addCell(9000, ['bgColor' => 'dddddd'])->addText('TÍTULO DEL PROYECTO DE INVESTIGACIÓN', ['bold' => true, 'size' => 10], ['alignment' => 'center']);
+        $projTbl->addRow();
+        $projTbl->addCell(9000, ['bgColor' => 'eeeeee'])->addText((string)($row->proyecto_nombre ?? ''), ['size' => 10], ['alignment' => 'center']);
+
+        $info = $section->addTable(['borderSize' => 6, 'borderColor' => 'b9c2cf', 'cellMargin' => 80]);
+        $info->addRow();
+        $info->addCell(2200)->addText('SEGUIMIENTO', ['bold' => true]);
+        $info->addCell(3700)->addText('');
+        $info->addCell(1200)->addText('TUTOR:', ['bold' => true]);
+        $info->addCell(1900)->addText((string)$tutorNombre);
+
+        $tbl = $section->addTable(['borderSize' => 6, 'borderColor' => '0b2a56', 'cellMargin' => 80]);
+        $tbl->addRow();
+        foreach (['N°', 'FECHA DE REVISIÓN', 'CONTENIDO DE TÍTULOS', 'OBSERVACIONES', 'FECHA DE CORRECCIÓN', 'FIRMA DE CONFORMIDAD'] as $th) {
+            $tbl->addCell(1500, ['bgColor' => '0b2a56'])->addText($th, ['bold' => true, 'color' => 'FFFFFF']);
+        }
+
+        $addSectionRow = function ($label) use ($tbl) {
+            $tbl->addRow();
+            $tbl->addCell(9000, ['gridSpan' => 6, 'bgColor' => 'c9daf8'])->addText($label, ['bold' => true]);
+        };
+
+        $items = [
+            ['header' => 'FORMATO INICIAL'],
+            ['n' => 1, 'txt' => 'Carátula o portada'],
+            ['n' => 2, 'txt' => 'Dedicatoria'],
+            ['n' => 3, 'txt' => 'Agradecimientos'],
+            ['n' => 4, 'txt' => 'Índice'],
+            ['n' => 5, 'txt' => 'Resumen'],
+            ['n' => 6, 'txt' => 'Introducción'],
+            ['header' => 'CAPÍTULO “I” PLANTEAMIENTO DEL PROBLEMA'],
+            ['n' => 7, 'txt' => 'Diagnóstico y justificación'],
+            ['n' => 8, 'txt' => 'Planteamiento del problema'],
+            ['n' => 9, 'txt' => 'Formulación del problema'],
+            ['n' => 10, 'txt' => 'Objetivo general'],
+            ['n' => 11, 'txt' => 'Objetivos específicos'],
+            ['n' => 12, 'txt' => 'Enfoque metodológico'],
+            ['header' => 'CAPÍTULO “II” MARCO TEÓRICO CONCEPTUAL'],
+            ['n' => 13, 'txt' => 'Marco teórico'],
+            ['header' => 'CAPÍTULO “III” PROPUESTA DE INNOVACIÓN O SOLUCIÓN DEL PROBLEMA'],
+            ['n' => 14, 'txt' => 'Pruebas realizadas'],
+            ['n' => 15, 'txt' => 'Análisis de resultados'],
+            ['header' => 'CAPÍTULO “IV” CONCLUSIONES Y RECOMENDACIONES'],
+            ['n' => 16, 'txt' => 'Conclusiones'],
+            ['n' => 17, 'txt' => 'Recomendaciones'],
+            ['n' => 18, 'txt' => 'Bibliografía (Fuentes de información)'],
+            ['n' => 19, 'txt' => 'Anexos'],
+        ];
+
+        foreach ($items as $it) {
+            if (isset($it['header'])) {
+                $addSectionRow($it['header']);
+                continue;
+            }
+            $tbl->addRow();
+            $tbl->addCell(800)->addText((string)$it['n']);
+            $tbl->addCell(1800)->addText('');
+            $tbl->addCell(3000)->addText($it['txt']);
+            $tbl->addCell(2200)->addText('');
+            $tbl->addCell(1800)->addText('');
+            $tbl->addCell(1800)->addText('');
+        }
+
+        $section->addText('NOTA:', ['bold' => true]);
+
+        $firmas = $section->addTable(['borderSize' => 6, 'borderColor' => '1f4e78', 'cellMargin' => 80]);
+        $firmas->addRow(900);
+        $firmas->addCell(3000)->addText('');
+        $firmas->addCell(3000)->addText('');
+        $firmas->addCell(3000)->addText('');
+        $firmas->addRow();
+        $firmas->addCell(3000, ['bgColor' => 'c9daf8'])->addText('DOCENTE TUTOR', ['bold' => true]);
+        $firmas->addCell(3000, ['bgColor' => 'c9daf8'])->addText('ENCARGADO DE DPTO. TMG', ['bold' => true]);
+        $firmas->addCell(3000, ['bgColor' => 'c9daf8'])->addText('JEFATURA DE CARRERA', ['bold' => true]);
+
+        $path = storage_path('app/tmp');
+        if (!is_dir($path)) {
+            @mkdir($path, 0777, true);
+        }
+        $fileName = 'planilla-seguimiento-' . (string)$row->cod_ceta . '.docx';
+        $temp = $path . DIRECTORY_SEPARATOR . $fileName;
+        $writer = IOFactory::createWriter($phpWord, 'Word2007');
+        $writer->save($temp);
+        return response()->download($temp, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ])->deleteFileAfterSend(true);
     }
 
     private function mergeEstudiantesResumen(array $entries)
