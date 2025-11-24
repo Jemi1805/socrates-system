@@ -271,7 +271,8 @@ export class PostulanteService {
   // --- Fallback simple: obtener inscrip_modalidad por cod_ceta_est (para aranceles_completos) ---
   getInscripModalidadByCodCeta(codCeta: number | string): Observable<any> {
     const params: any = { cod_ceta_est: codCeta };
-    return this.http.get<any>(`${this.baseUrl}/inscrip_modalidad`, { params });
+    const root = this.baseUrl.replace(/\/+$/, '').replace(/\/postulantes$/i, '');
+    return this.http.get<any>(`${root}/inscrip_modalidad`, { params });
   }
 
   // Asignar y obtener número de postulante por convocatoria
@@ -281,13 +282,15 @@ export class PostulanteService {
 
   // Actualiza la fila de inscrip_modalidad por ID (por ejemplo, para sincronizar modalidad_nom)
   updateInscripModalidad(id: number | string, payload: { modalidad_nom?: string; modalidad_id?: number | string; estado?: string | null; convocatoria_id?: number | string | null; nom_convocatoria?: string | null }): Observable<any> {
-    return this.http.patch<any>(`${this.baseUrl}/inscrip_modalidad/${id}`, payload);
+    const root = this.baseUrl.replace(/\/+$/, '').replace(/\/postulantes$/i, '');
+    return this.http.patch<any>(`${root}/inscrip_modalidad/${id}`, payload);
   }
 
   // Fallback robusto: upsert por código CETA (si el backend no soporta PATCH por ID)
   updateInscripModalidadByCod(codCeta: number | string, payload: { modalidad_nom?: string; modalidad_id?: number | string; estado?: string | null; convocatoria_id?: number | string | null; nom_convocatoria?: string | null }): Observable<any> {
     const body = { cod_ceta_est: codCeta, ...payload } as any;
-    return this.http.post<any>(`${this.baseUrl}/inscrip_modalidad/upsert_by_cod`, body);
+    const root = this.baseUrl.replace(/\/+$/, '').replace(/\/postulantes$/i, '');
+    return this.http.post<any>(`${root}/inscrip_modalidad/upsert_by_cod`, body);
   }
 
   // --- Convocatorias ---

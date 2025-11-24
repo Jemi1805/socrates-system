@@ -552,6 +552,10 @@ export class PostulantesListComponent implements OnInit {
   // Estados de carga
   loadingModalidades = false;
   loadingAranceles = false;
+  // Evitar sobrescribir el estado del switch justo después de persistir
+  private skipSyncPagoCompletoOnce: boolean = false;
+  // Evitar limpiar la selección al refrescar inmediatamente luego de guardar
+  private preserveSelectedArancelesOnce: boolean = false;
   
   // Pensums
   pensums: string[] = [];
@@ -2743,6 +2747,17 @@ private cargarPostulanteDesdeBD() {
           };
           saves.push(this.postulanteService.upsertDatosCarrera(payloadCarrera));
         }
+        if (codFinal) {
+          const seleccionadosCount = (this.totalArancelesSeleccionados || 0) || ((this.selectedAranceles || []).length);
+          const anyArancelRows = (seleccionadosCount > 0)
+            || ((this.totalAranceles || 0) > 0)
+            || ((this.aranceles || []).length > 0);
+          const estadoAr = this.pagoCompletoSeleccionados
+            ? 'completo'
+            : (anyArancelRows ? 'parcial' : 'sin_pagos');
+          const arCompl = this.pagoCompletoSeleccionados ? 1 : 0;
+          saves.push(this.postulanteService.updateInscripModalidadByCod(codFinal, { estado_arancel: estadoAr, aranceles_completos: arCompl } as any));
+        }
         if (codFinal && this.selectedOpcion === 'educacionRegular') {
           const serieTM = (this.eduRegularData?.serie_titulo_tm || '').toString().trim();
           const numeroTM = (this.eduRegularData?.numero_titulo_tm || '').toString().trim();
@@ -3225,25 +3240,49 @@ private cargarPostulanteDesdeBD() {
 
         forkJoin(ops.length ? ops : [of(null)]).subscribe({
           next: () => {
-            // Refrescar desde backend para asegurar consistencia de selección
-            this.cargarArancelesMaterialExtra();
-            this.editAranceles = false;
-            this.hasChangesInView = false;
-            // Persistir estado_arancel y aranceles_completos en inscrip_modalidad según el switch y selección actual
             try {
               const tieneSel = (this.selectedAranceles || []).length > 0;
               const estadoAr = tieneSel ? (this.pagoCompletoSeleccionados ? 'completo' : 'parcial') : 'sin_pagos';
               const arCompl = (tieneSel && this.pagoCompletoSeleccionados) ? 1 : 0;
-              this.postulanteService.updateInscripModalidadByCod(cod as number, { estado_arancel: estadoAr, aranceles_completos: arCompl } as any)
-                .subscribe({ next: () => {}, error: () => {} });
+              const estadoInsc = (estadoAr === 'completo') ? 'inscrito' : 'pendiente';
+              const payloadUpd: any = { estado: estadoInsc, estado_arancel: estadoAr, aranceles_completos: arCompl };
+              const req$ = (this.inscripModalidadIdActual != null)
+                ? this.postulanteService.updateInscripModalidad(this.inscripModalidadIdActual, payloadUpd)
+                : this.postulanteService.updateInscripModalidadByCod(cod as number, payloadUpd);
+              req$.subscribe({
+                next: () => {
+                  this.postulantesInscritos = (this.postulantesInscritos || []).map(row => {
+                    if (Number(row.cod_ceta) === Number(cod)) {
+                      return { ...row, estado: estadoInsc as any, estado_arancel: estadoAr as any } as any;
+                    }
+                    return row;
+                  });
+                  this.pagoCompletoSeleccionados = (estadoAr === 'completo');
+                  // Evitar que el refresh inmediato reemplace el estado con un valor viejo desde backend
+                  this.skipSyncPagoCompletoOnce = true;
+                  // Mantener visible la sección de switch mientras refresca
+                  this.preserveSelectedArancelesOnce = true;
+                  // Salir de edición antes de recargar para que el refresh cruce selección desde BD
+                  this.editAranceles = false;
+                  this.cargarArancelesMaterialExtra();
+                  this.hasChangesInView = false;
+                  if (cambiosResumen.length) {
+                    this.mostrarModalCambios(cambiosResumen);
+                  } else {
+                    const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual());
+                    this.mostrarModalCambios(cambios);
+                  }
+                },
+                error: () => {
+                  if (cambiosResumen.length) {
+                    this.mostrarModalCambios(cambiosResumen);
+                  } else {
+                    const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual());
+                    this.mostrarModalCambios(cambios);
+                  }
+                }
+              });
             } catch {}
-            // Mostrar resumen específico si existe; si no hay diferencias, mostrar el comparador general
-            if (cambiosResumen.length) {
-              this.mostrarModalCambios(cambiosResumen);
-            } else {
-              const cambios = this.compararSnapshots(this._snapshotAntes, this.getSnapshotActual());
-              this.mostrarModalCambios(cambios);
-            }
           },
           error: (e) => {
             console.error('Error al guardar selección de aranceles:', e);
@@ -3612,9 +3651,13 @@ private cargarPostulanteDesdeBD() {
       return;
     }
     this.loadingAranceles = true;
-    // Limpiar selección previa al recargar
-    this.selectedAranceles = [];
-    this.totalArancelesSeleccionados = 0;
+    // Limpiar selección previa al recargar, excepto si acabamos de guardar y queremos mantener el switch visible
+    if (!this.preserveSelectedArancelesOnce) {
+      this.selectedAranceles = [];
+      this.totalArancelesSeleccionados = 0;
+    } else {
+      this.preserveSelectedArancelesOnce = false;
+    }
     // Por defecto, asumir que no hay aranceles SGA hasta que el endpoint los devuelva
     this.tieneArancelesSga = false;
     // En modo visualización y para postulante nuevo: evitar SGA y construir tabla directamente desde aranceles_est
@@ -3692,10 +3735,15 @@ private cargarPostulanteDesdeBD() {
             // También sincronizar el estado 'pago completo' desde el composite por si no se ha cargado aún
             this.postulanteService.getInscripcionByCodCeta(Number(cod)).subscribe({
               next: (p) => {
-                const flag = (p as any)?.aranceles_completos ?? (p as any)?.inscripcion?.aranceles_completos;
-                if (flag !== undefined && flag !== null) {
-                  const v = (typeof flag === 'string') ? flag.trim() : flag;
-                  this.pagoCompletoSeleccionados = v === true || v === 1 || v === '1';
+                // Si acabamos de persistir, no sobreescribir el switch en este ciclo
+                if (!this.skipSyncPagoCompletoOnce) {
+                  const flag = (p as any)?.aranceles_completos ?? (p as any)?.inscripcion?.aranceles_completos;
+                  if (flag !== undefined && flag !== null) {
+                    const v = (typeof flag === 'string') ? flag.trim() : flag;
+                    this.pagoCompletoSeleccionados = v === true || v === 1 || v === '1';
+                  }
+                } else {
+                  this.skipSyncPagoCompletoOnce = false;
                 }
                 this.inscripModalidadIdActual = (p as any)?.inscripcion?.id ?? this.inscripModalidadIdActual;
               },
@@ -3710,9 +3758,13 @@ private cargarPostulanteDesdeBD() {
                       if (r && r.id != null) {
                         this.inscripModalidadIdActual = Number(r.id);
                       }
-                      if (flag2 !== undefined && flag2 !== null) {
-                        const v2 = (typeof flag2 === 'string') ? flag2.trim() : flag2;
-                        this.pagoCompletoSeleccionados = v2 === true || v2 === 1 || v2 === '1';
+                      if (!this.skipSyncPagoCompletoOnce) {
+                        if (flag2 !== undefined && flag2 !== null) {
+                          const v2 = (typeof flag2 === 'string') ? flag2.trim() : flag2;
+                          this.pagoCompletoSeleccionados = v2 === true || v2 === 1 || v2 === '1';
+                        }
+                      } else {
+                        this.skipSyncPagoCompletoOnce = false;
                       }
                     }
                   },
@@ -4662,6 +4714,58 @@ private cargarPostulanteDesdeBD() {
     // Propagar a cada ítem seleccionado (si tiene campo pagado)
     this.selectedAranceles = this.selectedAranceles.map(a => ({ ...a, pagado: value }));
     this.markChangedInView();
+    // Persistir inmediatamente en inscrip_modalidad para no depender del guardado general
+    try {
+      const cod = Number(this.postulanteActual?.cod_ceta || this.estudiante?.cod_ceta) || null;
+      if (cod) {
+        const seleccionadosCount = (this.totalArancelesSeleccionados || 0) || ((this.selectedAranceles || []).length);
+        const anyArancelRows = (seleccionadosCount > 0)
+          || ((this.totalAranceles || 0) > 0)
+          || ((this.aranceles || []).length > 0);
+        const estadoAr = value ? 'completo' : (anyArancelRows ? 'parcial' : 'sin_pagos');
+        const arCompl = value ? 1 : 0;
+        const estadoInsc = (estadoAr === 'completo') ? 'inscrito' : 'pendiente';
+        const payloadUpd: any = { estado: estadoInsc, estado_arancel: estadoAr, aranceles_completos: arCompl };
+        const req$ = (this.inscripModalidadIdActual != null)
+          ? this.postulanteService.updateInscripModalidad(this.inscripModalidadIdActual, payloadUpd)
+          : this.postulanteService.updateInscripModalidadByCod(cod, payloadUpd);
+        req$
+          .subscribe({
+            next: () => {
+              // Actualizar estado local inmediato (tabla en memoria)
+              this.postulantesInscritos = (this.postulantesInscritos || []).map(row => {
+                if (Number(row.cod_ceta) === Number(cod)) {
+                  return { ...row, estado: estadoInsc as any, estado_arancel: estadoAr as any } as any;
+                }
+                return row;
+              });
+              // Refrescar desde backend (última inscrip_modalidad)
+              this.postulanteService.getInscripModalidadByCodCeta(cod).subscribe({
+                next: (resp) => {
+                  const list = Array.isArray(resp?.data) ? resp.data : (Array.isArray(resp) ? resp : []);
+                  const rec = Array.isArray(list) && list.length
+                    ? [...list].sort((a: any, b: any) => (Number(b?.id || 0) - Number(a?.id || 0)))[0]
+                    : null;
+                  const est = (rec && (rec.estado_arancel || rec?.inscripcion?.estado_arancel)) || estadoAr;
+                  if (est) {
+                    this.postulantesInscritos = (this.postulantesInscritos || []).map(row => {
+                      if (Number(row.cod_ceta) === Number(cod)) {
+                        return { ...row, estado_arancel: (String(est).trim().toLowerCase() as any) } as any;
+                      }
+                      return row;
+                    });
+                    if (rec && rec.id != null) {
+                      this.inscripModalidadIdActual = Number(rec.id);
+                    }
+                  }
+                },
+                error: () => {}
+              });
+            },
+            error: () => {}
+          });
+      }
+    } catch {}
   }
 
   // Retorna la gestión actual calculada (primer elemento de la lista o cálculo directo)

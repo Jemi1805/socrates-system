@@ -182,6 +182,9 @@ class InscripModalidadController extends CrudController
             'estado' => 'nullable|string|max:255',
             'convocatoria_id' => 'nullable|exists:convocatorias,id',
             'nom_convocatoria' => 'nullable|string|max:150',
+            // permitir actualización de estado de aranceles vía update por ID
+            'aranceles_completos' => 'nullable|boolean',
+            'estado_arancel' => 'nullable|in:sin_pagos,parcial,completo',
         ];
     }
 
@@ -220,7 +223,7 @@ class InscripModalidadController extends CrudController
 
         $record = InscripModalidad::query()
             ->where('cod_ceta_est', $data['cod_ceta_est'])
-            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
             ->first();
 
         if ($record) {
