@@ -46,7 +46,7 @@
               <span class="total-text">Total: <strong>{{ postulantesInscritos.length }}</strong></span>
               <button
                 type="button"
-                class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2"
+                class="btn btn-outline-secondary d-flex align-items-center gap-2"
                 (click)="onClickActualizarInscritos()"
                 [disabled]="loadingInscritos">
                 <i class="bi" [ngClass]="loadingInscritos ? 'bi-arrow-clockwise spin' : 'bi-arrow-repeat'"></i>
@@ -60,7 +60,7 @@
           No hay postulantes inscritos registrados en la base de datos local.
         </div>
         <div class="table-responsive" *ngIf="postulantesInscritos.length > 0">
-          <table class="table table-hover table-sm align-middle table-fixed">
+          <table class="table table-hover table-sm align-middle table-fixed table-stackable">
             <thead class="table-dark">
               <tr>
                 <th scope="col">Postulante</th>
@@ -74,14 +74,14 @@
             <tbody>
               <ng-container *ngFor="let ins of postulantesInscritos">
               <tr>
-                <td>
+                <td data-label="Postulante">
                   <div class="fw-semibold"> {{ ins.cod_ceta }}</div>
                   <div>{{ ins.ap_pat }} {{ ins.ap_mat }} {{ ins.nombres_est }}</div>
                   <div class="text-muted" *ngIf="ins.celular as cel">
                     <i class="bi bi-telephone me-1"></i>{{ cel }}
                   </div>
                 </td>
-                <td>
+                <td data-label="Inscripción">
                   <div class="d-flex align-items-center justify-content-between gap-2">
                     <div>
                       <div class="fw-semibold">{{ ins.modo || '-' }}</div>
@@ -93,14 +93,14 @@
                     </button>
                   </div>
                 </td>
-                <td class="pagos-cell">
+                <td class="pagos-cell" data-label="Estado de Arancel">
                   <span class="pago-badge" [ngClass]="{
                     'pago-completo': (ins.estado_arancel || ins.pago_estado) === 'completo',
                     'pago-parcial': (ins.estado_arancel || ins.pago_estado) === 'parcial',
                     'pago-sin': !(ins.estado_arancel || ins.pago_estado) || (ins.estado_arancel || ins.pago_estado) === 'sin_pagos'
                   }">{{ ins.estado_arancel ? estadoArancelLabel(ins) : pagoEstadoLabel(ins) }}</span>
                 </td>
-                <td class="registro-tema-cell">
+                <td class="registro-tema-cell" data-label="Registro de Tema">
                   <ng-container *ngIf="tieneProyecto(ins); else noTemaTpl">
                     <div class="tema-row d-flex align-items-center gap-2">
                       <div class="tema-text flex-grow-1">
@@ -119,7 +119,7 @@
                     </button>
                   </ng-template>
                 </td>
-                <td class="designacion-cell">
+                <td class="designacion-cell" data-label="Designación de Tutor">
                   <div class="d-flex align-items-center justify-content-between gap-2">
                     <div class="flex-grow-1">
                       <ng-container *ngIf="ins.designacion?.tutor_nombre; else noTutorTpl">
@@ -144,7 +144,7 @@
                     </ng-container>
                   </div>
                 </td>
-                <td class="docs-cell">
+                <td class="docs-cell" data-label="Documentos">
                   <ng-container *ngIf="ins?.proyecto?.nombre || ins?.designacion?.numero_documento; else noDocsTpl">
                     <ul class="docs-list">
                       <li *ngIf="ins?.proyecto?.nombre">
@@ -1013,7 +1013,7 @@
             <i class="bi bi-info-circle me-1"></i>
             Ingrese datos de los aranceles para modalidad de graduación
           </div>
-          <button class="btn btn-outline-primary" (click)="cargarArancelesMaterialExtra()" *ngIf="!esNuevoPostulante">
+          <button class="btn btn-outline-secondary" (click)="cargarArancelesMaterialExtra()" *ngIf="!esNuevoPostulante">
             <i class="bi bi-arrow-repeat me-1"></i>
             Actualizar
           </button>

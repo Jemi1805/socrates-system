@@ -782,17 +782,24 @@ input {
     }
     .table.table-sm td, .table.table-sm th { font-size: .92rem; }
 
-    // Fijar layout de la tabla para evitar saltos y desbordes
     .table-fixed { table-layout: fixed; width: 100%; }
     .table-fixed thead th, .table-fixed tbody td {
       overflow: hidden; text-overflow: ellipsis; white-space: normal; vertical-align: top;
     }
+
     // Hacer más angosta la columna de Estado de Pagos
     .table-fixed thead th.pagos-col, .table-fixed tbody td.pagos-cell { width: 120px; max-width: 120px; }
-    // Evitar que los botones ojo desaparezcan al colapsar el espacio
-    .btn-eye { flex: 0 0 auto; white-space: nowrap; }
 
-    // Permitir que el menú de documentos se muestre sobre el TD (no recortar por overflow hidden)
+    @media (max-width: 768px) {
+      .table-stackable { table-layout: auto; }
+      .table-stackable thead { display: none; }
+      .table-stackable tbody tr { display: block; border: 1px solid rgba(5, 37, 68, 0.12); border-radius: 8px; padding: .5rem .75rem; margin-bottom: .5rem; background: #fff; }
+      .table-stackable tbody td { display: grid; grid-template-columns: 42% 1fr; align-items: start; gap: .5rem; border: none !important; padding: .35rem 0 !important; max-width: 100% !important; width: 100% !important; white-space: normal; }
+      .table-stackable tbody td::before { content: attr(data-label); font-weight: 600; color: $text-dark-blue; }
+      .table-stackable .pagos-cell, .table-stackable .registro-tema-cell, .table-stackable .designacion-cell, .table-stackable td.docs-cell { width: 100% !important; max-width: 100% !important; }
+      .table-stackable .btn-eye { margin-left: auto; }
+    }
+
     .table-fixed tbody tr { overflow: visible; }
     .table-fixed td.docs-cell { overflow: visible; position: relative; z-index: 13000; }
     td.docs-cell { position: relative; z-index: 13000; }
@@ -1320,6 +1327,10 @@ input {
 
 // Responsive
 @media (max-width: 768px) {
+  .content-wrapper {
+    padding: 1rem 0.5rem;
+  }
+
   .header {
     .main-title {
       font-size: 2rem;
@@ -1331,7 +1342,7 @@ input {
   }
   
   .form-card, .table-card {
-    padding: 20px;
+    padding: 10px;
   }
   
   .data-table {
@@ -1364,6 +1375,40 @@ input {
 
   button {
     height: 34px !important;
+  }
+
+  .search-tabs {
+    flex-direction: column;
+    
+    .tab-btn {
+      flex: none;
+    }
+  }
+  
+  .modalidad-item {
+    margin-bottom: 1rem;
+  }
+
+  .row > * {
+    margin-bottom: 0.5rem;
+  }
+
+  .modal-content {
+    width: 390px;
+    height: 700px;
+    margin-left: 10px;
+  }
+  
+  .btn.btn-outline-secondary[_ngcontent-ng-c838841276]{
+      display: none;
+  }
+
+  .table {
+    width: 700px;
+
+    .btn[_ngcontent-ng-c838841276] {
+      padding: 0.5rem;
+    }
   }
 }
 
