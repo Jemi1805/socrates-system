@@ -169,7 +169,7 @@
                   </ng-template>
                 </td>
                 <td class="docs-cell" data-label="Documentos">
-                  <ng-container *ngIf="ins?.proyecto?.nombre || ins?.designacion?.numero_documento; else noDocsTpl">
+                  <ng-container *ngIf="ins?.proyecto?.nombre || ins?.designacion?.numero_documento || ins?.proyecto?.seguimiento_pdf; else noDocsTpl">
                     <ul class="docs-list">
                       <li *ngIf="ins?.proyecto?.nombre">
                         <a href="" (click)="verFmdg(ins); $event.preventDefault()">FDMG-1</a>
@@ -184,6 +184,9 @@
                             <i class="bi bi-download" aria-hidden="true"></i>
                           </button>
                         </span>
+                      </li>
+                      <li *ngIf="ins?.proyecto?.seguimiento_pdf">
+                        <a [href]="getSeguimientoUrl(ins)" target="_blank">Ver seguimiento cargado</a>
                       </li>
                     </ul>
                   </ng-container>
@@ -237,6 +240,26 @@
             </div>
             <div class="card-footer text-end">
               <button type="button" class="btn btn-secondary btn-sm" (click)="cerrarDetalle()">Cerrar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal para visualizar documento de seguimiento (PDF) -->
+        <div *ngIf="docModalVisible" class="detalle-overlay">
+          <div class="backdrop" (click)="cerrarDocModal()"></div>
+          <div class="card shadow doc-modal-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span class="fw-semibold">{{ docModalTitle || 'Documento de seguimiento' }}</span>
+              <button type="button" class="btn-close" aria-label="Cerrar" (click)="cerrarDocModal()"></button>
+            </div>
+            <div class="card-body">
+              <p class="mb-0">El documento de seguimiento se abrirá en una nueva pestaña.</p>
+            </div>
+            <div class="card-footer text-end">
+              <button *ngIf="docModalUrl" type="button" class="btn btn-outline-primary btn-sm me-2" (click)="abrirDocSeguimientoEnNuevaPestana()">
+                Abrir en nueva pestaña
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" (click)="cerrarDocModal()">Cerrar</button>
             </div>
           </div>
         </div>

@@ -8,6 +8,8 @@ import { Postulante } from './postulante.model';
 import { HttpEventType, HttpResponse } from '@angular/common/http';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
 import { CommonModule, formatDate } from '@angular/common';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { environment } from '../../../environments/environment';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { SgaService, Convocatoria } from '../../../shared/services/sga.service';
 import { LoadingService } from '../../../core/services/loading.service';
@@ -33,7 +35,7 @@ interface Estudiante {
   gestion_fin?: string;
   incrip_uni?: boolean;
 }
- 
+
 interface ModalidadGraduacion {
   id: number;
   nombre: string;
@@ -119,8 +121,13 @@ export class PostulantesListComponent implements OnInit {
   convocatoriasFiltro: Array<{ id: string; label: string }> = [];
   // Modal de detalle de procesos
   detalleVisible: boolean = false;
-  detalleTipo: 'inscripcion' | 'tema' | 'designacion' | null = null;
+  detalleTipo: 'inscripcion' | 'tema' | 'designacion' | null = null; 
   detalleData: any = null;
+  // Modal para visualizar documentos (p.ej. PDF de seguimiento)
+  docModalVisible: boolean = false;
+  docModalUrl: string | null = null;
+  docModalSafeUrl: SafeResourceUrl | null = null;
+  docModalTitle: string | null = null;
   
   // Datos del estudiante y modalidad
   estudiante: Estudiante | null = null;
@@ -866,7 +873,6 @@ private validarCampos(): string[] {
   return faltantes;
 }
 
-// Construye faltantes por sección con etiquetas de UI
 private validarCamposSecciones(): Array<{ titulo: string; items: string[] }> {
   const secciones: Array<{ titulo: string; items: string[] }> = [];
   // Datos del estudiante
@@ -898,8 +904,6 @@ private validarCamposSecciones(): Array<{ titulo: string; items: string[] }> {
 
   // Inicio/Conclusión
   const ic: string[] = [];
-  if (!this.isNonEmpty(this.datosInicioCarrera.reg_ini_c)) ic.push('Tipo de Régimen (Inicio de Carrera)');
-  if (!this.isNonEmpty(this.datosConclusionCarrera.reg_con_c)) ic.push('Tipo de Régimen (Conclusión de Carrera)');
   if (!this.isNonEmpty(this.datosInicioCarrera.gestion_ini)) ic.push('Gestión de Inicio de Carrera');
   if (!this.isNonEmpty(this.datosConclusionCarrera.gestion_fin)) ic.push('Gestión de Conclusión de Carrera');
   if (
@@ -931,6 +935,7 @@ private validarCamposSecciones(): Array<{ titulo: string; items: string[] }> {
     }
     case 'traspasoInstituto': {
       if (!this.isNonEmpty(this.traspasoData.instituto_origen)) tran.push('Instituto de origen (Traspaso)');
+      // Si el usuario añadió filas, exigir que estén completas
       (this.traspasoData.grados_gestiones || []).forEach((gg, i) => {
         if (this.isNonEmpty(gg.grado) || this.isNonEmpty(gg.gestion)) {
           if (!this.isNonEmpty(gg.grado)) tran.push(`Grado #${i + 1} (Traspaso)`);
@@ -1033,7 +1038,7 @@ get labelNuevoArancelGestion(): string {
   return this.nuevoArancel?.gestion || 'Seleccione gestión';
 }
 
-constructor(private postulanteService: PostulanteService, private sgaService: SgaService, private router: Router, private route: ActivatedRoute, private loadingService: LoadingService, private proyectoService: ProyectoService, private pdfService: PdfService) {}
+constructor(private postulanteService: PostulanteService, private sgaService: SgaService, private router: Router, private route: ActivatedRoute, private loadingService: LoadingService, private proyectoService: ProyectoService, private pdfService: PdfService, private sanitizer: DomSanitizer) {}
 
 // Normalizador para Tipo de Bachiller: siempre 'Nacional' o 'Extranjero'
 private formatTipoBachiller(v: string | null | undefined): string | null {
@@ -1411,7 +1416,7 @@ cargarDetallesTabla() {
           const area = found.area || found.pertinencia || (Array.isArray(found.estudiantes) ? (found.estudiantes[0]?.area || null) : null);
           const numeroDoc = (found as any)?.numero_documento ?? null;
           const cite = (found as any)?.cite ?? null;
-          const tutorCel = (found as any)?.tutor_celular ?? (found as any)?.tutor_cel ?? (found as any)?.celular ?? (found?.tutor?.celular ?? null);
+          const tutorCel = (found as any)?.tutor_celular ?? (found as any)?.tutor_cel ?? (found?.tutor?.celular ?? null);
           const tituloAcad = (found as any)?.tutor_titulo_academico ?? (found as any)?.tutor_titulo ?? (found?.tutor as any)?.tutor_titulo_academico ?? null;
           const convInicio = (found as any)?.convocatoria_fecha_inicio ?? null;
           const convFin = (found as any)?.convocatoria_fecha_fin ?? null;
@@ -1524,6 +1529,15 @@ pagoEstadoLabel(ins: PostulanteInscrito): string {
   return 'Sin Pagos';
 }
 
+getSeguimientoUrl(ins: PostulanteInscrito | null | undefined): string | null {
+  if (!ins || !(ins as any)?.proyecto || !(ins as any).proyecto.seguimiento_pdf) return null;
+  const raw = String((ins as any).proyecto.seguimiento_pdf || '').trim();
+  if (!raw) return null;
+  const apiRoot = environment.apiUrl.replace(/\/+api\/?$/, '');
+  const path = raw.startsWith('storage/') ? raw : `storage/${raw}`;
+  return `${apiRoot}/${path}`;
+}
+
 estadoArancelLabel(ins: PostulanteInscrito): string {
   const v = ins?.estado_arancel;
   if (v === 'completo') return 'Completo';
@@ -1534,7 +1548,7 @@ estadoArancelLabel(ins: PostulanteInscrito): string {
 private pickProyectoFromResponse(res: any, wantedCod: string): any | null {
   if (!res) return null;
   const getCod = (o: any): string | null => {
-    const v = (o?.cod_ceta ?? o?.codCeta ?? o?.codigo_ceta ?? o?.cod_ceta_est);
+    const v = (o?.cod_ceta ?? o?.codCeta ?? o?.codigo_ceta);
     if (v === undefined || v === null) return null;
     const s = String(v);
     return s;
@@ -1834,6 +1848,34 @@ async verDesignacion(ins: PostulanteInscrito) {
   } finally {
     this.loadingService.hideModal();
   }
+}
+
+verDocumentoSeguimiento(ins: PostulanteInscrito) {
+  if (!ins || !ins.proyecto || !ins.proyecto.seguimiento_pdf) return;
+  const path = String(ins.proyecto.seguimiento_pdf).trim();
+  if (!path) return;
+  // Construir URL absoluta al backend (quitar sufijo /api de apiUrl si existe)
+  const apiRoot = environment.apiUrl.replace(/\/+api\/?$/, '');
+  const normalizedPath = path.startsWith('storage/') ? path : `storage/${path}`;
+  const url = `${apiRoot}/${normalizedPath}`;
+  this.docModalTitle = `Seguimiento del proyecto - ${ins.cod_ceta}`;
+  this.docModalUrl = url;
+  this.docModalSafeUrl = this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  this.docModalVisible = true;
+}
+
+abrirDocSeguimientoEnNuevaPestana() {
+  if (!this.docModalUrl) return;
+  try {
+    window.open(this.docModalUrl, '_blank');
+  } catch {}
+}
+
+cerrarDocModal() {
+  this.docModalVisible = false;
+  this.docModalUrl = null;
+  this.docModalSafeUrl = null;
+  this.docModalTitle = null;
 }
 
 //

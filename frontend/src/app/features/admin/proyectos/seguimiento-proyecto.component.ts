@@ -7,6 +7,7 @@ import { ProyectoService } from './proyecto.service';
 import { PostulanteService } from '../postulantes/postulante.service';
 import { SgaService } from '../../../shared/services/sga.service';
 import { LoadingService } from '../../../core/services/loading.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-seguimiento-proyecto',
@@ -85,6 +86,15 @@ export class SeguimientoProyectoComponent implements OnInit {
     });
   }
 
+  getSeguimientoUrl(path: string | null | undefined): string | null {
+    if (!path) return null;
+    const raw = String(path).trim();
+    if (!raw) return null;
+    const apiRoot = environment.apiUrl.replace(/\/+api\/?$/, '');
+    const normalized = raw.startsWith('storage/') ? raw : `storage/${raw}`;
+    return `${apiRoot}/${normalized}`;
+  }
+
   private pickProyecto(res: any): any {
     if (!res) return null;
     if (Array.isArray(res)) return res[0] || null;
@@ -125,6 +135,15 @@ export class SeguimientoProyectoComponent implements OnInit {
       },
       complete: () => { this.saving = false; this.loading.hideModal(); }
     });
+  }
+
+  getSeguimientoNombre(): string | null {
+    const path = (this.proyecto as any)?.seguimiento_pdf;
+    if (!path) return null;
+    const s = String(path);
+    const parts = s.split('/');
+    const last = parts[parts.length - 1];
+    return last || s;
   }
 
   volver() {
