@@ -172,12 +172,12 @@
                 </td>
                 <td class="defensa-cell" data-label="Defensa">
                   <ng-container *ngIf="tieneProyecto(ins); else defNoTemaTpl">
-                    <div class="d-flex flex-column gap-1">
+                    <div class="d-flex align-items-center gap-2">
                       <div class="small" *ngIf="tieneDefensaProgramada(ins); else sinDefensaTpl">
                         {{ defensaResumenUI(ins) }}
                       </div>
                       <ng-template #sinDefensaTpl>
-                        <span class="badge rounded-pill bg-secondary">Sin defensa programada</span>
+                        <span class="badge rounded-pill bg-secondary">Sin defensa</span>
                       </ng-template>
                       <div class="d-flex gap-2">
                         <button
