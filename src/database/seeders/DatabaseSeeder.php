@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
         // Ejecutar seeder de permisos directos por usuario
         $this->call([
             UsuarioPermisoSeeder::class,
+            PermisosDefensasSeeder::class,
             ModalidadSeeder::class,
             // Semillas base para carreras y pensums
             CarreraSeeder::class,

@@ -2052,6 +2052,7 @@ guardarDefensa() {
   // limpiar errores previos
   this.defensaFechaError = null;
   this.defensaHoraError = null;
+
   const fecha = (this.defensaForm.fecha_defensa || '').trim();
   if (fecha && (this.defensaFechaMin || this.defensaFechaMax)) {
     if (this.defensaFechaMin && fecha < this.defensaFechaMin) {
@@ -2063,6 +2064,7 @@ guardarDefensa() {
       return;
     }
   }
+
   const hi = (this.defensaForm.hora_inicio || '').trim();
   const hf = (this.defensaForm.hora_fin || '').trim();
   if (hi && hf) {
@@ -2077,16 +2079,76 @@ guardarDefensa() {
       return;
     }
   }
-  try {
-    console.log('guardarDefensa - datos:', {
-      ins: this.defensaSeleccionada,
-      modo: this.defensaModo,
-      form: this.defensaForm,
-      fechaMin: this.defensaFechaMin,
-      fechaMax: this.defensaFechaMax,
+
+  // Determinar proyecto y defensa actual
+  const actual: any = this.defensaSeleccionada as any;
+  const proyectoId = actual?.proyecto?.id != null ? Number(actual.proyecto.id) : null;
+  const codCeta = actual?.cod_ceta != null ? Number(actual.cod_ceta) : null;
+  if (!proyectoId || !codCeta || !this.defensaForm.convocatoria_id) {
+    console.error('No se pudo determinar proyecto/cod_ceta/convocatoria para programar defensa', {
+      proyectoId,
+      codCeta,
+      defensaForm: this.defensaForm,
     });
-  } catch {}
-  this.cerrarModalDefensa();
+    return;
+  }
+
+  const basePayload = {
+    fecha_defensa: this.defensaForm.fecha_defensa,
+    hora_inicio: this.defensaForm.hora_inicio,
+    hora_fin: this.defensaForm.hora_fin,
+    grupo: this.defensaForm.grupo || null,
+    aula: this.defensaForm.aula || null,
+    observaciones: this.defensaForm.observaciones || null,
+  };
+
+  const defensaActual: any = actual.defensa || null;
+  const esReprogramar = this.defensaModo === 'reprogramar' && defensaActual && defensaActual.id != null;
+
+  const request$ = esReprogramar
+    ? this.postulanteService.reprogramarDefensa(Number(defensaActual.id), {
+        convocatoria_id: this.defensaForm.convocatoria_id!,
+        ...basePayload,
+      })
+    : this.postulanteService.programarDefensa({
+        proyecto_id: proyectoId,
+        cod_ceta: codCeta,
+        convocatoria_id: this.defensaForm.convocatoria_id!,
+        ...basePayload,
+      });
+
+  this.loadingService.showModal();
+  request$
+    .pipe(finalize(() => this.loadingService.hideModal()))
+    .subscribe({
+      next: (resp: any) => {
+        const nuevaDefensa = resp || {
+          id: defensaActual?.id ?? null,
+          proyecto_id: proyectoId,
+          cod_ceta: codCeta,
+          convocatoria_id: this.defensaForm.convocatoria_id,
+          fecha_defensa: this.defensaForm.fecha_defensa,
+          hora_inicio: this.defensaForm.hora_inicio,
+          hora_fin: this.defensaForm.hora_fin,
+          grupo: this.defensaForm.grupo || null,
+          aula: this.defensaForm.aula || null,
+          observaciones: this.defensaForm.observaciones || null,
+        };
+
+        // Actualizar la fila en la lista en memoria para que la columna Defensa refleje el cambio
+        this.postulantesInscritos = (this.postulantesInscritos || []).map(row => {
+          if (Number(row.cod_ceta) === codCeta) {
+            return { ...row, defensa: nuevaDefensa } as any;
+          }
+          return row;
+        });
+
+        this.cerrarModalDefensa();
+      },
+      error: (err) => {
+        console.error('Error al guardar defensa', err);
+      },
+    });
 }
 
 private calcularRangoMesDefensa(conv: { mes_defensa?: string | null } | null): { min: string | null; max: string | null } {
