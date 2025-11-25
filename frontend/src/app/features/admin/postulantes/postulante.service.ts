@@ -42,6 +42,33 @@ export class PostulanteService {
     return this.http.get<Postulante[]>(this.apiUrl);
   }
 
+  // --- Defensas ---
+  programarDefensa(payload: {
+    proyecto_id: number | string;
+    cod_ceta: number | string;
+    convocatoria_id: number | string;
+    fecha_defensa: string;
+    hora_inicio: string;
+    hora_fin: string;
+    grupo?: string | null;
+    aula?: string | null;
+    observaciones?: string | null;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/defensas`, payload);
+  }
+
+  reprogramarDefensa(id: number | string, payload: {
+    convocatoria_id: number | string;
+    fecha_defensa: string;
+    hora_inicio: string;
+    hora_fin: string;
+    grupo?: string | null;
+    aula?: string | null;
+    observaciones?: string | null;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/defensas/${id}/reprogramar`, payload);
+  }
+
   // --- Inscripciones ---
   registrarInscripcion(payload: any): Observable<any> {
     return this.http.post<any>(this.inscripcionesUrl, payload);

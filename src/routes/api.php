@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\DocenteController;
 use App\Http\Controllers\Api\TutorController;
 use App\Http\Controllers\Api\PertinenciaController;
 use App\Http\Controllers\Api\ConvocatoriaController;
+use App\Http\Controllers\Api\DefensaController;
 
 // 🔐 RUTAS DE AUTENTICACIÓN (Sin middleware)
 Route::prefix('auth')->group(function () {
@@ -186,8 +187,21 @@ Route::middleware('auth:sanctum')->group(function () {
     // Tutores: designación
     Route::post('tutores/designar', [TutorController::class, 'designar'])
         ->middleware('permission:tutores.designar');
-    });
+    
 
+    // Defensas (programación de defensa de proyecto)
+    Route::post('defensas', [DefensaController::class, 'store'])
+        ->middleware('permission:defensas.programar');
+    Route::put('defensas/{id}', [DefensaController::class, 'update'])
+        ->where(['id' => '\\d+'])
+        ->middleware('permission:defensas.programar');
+    Route::post('defensas/{id}/reprogramar', [DefensaController::class, 'reprogramar'])
+        ->where(['id' => '\\d+'])
+        ->middleware('permission:defensas.reprogramar');
+    Route::get('proyecto/{id}/defensas', [DefensaController::class, 'byProyecto'])
+        ->where(['id' => '\\d+'])
+        ->middleware('permission:defensas.leer');
+});
 // 📦 RUTAS DE PRODUCTOS (Mantener existentes)
 // Route::get('/productos', [ProductosController::class, 'index']);
 // Route::post('/productos', [ProductosController::class, 'store']);

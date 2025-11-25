@@ -37,6 +37,11 @@ class PostulanteController extends Controller
             ->select('cod_ceta', DB::raw('MAX(id) as last_id'))
             ->groupBy('cod_ceta');
 
+        // Última defensa por proyecto (para mostrar resumen en la tabla de inscritos)
+        $latestDefensa = DB::table('defensas')
+            ->select('proyecto_id', DB::raw('MAX(id) as last_id'))
+            ->groupBy('proyecto_id');
+
         $query = Postulante::query()
             ->select([
                 'postulantes.cod_ceta',
@@ -55,6 +60,14 @@ class PostulanteController extends Controller
                 'inscrip_modalidad.convocatoria_id',
                 'inscrip_modalidad.nom_convocatoria',
                 DB::raw('proj.celular as celular'),
+                // Resumen de defensa (última por proyecto)
+                DB::raw('def.fecha_defensa as defensa_fecha_defensa'),
+                DB::raw('def.hora_inicio as defensa_hora_inicio'),
+                DB::raw('def.hora_fin as defensa_hora_fin'),
+                DB::raw('def.grupo as defensa_grupo'),
+                DB::raw('def.aula as defensa_aula'),
+                DB::raw('def.estado_defensa as defensa_estado'),
+                DB::raw('def.id as defensa_id'),
             ])
             ->joinSub($latestInscripciones, 'latest_insc', function ($join) {
                 $join->on('latest_insc.cod_ceta_est', '=', 'postulantes.cod_ceta');
@@ -68,6 +81,13 @@ class PostulanteController extends Controller
             })
             ->leftJoin('proyecto as proj', function ($join) {
                 $join->on('proj.id', '=', 'latest_proy.last_id');
+            })
+            // Unir última defensa asociada al proyecto
+            ->leftJoinSub($latestDefensa, 'latest_def', function ($join) {
+                $join->on('latest_def.proyecto_id', '=', 'proj.id');
+            })
+            ->leftJoin('defensas as def', function ($join) {
+                $join->on('def.id', '=', 'latest_def.last_id');
             });
 
         if ($estado !== null && $estado !== '') {

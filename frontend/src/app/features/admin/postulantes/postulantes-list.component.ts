@@ -95,6 +95,15 @@ interface PostulanteInscrito {
   nro_postulante?: number | null;
   convocatoria_id?: number | null;
   nom_convocatoria?: string | null;
+  defensa?: {
+    id?: number | null;
+    fecha_defensa?: string | null;
+    hora_inicio?: string | null;
+    hora_fin?: string | null;
+    grupo?: string | null;
+    aula?: string | null;
+    estado?: string | null;
+  } | null;
 }
 
 @Component({
@@ -128,6 +137,28 @@ export class PostulantesListComponent implements OnInit {
   docModalUrl: string | null = null;
   docModalSafeUrl: SafeResourceUrl | null = null;
   docModalTitle: string | null = null;
+  // Modal de defensa
+  defensaModalVisible: boolean = false;
+  defensaModalTitulo: string = '';
+  defensaModo: 'programar' | 'reprogramar' = 'programar';
+  defensaSeleccionada: PostulanteInscrito | null = null;
+  defensaForm: {
+    fecha_defensa: string;
+    hora_inicio: string;
+    hora_fin: string;
+    grupo: string;
+    aula: string;
+    convocatoria_id: number | null;
+    observaciones: string;
+  } = {
+    fecha_defensa: '',
+    hora_inicio: '',
+    hora_fin: '',
+    grupo: '',
+    aula: '',
+    convocatoria_id: null,
+    observaciones: '',
+  };
   
   // Datos del estudiante y modalidad
   estudiante: Estudiante | null = null;
@@ -1265,9 +1296,9 @@ cargarPostulantesInscritos(showModal: boolean = true) {
         fecha_inscripcion: row?.fecha_inscripcion ?? row?.created_at ?? null,
         estado: row?.estado ?? null,
         estado_arancel: (() => {
-          const raw = (row as any)?.estado_arancel ?? (row as any)?.inscripcion?.estado_arancel ?? null;
-          if (raw === null || raw === undefined) return null;
-          const s = String(raw).toLowerCase().trim().replace(/\s+/g, '_');
+          const rawEA = (row as any)?.estado_arancel ?? (row as any)?.inscripcion?.estado_arancel ?? null;
+          if (rawEA === null || rawEA === undefined) return null;
+          const s = String(rawEA).toLowerCase().trim().replace(/\s+/g, '_');
           if (s === 'completo') return 'completo' as const;
           if (s === 'parcial') return 'parcial' as const;
           if (s === 'sin_pagos' || s === 'sin-pagos' || s === 'sinpagos') return 'sin_pagos' as const;
@@ -1277,6 +1308,25 @@ cargarPostulantesInscritos(showModal: boolean = true) {
         nro_postulante: row?.nro_postulante ?? null,
         convocatoria_id: row?.convocatoria_id != null ? Number(row.convocatoria_id) : null,
         nom_convocatoria: row?.nom_convocatoria ?? null,
+        defensa: (() => {
+          const id = row?.defensa_id;
+          const fecha = row?.defensa_fecha_defensa;
+          const hi = row?.defensa_hora_inicio;
+          const hf = row?.defensa_hora_fin;
+          const grupo = row?.defensa_grupo;
+          const aula = row?.defensa_aula;
+          const estado = row?.defensa_estado;
+          if (!id && !fecha && !hi && !hf && !grupo && !aula && !estado) return null;
+          return {
+            id: id != null ? Number(id) : null,
+            fecha_defensa: fecha ?? null,
+            hora_inicio: hi ?? null,
+            hora_fin: hf ?? null,
+            grupo: grupo ?? null,
+            aula: aula ?? null,
+            estado: estado ?? null,
+          };
+        })(),
       })).filter((row: PostulanteInscrito) => !!row.cod_ceta);
       this.reconstruirOpcionesFiltrosDesdeFilas();
       this.loadingInscritos = false;
@@ -1878,7 +1928,91 @@ cerrarDocModal() {
   this.docModalTitle = null;
 }
 
-//
+abrirModalDefensa(ins: PostulanteInscrito, modo: 'programar' | 'reprogramar') {
+  this.defensaSeleccionada = ins;
+  this.defensaModo = modo;
+  this.defensaModalTitulo = modo === 'programar' ? 'Programar defensa' : 'Reprogramar defensa';
+  const def: any = (ins as any).defensa || {};
+  this.defensaForm = {
+    fecha_defensa: def.fecha_defensa || '',
+    hora_inicio: def.hora_inicio || '',
+    hora_fin: def.hora_fin || '',
+    grupo: def.grupo || '',
+    aula: def.aula || '',
+    convocatoria_id: def.convocatoria_id != null ? Number(def.convocatoria_id) : (ins.convocatoria_id != null ? Number(ins.convocatoria_id) : null),
+    observaciones: def.observaciones || '',
+  };
+  this.defensaModalVisible = true;
+}
+
+cerrarModalDefensa() {
+  this.defensaModalVisible = false;
+  this.defensaSeleccionada = null;
+  this.defensaModo = 'programar';
+  this.defensaModalTitulo = '';
+  this.defensaForm = {
+    fecha_defensa: '',
+    hora_inicio: '',
+    hora_fin: '',
+    grupo: '',
+    aula: '',
+    convocatoria_id: null,
+    observaciones: '',
+  };
+}
+
+tieneDefensaProgramada(ins: PostulanteInscrito): boolean {
+  if (!ins) return false;
+  const def: any = (ins as any).defensa;
+  if (!def) return false;
+  return !!(
+    def.id != null ||
+    def.fecha_defensa ||
+    def.hora_inicio ||
+    def.hora_fin ||
+    def.grupo ||
+    def.aula
+  );
+}
+
+defensaResumenUI(ins: PostulanteInscrito): string {
+  if (!ins) return '';
+  const def: any = (ins as any).defensa;
+  if (!def) return '';
+  const partes: string[] = [];
+  if (def.fecha_defensa) partes.push(String(def.fecha_defensa));
+  if (def.hora_inicio || def.hora_fin) {
+    const hi = def.hora_inicio ? String(def.hora_inicio) : '';
+    const hf = def.hora_fin ? String(def.hora_fin) : '';
+    const rango = hf ? `${hi} - ${hf}` : hi;
+    if (rango.trim()) partes.push(rango.trim());
+  }
+  if (def.aula) partes.push(`Aula: ${def.aula}`);
+  if (def.grupo) partes.push(`Grupo: ${def.grupo}`);
+  return partes.join(' | ');
+}
+
+puedeProgramarDefensa(ins: PostulanteInscrito): boolean {
+  // Por ahora, la condición mínima es que tenga proyecto registrado
+  return this.tieneProyecto(ins);
+}
+
+guardarDefensa() {
+  if (!this.defensaSeleccionada) {
+    this.cerrarModalDefensa();
+    return;
+  }
+  try {
+    // Integración real de guardado de defensa se puede implementar más adelante.
+    // De momento, solo registramos en consola para no romper el flujo.
+    console.log('guardarDefensa - datos:', {
+      ins: this.defensaSeleccionada,
+      modo: this.defensaModo,
+      form: this.defensaForm,
+    });
+  } catch {}
+  this.cerrarModalDefensa();
+}
 
 ngOnInit() {
   // Si viene /postulantes/:cod_ceta, preparar vista individual

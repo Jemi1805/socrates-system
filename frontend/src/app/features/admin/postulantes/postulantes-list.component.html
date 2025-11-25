@@ -55,6 +55,7 @@
             </div>
           </div>
         </div>
+
         <div *ngIf="!loadingInscritos && postulantesInscritos.length === 0" class="alert alert-info mb-0">
           <i class="bi bi-info-circle me-2"></i>
           No hay postulantes inscritos registrados en la base de datos local.
@@ -69,6 +70,7 @@
                 <th scope="col">Registro de Tema</th>
                 <th scope="col">Designación de Tutor</th>
                 <th scope="col">Estado de seguimiento</th>
+                <th scope="col">Defensa</th>
                 <th scope="col">Documentos</th>
               </tr>
             </thead>
@@ -165,6 +167,39 @@
                     </div>
                   </ng-container>
                   <ng-template #segNoTemaTpl>
+                    <span class="badge rounded-pill bg-warning text-dark">Falta registro de tema</span>
+                  </ng-template>
+                </td>
+                <td class="defensa-cell" data-label="Defensa">
+                  <ng-container *ngIf="tieneProyecto(ins); else defNoTemaTpl">
+                    <div class="d-flex flex-column gap-1">
+                      <div class="small" *ngIf="tieneDefensaProgramada(ins); else sinDefensaTpl">
+                        {{ defensaResumenUI(ins) }}
+                      </div>
+                      <ng-template #sinDefensaTpl>
+                        <span class="badge rounded-pill bg-secondary">Sin defensa programada</span>
+                      </ng-template>
+                      <div class="d-flex gap-2">
+                        <button
+                          type="button"
+                          class="btn btn-outline-primary btn-sm px-2 py-1"
+                          *ngIf="puedeProgramarDefensa(ins) && !tieneDefensaProgramada(ins)"
+                          (click)="abrirModalDefensa(ins, 'programar')">
+                          <i class="bi bi-calendar-plus"></i>
+                          <span class="ms-1">Programar</span>
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-outline-warning btn-sm px-2 py-1"
+                          *ngIf="puedeProgramarDefensa(ins) && tieneDefensaProgramada(ins)"
+                          (click)="abrirModalDefensa(ins, 'reprogramar')">
+                          <i class="bi bi-arrow-repeat"></i>
+                          <span class="ms-1">Reprogramar</span>
+                        </button>
+                      </div>
+                    </div>
+                  </ng-container>
+                  <ng-template #defNoTemaTpl>
                     <span class="badge rounded-pill bg-warning text-dark">Falta registro de tema</span>
                   </ng-template>
                 </td>
@@ -266,6 +301,70 @@
       </div>
     </div>
     
+  </div>
+
+  <!-- Modal para programación de defensa (estilo Bootstrap modal, similar al de usuarios; fuera de la card para evitar clipping) -->
+  <div *ngIf="defensaModalVisible">
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="defensaModalLabel">
+      <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header py-2 d-flex justify-content-between align-items-center">
+            <h5 class="modal-title mb-0" id="defensaModalLabel">
+              <i class="bi bi-calendar-event me-2"></i>
+              {{ defensaModalTitulo }}
+            </h5>
+            <button type="button" class="btn-close" aria-label="Close" (click)="cerrarModalDefensa()"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-12 col-md-4">
+                <label class="form-label">Convocatoria</label>
+                <select class="form-select" [(ngModel)]="defensaForm.convocatoria_id">
+                  <option [ngValue]="null">Seleccione una convocatoria</option>
+                  <option *ngFor="let conv of convocatorias" [ngValue]="conv.id">
+                    {{ conv.numero_convocatoria }} - {{ conv.nombre }}
+                  </option>
+                </select>
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label">Fecha de defensa</label>
+                <input type="date" class="form-control" [(ngModel)]="defensaForm.fecha_defensa" />
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label">Hora inicio</label>
+                <input type="time" class="form-control" [(ngModel)]="defensaForm.hora_inicio" />
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label">Hora fin</label>
+                <input type="time" class="form-control" [(ngModel)]="defensaForm.hora_fin" />
+              </div>
+              <div class="col-12 col-md-3">
+                <label class="form-label">Grupo</label>
+                <input type="text" class="form-control" [(ngModel)]="defensaForm.grupo" placeholder="Ej.: 1" />
+              </div>
+              <div class="col-12 col-md-5">
+                <label class="form-label">Aula</label>
+                <input type="text" class="form-control" [(ngModel)]="defensaForm.aula" placeholder="Ej.: Aula 3" />
+              </div>
+              <div class="col-12">
+                <label class="form-label">Observaciones</label>
+                <textarea class="form-control" rows="2" [(ngModel)]="defensaForm.observaciones" placeholder="Detalle adicional"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cerrarModalDefensa()">
+              Cancelar
+            </button>
+            <button type="button" class="btn btn-success btn-sm" (click)="guardarDefensa()">
+              <i class="bi bi-save me-1"></i>
+              Guardar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade show" (click)="cerrarModalDefensa()"></div>
   </div>
 
   <!-- Resumen debajo del navbar (mismo ancho que las cards internas) -->
@@ -1632,4 +1731,5 @@
     </div>
     <div class="modal-backdrop fade show" (click)="continuarCambios()"></div>
   </div>
-</div>
+
+  </div>
