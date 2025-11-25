@@ -20,6 +20,7 @@ class ConvocatoriaController extends Controller
                 'nombre' => 'required|string|max:30',
                 'fecha_inicio' => 'required|date',
                 'fecha_fin' => 'required|date',
+                'mes_defensa' => 'nullable|date_format:Y-m',
                 'descripcion' => 'nullable|string|max:100',
                 'es_activo' => 'nullable|boolean',
             ];
@@ -31,6 +32,7 @@ class ConvocatoriaController extends Controller
             'nombre' => 'sometimes|string|max:30',
             'fecha_inicio' => 'sometimes|date',
             'fecha_fin' => 'sometimes|date',
+            'mes_defensa' => 'nullable|date_format:Y-m',
             'descripcion' => 'nullable|string|max:100',
             'es_activo' => 'sometimes|boolean',
         ];

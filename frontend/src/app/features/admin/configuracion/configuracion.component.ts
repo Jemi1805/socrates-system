@@ -58,6 +58,8 @@ export class ConfiguracionComponent implements OnInit {
   anioActual = new Date().getFullYear();
   anioFechaMin = `${new Date().getFullYear()}-01-01`;
   anioFechaMax = `${new Date().getFullYear()}-12-31`;
+  anioMesMin = `${new Date().getFullYear()}-01`;
+  anioMesMax = `${new Date().getFullYear()}-12`;
   ultimaFechaInicio: string | null = null;
   siguienteNumeroConvocatoria = 1;
   convFormError: string | null = null;
@@ -265,6 +267,7 @@ export class ConfiguracionComponent implements OnInit {
       nombre: ['', [Validators.required, Validators.maxLength(30)]],
       fecha_inicio: ['', [Validators.required, this.validarFechaEnAnioActual()]],
       fecha_fin: ['', [Validators.required, this.validarFechaEnAnioActual()]],
+      mes_defensa: [''],
       descripcion: ['', [Validators.maxLength(100)]],
       es_activo: [true],
     }, { validators: this.validarRangoFechas() });
@@ -676,6 +679,7 @@ export class ConfiguracionComponent implements OnInit {
         nombre: ['', [Validators.required, Validators.maxLength(30)]],
         fecha_inicio: ['', [Validators.required, this.validarFechaEnAnioActual()]],
         fecha_fin: ['', [Validators.required, this.validarFechaEnAnioActual()]],
+        mes_defensa: [''],
         descripcion: ['', [Validators.maxLength(100)]],
         es_activo: [true],
       }, { validators: this.validarRangoFechas() });
@@ -773,6 +777,7 @@ export class ConfiguracionComponent implements OnInit {
       nombre: this.formatNumeroConvocatoria(numero),
       fecha_inicio: '',
       fecha_fin: '',
+      mes_defensa: '',
       descripcion: '',
       es_activo: true,
     });
@@ -805,6 +810,7 @@ export class ConfiguracionComponent implements OnInit {
       nombre: val.nombre,
       fecha_inicio: val.fecha_inicio,
       fecha_fin: val.fecha_fin,
+      mes_defensa: val.mes_defensa || undefined,
       descripcion: val.descripcion || '',
       es_activo: !!val.es_activo,
     };
@@ -838,6 +844,7 @@ export class ConfiguracionComponent implements OnInit {
       nombre: conv.nombre || '',
       fecha_inicio: inicio,
       fecha_fin: fin,
+      mes_defensa: conv.mes_defensa || '',
       descripcion: conv.descripcion || '',
       es_activo: conv.es_activo,
     });
@@ -864,20 +871,14 @@ export class ConfiguracionComponent implements OnInit {
     }
     const val = this.editConvForm.getRawValue();
     this.convFormError = null;
-    if (this.ultimaFechaInicio) {
-      // Permitir mantener la misma fecha o aumentar, pero no reducir por debajo del mínimo global.
-      const fechaMinima = this.obtenerFechaMinimaPermitidaParaEdicion(this.editingConv.id);
-      if (fechaMinima && val.fecha_inicio && val.fecha_inicio < fechaMinima) {
-        this.convFormError = `La fecha de inicio no puede ser menor a ${fechaMinima}.`;
-        return;
-      }
-    }
+    // Edición: se permite ajustar la fecha de inicio dentro del año en curso.
     const payload: Partial<Convocatoria> = {
       anio: Number(val.anio) || this.editingConv.anio || this.anioActual,
       numero_convocatoria: Number(val.numero_convocatoria) || this.editingConv.numero_convocatoria || 1,
       nombre: val.nombre,
       fecha_inicio: val.fecha_inicio,
       fecha_fin: val.fecha_fin,
+      mes_defensa: val.mes_defensa || undefined,
       descripcion: val.descripcion || '',
       es_activo: !!val.es_activo,
     };

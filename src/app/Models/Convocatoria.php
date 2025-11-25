@@ -21,6 +21,7 @@ class Convocatoria extends Model
         'nombre',
         'fecha_inicio',
         'fecha_fin',
+        'mes_defensa',
         'descripcion',
         'es_activo',
         'creado_por',

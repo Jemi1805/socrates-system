@@ -191,9 +191,10 @@ class TutorController extends Controller
             't.apellido_p as t_ap',
             't.apellido_m as t_am',
             DB::raw('COALESCE(p.carrera, carrera.nombre_carrera) as carrera_nombre'),
-            'c.anio as convocatoria_anio',
-            'c.numero_convocatoria as convocatoria_numero',
-            'c.fecha_fin as convocatoria_fecha_fin',
+            DB::raw('COALESCE(c2.anio, c.anio) as convocatoria_anio'),
+            DB::raw('COALESCE(c2.numero_convocatoria, c.numero_convocatoria) as convocatoria_numero'),
+            DB::raw('COALESCE(c2.fecha_fin, c.fecha_fin) as convocatoria_fecha_fin'),
+            DB::raw('COALESCE(c2.mes_defensa, c.mes_defensa) as convocatoria_mes_defensa'),
         ];
         $celParts = [];
         if (Schema::hasColumn('postulantes', 'celular')) {
@@ -216,6 +217,7 @@ class TutorController extends Controller
             ->leftJoin('carrera', 't.cod_carrera', '=', 'carrera.cod_carrera')
             ->leftJoin('inscrip_modalidad as im', 'im.cod_ceta_est', '=', 'dt.cod_ceta')
             ->leftJoin('convocatorias as c', 'dt.convocatoria_id', '=', 'c.id')
+            ->leftJoin('convocatorias as c2', 'im.convocatoria_id', '=', 'c2.id')
             ->select($select)
             ->where('dt.cod_ceta', is_numeric($codCeta) ? (int)$codCeta : $codCeta)
             ->orderByDesc('dt.id')
@@ -245,9 +247,20 @@ class TutorController extends Controller
 
         $defensaMes = null;
         try {
-            $fechaBase = $row->convocatoria_fecha_fin ?: $row->fecha_designacion;
-            if ($fechaBase) {
-                $defensaMes = \Carbon\Carbon::parse($fechaBase)->locale('es')->isoFormat('MMMM');
+            if (!empty($row->convocatoria_mes_defensa)) {
+                $md = trim((string)$row->convocatoria_mes_defensa);
+                if ($md !== '') {
+                    $carbon = \Carbon\Carbon::createFromFormat('Y-m', $md)->startOfMonth();
+                    $defensaMes = $carbon->locale('es')->isoFormat('MMMM');
+                }
+            }
+            if (!$defensaMes) {
+                $fechaBase = $row->convocatoria_fecha_fin ?: $row->fecha_designacion;
+                if ($fechaBase) {
+                    $defensaMes = \Carbon\Carbon::parse($fechaBase)->locale('es')->isoFormat('MMMM');
+                }
+            }
+            if ($defensaMes) {
                 $defensaMes = mb_strtoupper($defensaMes, 'UTF-8');
             }
         } catch (\Throwable $e) {

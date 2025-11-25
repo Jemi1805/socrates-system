@@ -529,6 +529,13 @@
                 <label class="form-label">Fecha de fin <span class="text-danger">*</span></label>
                 <input type="date" class="form-control" formControlName="fecha_fin" [attr.min]="newConvForm.get('fecha_inicio')?.value ? addOneDay(newConvForm.get('fecha_inicio')?.value) : anioFechaMin" [attr.max]="anioFechaMax" />
               </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Mes de defensa</label>
+                <input type="month" class="form-control" formControlName="mes_defensa"
+                  [attr.min]="(newConvForm.get('anio')?.value || anioActual) + '-01'"
+                  [attr.max]="(newConvForm.get('anio')?.value || anioActual) + '-12'" />
+                <div class="form-text">Ej.: {{ (newConvForm.get('anio')?.value || anioActual) + '-03' }}</div>
+              </div>
               <div class="col-12">
                 <label class="form-label">Descripción</label>
                 <textarea class="form-control" formControlName="descripcion" rows="2" placeholder="Detalle adicional"></textarea>
@@ -593,6 +600,11 @@
               <div class="col-12 col-md-6">
                 <label class="form-label">Fecha de fin <span class="text-danger">*</span></label>
                 <input type="date" class="form-control" formControlName="fecha_fin" [attr.min]="editConvForm.get('fecha_inicio')?.value ? addOneDay(editConvForm.get('fecha_inicio')?.value) : anioFechaMin" [attr.max]="anioFechaMax" />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Mes de defensa</label>
+                <input type="month" class="form-control" formControlName="mes_defensa" [attr.min]="anioMesMin" [attr.max]="anioMesMax" />
+                <div class="form-text">Ej.: 2025-03</div>
               </div>
               <div class="col-12">
                 <label class="form-label">Descripción</label>
