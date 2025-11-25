@@ -172,31 +172,39 @@
                 </td>
                 <td class="defensa-cell" data-label="Defensa">
                   <ng-container *ngIf="tieneProyecto(ins); else defNoTemaTpl">
-                    <div class="d-flex align-items-center gap-2">
-                      <div class="small" *ngIf="tieneDefensaProgramada(ins); else sinDefensaTpl">
-                        {{ defensaResumenUI(ins) }}
+                    <div class="defensa-resumen" *ngIf="tieneDefensaProgramada(ins); else sinDefensaTpl">
+                      <div class="defensa-col defensa-col-fecha">
+                        <i class="bi bi-calendar-event me-1"></i>
+                        <span>{{ defensaFechaUI(ins) }}</span>
                       </div>
-                      <ng-template #sinDefensaTpl>
-                        <span class="badge rounded-pill bg-secondary">Sin defensa</span>
-                      </ng-template>
-                      <div class="d-flex gap-2">
-                        <button
-                          type="button"
-                          class="btn btn-outline-primary btn-sm px-2 py-1"
-                          *ngIf="puedeProgramarDefensa(ins) && !tieneDefensaProgramada(ins)"
-                          (click)="abrirModalDefensa(ins, 'programar')">
-                          <i class="bi bi-calendar-plus"></i>
-                          <span class="ms-1">Programar</span>
-                        </button>
-                        <button
-                          type="button"
-                          class="btn btn-outline-warning btn-sm px-2 py-1"
-                          *ngIf="puedeProgramarDefensa(ins) && tieneDefensaProgramada(ins)"
-                          (click)="abrirModalDefensa(ins, 'reprogramar')">
-                          <i class="bi bi-arrow-repeat"></i>
-                          <span class="ms-1">Reprogramar</span>
-                        </button>
+                      <div class="defensa-col defensa-col-hora">
+                        <i class="bi bi-clock me-1"></i>
+                        <span>{{ defensaHoraUI(ins) }}</span>
                       </div>
+                      <div class="defensa-col defensa-col-detalle">
+                        <span>{{ defensaDetalleUI(ins) }}</span>
+                      </div>
+                    </div>
+                    <ng-template #sinDefensaTpl>
+                      <span class="badge rounded-pill bg-secondary">Sin defensa</span>
+                    </ng-template>
+                    <div class="d-flex gap-2 ms-auto">
+                      <button
+                        type="button"
+                        class="btn btn-outline-primary btn-sm px-2 py-1"
+                        *ngIf="puedeProgramarDefensa(ins) && !tieneDefensaProgramada(ins)"
+                        (click)="abrirModalDefensa(ins, 'programar')">
+                        <i class="bi bi-calendar-plus"></i>
+                        <span class="ms-1">Programar</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-warning btn-sm px-2 py-1"
+                        *ngIf="puedeProgramarDefensa(ins) && tieneDefensaProgramada(ins)"
+                        (click)="abrirModalDefensa(ins, 'reprogramar')">
+                        <i class="bi bi-arrow-repeat"></i>
+                        <span class="ms-1">Reprogramar</span>
+                      </button>
                     </div>
                   </ng-container>
                   <ng-template #defNoTemaTpl>

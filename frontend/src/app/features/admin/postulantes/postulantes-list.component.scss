@@ -135,8 +135,8 @@ $transition: all 0.3s ease;
   // Badge de estado
   .status-badge {
     display: inline-block;
-    padding: 0.15rem 0.5rem;
-    border-radius: 999px;
+    padding: 0.35rem 0.9rem;
+    border-radius: 8px;
     font-size: 0.75rem;
     font-weight: 600;
     line-height: 1.2;
@@ -243,6 +243,34 @@ $transition: all 0.3s ease;
   > .d-flex { flex-wrap: nowrap; }
   .flex-grow-1 { min-width: 0; }
   .btn-eye { margin-left: auto; }
+}
+
+// Celda de defensa: chip compacto con icono
+.defensa-cell {
+  max-width: 380px;
+  .defensa-resumen {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .15rem;
+
+    .defensa-col {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+    }
+
+    .defensa-col-detalle {
+      color: $text-light;
+      font-size: .8rem;
+    }
+
+    i {
+      font-size: .9rem;
+      color: $primary-color;
+      flex-shrink: 0;
+    }
+  }
 }
 
 // Modal simple de detalle (overlay ligero)

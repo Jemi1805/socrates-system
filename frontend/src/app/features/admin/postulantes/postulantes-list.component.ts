@@ -1996,17 +1996,63 @@ defensaResumenUI(ins: PostulanteInscrito): string {
   if (!ins) return '';
   const def: any = (ins as any).defensa;
   if (!def) return '';
+
   const partes: string[] = [];
-  if (def.fecha_defensa) partes.push(String(def.fecha_defensa));
-  if (def.hora_inicio || def.hora_fin) {
-    const hi = def.hora_inicio ? String(def.hora_inicio) : '';
-    const hf = def.hora_fin ? String(def.hora_fin) : '';
-    const rango = hf ? `${hi} - ${hf}` : hi;
-    if (rango.trim()) partes.push(rango.trim());
-  }
+
+  const fechaLabel = this.defensaFechaUI(ins);
+  if (fechaLabel) partes.push(fechaLabel);
+
+  const horaLabel = this.defensaHoraUI(ins);
+  if (horaLabel) partes.push(horaLabel);
+
+  const detalleLabel = this.defensaDetalleUI(ins);
+  if (detalleLabel) partes.push(detalleLabel);
+
+  return partes.join(' · ');
+}
+
+defensaFechaUI(ins: PostulanteInscrito): string {
+  if (!ins) return '';
+  const def: any = (ins as any).defensa;
+  if (!def || !def.fecha_defensa) return '';
+  const raw = String(def.fecha_defensa).trim();
+  let fechaLabel = raw;
+  try {
+    const soloFecha = raw.split('T')[0];
+    const [y, m, d] = soloFecha.split('-');
+    if (y && m && d) {
+      fechaLabel = `${d}/${m}/${y}`;
+    }
+  } catch {}
+  return fechaLabel;
+}
+
+defensaDetalleUI(ins: PostulanteInscrito): string {
+  if (!ins) return '';
+  const def: any = (ins as any).defensa;
+  if (!def) return '';
+
+  const partes: string[] = [];
+
   if (def.aula) partes.push(`Aula: ${def.aula}`);
   if (def.grupo) partes.push(`Grupo: ${def.grupo}`);
-  return partes.join(' | ');
+
+  return partes.join(' · ');
+}
+
+defensaHoraUI(ins: PostulanteInscrito): string {
+  if (!ins) return '';
+  const def: any = (ins as any).defensa;
+  if (!def) return '';
+
+  if (def.hora_inicio || def.hora_fin) {
+    const hi = def.hora_inicio ? String(def.hora_inicio).slice(0, 5) : '';
+    const hf = def.hora_fin ? String(def.hora_fin).slice(0, 5) : '';
+    const rango = hf ? `${hi} - ${hf}` : hi;
+    return rango.trim();
+  }
+
+  return '';
 }
 
 puedeProgramarDefensa(ins: PostulanteInscrito): boolean {
