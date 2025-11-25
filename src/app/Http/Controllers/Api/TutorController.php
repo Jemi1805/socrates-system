@@ -291,7 +291,12 @@ class TutorController extends Controller
 
         // Intentar generar desde plantilla si existe
         $nroPostulante = isset($row->nro_postulante) ? $row->nro_postulante : null;
-        $apellidosDoc = trim(implode(' ', array_filter([$row->ap_pat ?? '', $row->ap_mat ?? '', $row->apellidos_est ?? ''])));
+        $apellidosDoc = '';
+        if (isset($row->ap_pat) || isset($row->ap_mat)) {
+            $apellidosDoc = trim(implode(' ', array_filter([$row->ap_pat ?? '', $row->ap_mat ?? ''])));
+        } elseif (isset($row->apellidos_est)) {
+            $apellidosDoc = trim((string)$row->apellidos_est);
+        }
         $templatePath = resource_path('templates/planilla_seguimiento.docx');
         if (is_string($templatePath) && file_exists($templatePath)) {
             try {
@@ -375,7 +380,12 @@ class TutorController extends Controller
         $header->addCell($wVal)->addText((string)($nroPostulante ?? ''));
 
         // Fila 2: APELLIDOS | ÁREA DE INVESTIGACIÓN | GESTIÓN
-        $apellidos = trim(implode(' ', array_filter([$row->ap_pat ?? '', $row->ap_mat ?? '', $row->apellidos_est ?? ''])));
+        $apellidos = '';
+        if (isset($row->ap_pat) || isset($row->ap_mat)) {
+            $apellidos = trim(implode(' ', array_filter([$row->ap_pat ?? '', $row->ap_mat ?? ''])));
+        } elseif (isset($row->apellidos_est)) {
+            $apellidos = trim((string)$row->apellidos_est);
+        }
         $header->addRow();
         $header->addCell($wLabel)->addText('APELLIDOS:', $labelStyle);
         $header->addCell($wVal)->addText($apellidos);
