@@ -319,7 +319,7 @@
             <div class="row g-3">
               <div class="col-12 col-md-4">
                 <label class="form-label">Convocatoria</label>
-                <select class="form-select" [(ngModel)]="defensaForm.convocatoria_id">
+                <select class="form-select" [(ngModel)]="defensaForm.convocatoria_id" (ngModelChange)="onDefensaConvChange($event)">
                   <option [ngValue]="null">Seleccione una convocatoria</option>
                   <option *ngFor="let conv of convocatorias" [ngValue]="conv.id">
                     {{ conv.numero_convocatoria }} - {{ conv.nombre }}
@@ -328,7 +328,17 @@
               </div>
               <div class="col-12 col-md-4">
                 <label class="form-label">Fecha de defensa</label>
-                <input type="date" class="form-control" [(ngModel)]="defensaForm.fecha_defensa" />
+                <input
+                  type="date"
+                  class="form-control"
+                  [(ngModel)]="defensaForm.fecha_defensa"
+                  [attr.min]="defensaFechaMin || null"
+                  [attr.max]="defensaFechaMax || null"
+                  [ngClass]="{ 'is-invalid': defensaFechaError }"
+                />
+                <div *ngIf="defensaFechaError" class="invalid-feedback d-block">
+                  {{ defensaFechaError }}
+                </div>
               </div>
               <div class="col-6 col-md-2">
                 <label class="form-label">Hora inicio</label>
@@ -336,7 +346,16 @@
               </div>
               <div class="col-6 col-md-2">
                 <label class="form-label">Hora fin</label>
-                <input type="time" class="form-control" [(ngModel)]="defensaForm.hora_fin" />
+                <input
+                  type="time"
+                  class="form-control"
+                  [(ngModel)]="defensaForm.hora_fin"
+                  [attr.min]="defensaForm.hora_inicio || null"
+                  (ngModelChange)="onDefensaHoraFinChange($event)"
+                />
+                <div *ngIf="defensaHoraError" class="invalid-feedback d-block">
+                  {{ defensaHoraError }}
+                </div>
               </div>
               <div class="col-12 col-md-3">
                 <label class="form-label">Grupo</label>

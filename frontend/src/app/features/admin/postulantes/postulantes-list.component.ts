@@ -142,6 +142,10 @@ export class PostulantesListComponent implements OnInit {
   defensaModalTitulo: string = '';
   defensaModo: 'programar' | 'reprogramar' = 'programar';
   defensaSeleccionada: PostulanteInscrito | null = null;
+  defensaFechaMin: string | null = null;
+  defensaFechaMax: string | null = null;
+  defensaFechaError: string | null = null;
+  defensaHoraError: string | null = null;
   defensaForm: {
     fecha_defensa: string;
     hora_inicio: string;
@@ -1933,13 +1937,22 @@ abrirModalDefensa(ins: PostulanteInscrito, modo: 'programar' | 'reprogramar') {
   this.defensaModo = modo;
   this.defensaModalTitulo = modo === 'programar' ? 'Programar defensa' : 'Reprogramar defensa';
   const def: any = (ins as any).defensa || {};
+  const convId = def.convocatoria_id != null
+    ? Number(def.convocatoria_id)
+    : (ins.convocatoria_id != null ? Number(ins.convocatoria_id) : null);
+  const conv = convId != null
+    ? (this.convocatorias || []).find(c => Number((c as any).id) === Number(convId)) || null
+    : null;
+  const rango = this.calcularRangoMesDefensa(conv as any);
+  this.defensaFechaMin = rango.min;
+  this.defensaFechaMax = rango.max;
   this.defensaForm = {
     fecha_defensa: def.fecha_defensa || '',
     hora_inicio: def.hora_inicio || '',
     hora_fin: def.hora_fin || '',
     grupo: def.grupo || '',
     aula: def.aula || '',
-    convocatoria_id: def.convocatoria_id != null ? Number(def.convocatoria_id) : (ins.convocatoria_id != null ? Number(ins.convocatoria_id) : null),
+    convocatoria_id: convId,
     observaciones: def.observaciones || '',
   };
   this.defensaModalVisible = true;
@@ -1950,6 +1963,10 @@ cerrarModalDefensa() {
   this.defensaSeleccionada = null;
   this.defensaModo = 'programar';
   this.defensaModalTitulo = '';
+  this.defensaFechaMin = null;
+  this.defensaFechaMax = null;
+  this.defensaFechaError = null;
+  this.defensaHoraError = null;
   this.defensaForm = {
     fecha_defensa: '',
     hora_inicio: '',
@@ -1997,21 +2014,96 @@ puedeProgramarDefensa(ins: PostulanteInscrito): boolean {
   return this.tieneProyecto(ins);
 }
 
+onDefensaConvChange(id: number | string | null) {
+  const convId = id != null ? Number(id) : null;
+  this.defensaForm.convocatoria_id = convId;
+  const conv = convId != null
+    ? (this.convocatorias || []).find(c => Number((c as any).id) === Number(convId)) || null
+    : null;
+  const rango = this.calcularRangoMesDefensa(conv as any);
+  this.defensaFechaMin = rango.min;
+  this.defensaFechaMax = rango.max;
+}
+
+onDefensaHoraFinChange(valor: string | null) {
+  const hi = (this.defensaForm.hora_inicio || '').trim();
+  const hf = (valor || '').trim();
+  this.defensaForm.hora_fin = hf;
+  this.defensaHoraError = null;
+  if (!hi || !hf) return;
+  const toMinutes = (h: string) => {
+    const [HH, MM] = h.split(':');
+    const hh = parseInt(HH || '0', 10);
+    const mm = parseInt(MM || '0', 10);
+    return hh * 60 + mm;
+  };
+  if (toMinutes(hf) <= toMinutes(hi)) {
+    // Si intenta poner una hora anterior o igual, marcamos error y vaciamos hora_fin para forzar a elegir un valor válido
+    this.defensaHoraError = 'La hora de fin debe ser mayor que la hora de inicio.';
+    this.defensaForm.hora_fin = '';
+  }
+}
+
 guardarDefensa() {
   if (!this.defensaSeleccionada) {
     this.cerrarModalDefensa();
     return;
   }
+  // limpiar errores previos
+  this.defensaFechaError = null;
+  this.defensaHoraError = null;
+  const fecha = (this.defensaForm.fecha_defensa || '').trim();
+  if (fecha && (this.defensaFechaMin || this.defensaFechaMax)) {
+    if (this.defensaFechaMin && fecha < this.defensaFechaMin) {
+      this.defensaFechaError = 'La fecha de defensa debe estar dentro del mes de defensa definido en la convocatoria.';
+      return;
+    }
+    if (this.defensaFechaMax && fecha > this.defensaFechaMax) {
+      this.defensaFechaError = 'La fecha de defensa debe estar dentro del mes de defensa definido en la convocatoria.';
+      return;
+    }
+  }
+  const hi = (this.defensaForm.hora_inicio || '').trim();
+  const hf = (this.defensaForm.hora_fin || '').trim();
+  if (hi && hf) {
+    const toMinutes = (h: string) => {
+      const [HH, MM] = h.split(':');
+      const hh = parseInt(HH || '0', 10);
+      const mm = parseInt(MM || '0', 10);
+      return hh * 60 + mm;
+    };
+    if (toMinutes(hf) <= toMinutes(hi)) {
+      this.defensaHoraError = 'La hora de fin debe ser mayor que la hora de inicio.';
+      return;
+    }
+  }
   try {
-    // Integración real de guardado de defensa se puede implementar más adelante.
-    // De momento, solo registramos en consola para no romper el flujo.
     console.log('guardarDefensa - datos:', {
       ins: this.defensaSeleccionada,
       modo: this.defensaModo,
       form: this.defensaForm,
+      fechaMin: this.defensaFechaMin,
+      fechaMax: this.defensaFechaMax,
     });
   } catch {}
   this.cerrarModalDefensa();
+}
+
+private calcularRangoMesDefensa(conv: { mes_defensa?: string | null } | null): { min: string | null; max: string | null } {
+  const mes = conv && conv.mes_defensa ? String(conv.mes_defensa).trim() : '';
+  if (!mes || !/^\d{4}-\d{2}$/.test(mes)) {
+    return { min: null, max: null };
+  }
+  const [anioStr, mesStr] = mes.split('-');
+  const anio = parseInt(anioStr, 10);
+  const mesNum = parseInt(mesStr, 10);
+  if (!anio || !mesNum || mesNum < 1 || mesNum > 12) {
+    return { min: null, max: null };
+  }
+  const firstDay = `${anioStr}-${mesStr}-01`;
+  const lastDate = new Date(anio, mesNum, 0).getDate();
+  const lastDay = `${anioStr}-${mesStr}-${String(lastDate).padStart(2, '0')}`;
+  return { min: firstDay, max: lastDay };
 }
 
 ngOnInit() {
