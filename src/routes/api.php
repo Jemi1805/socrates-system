@@ -94,6 +94,9 @@ Route::middleware('auth:sanctum')->group(function () {
         ->except(['store'])
         ->where(['proyecto' => '\\d+']) // evita colisión con 'by_cod'
         ->middleware('permission:temas.actualizar');
+    Route::post('proyecto/{id}/seguimiento_pdf', [ProyectoController::class, 'uploadSeguimientoPdf'])
+        ->where(['id' => '\\d+'])
+        ->middleware('permission:temas.actualizar');
     Route::apiResource('inscrip_modalidad', InscripModalidadController::class)
         ->middleware('permission:inscrip_modalidad.actualizar');
     Route::post('inscrip_modalidad/upsert_by_cod', [InscripModalidadController::class, 'upsertByCod'])

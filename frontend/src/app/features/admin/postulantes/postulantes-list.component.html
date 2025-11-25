@@ -68,6 +68,7 @@
                 <th scope="col" class="pagos-col">Estado de Arancel</th>
                 <th scope="col">Registro de Tema</th>
                 <th scope="col">Designación de Tutor</th>
+                <th scope="col">Estado de seguimiento</th>
                 <th scope="col">Documentos</th>
               </tr>
             </thead>
@@ -143,6 +144,29 @@
                       </button>
                     </ng-container>
                   </div>
+                </td>
+                <td class="seguimiento-cell" data-label="Estado de seguimiento">
+                  <ng-container *ngIf="tieneProyecto(ins); else segNoTemaTpl">
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="badge" [ngClass]="{
+                        'bg-secondary': seguimientoEstadoUI(ins) === 'En proceso',
+                        'bg-success': seguimientoEstadoUI(ins) === 'Aprobado',
+                        'bg-danger': seguimientoEstadoUI(ins) === 'Reprobado',
+                        'bg-warning text-dark': seguimientoEstadoUI(ins) === 'Reprogramado',
+                        'bg-dark': seguimientoEstadoUI(ins) === 'Abandono'
+                      }">{{ seguimientoEstadoUI(ins) }}</span>
+                      <button *ngIf="isSeguimientoEnProceso(ins)" type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irSeguimiento(ins)">
+                        <i class="bi bi-journal-plus"></i>
+                        <span class="ms-1">Registrar</span>
+                      </button>
+                      <button *ngIf="!isSeguimientoEnProceso(ins)" type="button" class="btn btn-outline-secondary btn-sm px-2 py-1" (click)="irSeguimiento(ins)" title="Editar seguimiento">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                    </div>
+                  </ng-container>
+                  <ng-template #segNoTemaTpl>
+                    <span class="badge rounded-pill bg-warning text-dark">Falta registro de tema</span>
+                  </ng-template>
                 </td>
                 <td class="docs-cell" data-label="Documentos">
                   <ng-container *ngIf="ins?.proyecto?.nombre || ins?.designacion?.numero_documento; else noDocsTpl">

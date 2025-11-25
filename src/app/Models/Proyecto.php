@@ -26,6 +26,8 @@ class Proyecto extends Model
         'estado',
         'porcentaje_avance',
         'inscrip_modalidad_id',
+        'seguimiento_estado',
+        'seguimiento_pdf',
     ];
 
     protected $casts = [
@@ -50,6 +52,7 @@ class Proyecto extends Model
      */
     public function getModalidadIdAttribute()
     {
-        return $this->inscripModalidad->modalidad_id ?? null;
+        $rel = $this->inscripModalidad;
+        return ($rel && isset($rel->modalidad_id)) ? $rel->modalidad_id : null;
     }
 }

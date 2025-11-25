@@ -1,0 +1,102 @@
+<div class="seguimiento-container">
+  <app-header
+    pageTitle="Seguimiento de proyecto"
+    [breadcrumbItems]="[
+      { label: 'Postulantes inscritos', route: '/postulantes' },
+      { label: 'Seguimiento' }
+    ]">
+  </app-header>
+
+  <div class="content-wrapper">
+    <div class="mb-2">
+      <button class="btn btn-success btn-sm" (click)="volver()">
+        <i class="bi bi-arrow-left me-1"></i>
+        Volver a la lista
+      </button>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-12 col-xl-4">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-person-vcard me-2"></i> Postulante</div>
+          <div class="card-body">
+            <ng-container *ngIf="postulante as p; else noPostTpl">
+              <div><span class="text-muted">CETA:</span> <strong>{{ p?.cod_ceta || '-' }}</strong></div>
+              <div><span class="text-muted">Nombre:</span> <strong>{{ (p?.ap_pat || '') + ' ' + (p?.ap_mat || '') + ' ' + (p?.nombres_est || '') }}</strong></div>
+              <div><span class="text-muted">CI:</span> {{ p?.ci || '-' }} <span *ngIf="p?.procedencia">- {{ p?.procedencia }}</span></div>
+              <div><span class="text-muted">Carrera:</span> {{ p?.carrera || '-' }}</div>
+              <div><span class="text-muted">Pensum:</span> {{ p?.pensum || '-' }}</div>
+            </ng-container>
+            <ng-template #noPostTpl>
+              <div class="text-muted">Cargando datos del postulante…</div>
+            </ng-template>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-xl-4">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-journal-text me-2"></i> Proyecto</div>
+          <div class="card-body">
+            <ng-container *ngIf="proyecto as pr; else noPryTpl">
+              <div><span class="text-muted">Tema:</span> <strong>{{ pr?.nombre || '-' }}</strong></div>
+              <div *ngIf="pr?.objetivo"><span class="text-muted">Objetivo:</span> {{ pr?.objetivo }}</div>
+              <div><span class="text-muted">Modalidad:</span> {{ pr?.tipo || '-' }}</div>
+              <div><span class="text-muted">Estado seguimiento:</span> {{ pr?.seguimiento_estado || 'En proceso' }}</div>
+              <div *ngIf="pr?.seguimiento_pdf" class="mt-1">
+                <a [href]="('/storage/' + pr.seguimiento_pdf)" target="_blank" class="link-primary">Ver PDF cargado</a>
+              </div>
+            </ng-container>
+            <ng-template #noPryTpl>
+              <div class="text-muted">Cargando proyecto…</div>
+            </ng-template>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-xl-4">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-person-lines-fill me-2"></i> Tutor designado</div>
+          <div class="card-body">
+            <ng-container *ngIf="tutor as t; else noTutorTpl">
+              <div><span class="text-muted">Tutor:</span> <strong>{{ t?.tutor_nombre || '-' }}</strong></div>
+              <div *ngIf="t?.tutor_titulo_academico"><span class="text-muted">Título:</span> {{ t?.tutor_titulo_academico }}</div>
+              <div *ngIf="t?.area"><span class="text-muted">Área:</span> {{ t?.area }}</div>
+              <div *ngIf="t?.tutor_celular"><span class="text-muted">Celular:</span> {{ t?.tutor_celular }}</div>
+            </ng-container>
+            <ng-template #noTutorTpl>
+              <div class="text-muted">Sin designación o cargando…</div>
+            </ng-template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header"><i class="bi bi-clipboard-check me-2"></i> Registrar seguimiento</div>
+      <div class="card-body">
+        <div *ngIf="error" class="alert alert-danger py-1">{{ error }}</div>
+        <div *ngIf="success" class="alert alert-success py-1">{{ success }}</div>
+
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label">Estado del proyecto</label>
+            <select class="form-select" [(ngModel)]="estadoSeleccionado">
+              <option [ngValue]="null">En proceso</option>
+              <option *ngFor="let e of estados" [ngValue]="e">{{ e }}</option>
+            </select>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Documento PDF (opcional)</label>
+            <input type="file" class="form-control" accept="application/pdf" (change)="onFileChange($event)" />
+            <div class="form-text">Adjunte un PDF de seguimiento si corresponde.</div>
+          </div>
+          <div class="col-md-3 text-end">
+            <button class="btn btn-primary" (click)="guardar()" [disabled]="saving || !proyecto">
+              <i class="bi bi-save me-1"></i>
+              {{ saving ? 'Guardando…' : 'Guardar' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

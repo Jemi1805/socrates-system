@@ -6,6 +6,7 @@ import { TutoresHomeComponent } from './features/admin/tutores/tutores-home.comp
 
 import { DesignarTutorComponent } from './features/admin/tutores/designar-tutor.component';
 import { RegistroTemaComponent } from './features/admin/proyectos/registro-tema.component';
+import { SeguimientoProyectoComponent } from './features/admin/proyectos/seguimiento-proyecto.component';
 import { ConfiguracionComponent } from './features/admin/configuracion/configuracion.component';
 import { authGuard } from './core/guards/auth.guard';
 
@@ -21,6 +22,7 @@ export const routes: Routes = [
   { path: 'postulantes/:cod_ceta', component: PostulantesListComponent, canActivate: [authGuard] },
   { path: 'postulantes', component: PostulantesListComponent, canActivate: [authGuard] },
   { path: 'registro-tema', component: RegistroTemaComponent, canActivate: [authGuard] },
+  { path: 'seguimiento', component: SeguimientoProyectoComponent, canActivate: [authGuard] },
   { path: 'tutores', component: TutoresHomeComponent, canActivate: [authGuard] },
   { path: 'tutores/designar', component: DesignarTutorComponent, canActivate: [authGuard] },
   { path: 'configuracion', component: ConfiguracionComponent, canActivate: [authGuard] },

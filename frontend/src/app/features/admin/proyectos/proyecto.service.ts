@@ -39,4 +39,15 @@ export class ProyectoService {
   updateProyecto(id: number | string, payload: Partial<ProyectoPayload>): Observable<any> {
     return this.http.put<any>(`${this.apiUrl}/${id}`, payload);
   }
+
+  getProyectoById(id: number | string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/${id}`);
+  }
+
+  uploadSeguimientoPdf(id: number | string, opts: { pdf?: File; estado?: string }): Observable<any> {
+    const form = new FormData();
+    if (opts?.pdf) form.append('pdf', opts.pdf);
+    if (opts?.estado) form.append('estado', opts.estado);
+    return this.http.post<any>(`${this.apiUrl}/${id}/seguimiento_pdf`, form);
+  }
 }

@@ -1,0 +1,31 @@
+@use "sass:color";
+
+// Variables
+$primary-color: #4C9DBD;
+$secondary-color: #FF9800;
+$success-color: #4CAF50;
+$danger-color: #F44336;
+$info-color: #17a2b8;
+$light-gray: #f5f5f5;
+$border-color: #e0e0e0;
+$text-dark-blue: #052544;
+$text-light: #666;
+$shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+$border-radius: 12px;
+$transition: all 0.3s ease;
+
+// Estilos generales
+
+.seguimiento-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #052544 0%, #4C9DBD 100%);
+  padding: 0;
+}
+
+.content-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.card-header { font-weight: 600; }

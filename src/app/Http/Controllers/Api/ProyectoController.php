@@ -7,6 +7,7 @@ use App\Models\InscripModalidad;
 use App\Models\Modalidad;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class ProyectoController extends CrudController
 {
@@ -31,6 +32,7 @@ class ProyectoController extends CrudController
             'inscrip_modalidad_id' => 'nullable|exists:inscrip_modalidad,id',
             // Permitimos modalidad_id en el payload para poder actualizar la inscripción ligada
             'modalidad_id' => 'nullable|exists:modalidad,id',
+            'seguimiento_estado' => 'nullable|string|max:30',
         ];
     }
 
@@ -221,5 +223,23 @@ class ProyectoController extends CrudController
             return isset($row['id']) ? $row['id'] : null;
         }
         return null;
+    }
+
+    public function uploadSeguimientoPdf(Request $request, $id)
+    {
+        $model = Proyecto::findOrFail($id);
+        if ($request->hasFile('pdf')) {
+            $file = $request->file('pdf');
+            $path = $file->store('seguimientos', 'public');
+            $model->seguimiento_pdf = $path;
+        }
+        if ($request->filled('estado')) {
+            $estado = trim((string)$request->input('estado'));
+            if ($estado !== '') {
+                $model->seguimiento_estado = $estado;
+            }
+        }
+        $model->save();
+        return response()->json($model);
     }
 }

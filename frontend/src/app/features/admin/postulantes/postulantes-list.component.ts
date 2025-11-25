@@ -74,7 +74,7 @@ interface PostulanteInscrito {
   pensum?: string | null;
   modo?: string | null;
   carrera?: string | null;
-  proyecto?: { nombre?: string | null; objetivo?: string | null } | null;
+  proyecto?: { id?: number | null; nombre?: string | null; objetivo?: string | null; seguimiento_estado?: string | null; seguimiento_pdf?: string | null } | null;
   designacion?: {
     tutor_nombre?: string | null;
     area?: string | null;
@@ -1365,6 +1365,7 @@ cargarDetallesTabla() {
       next: (res) => {
         const p = this.pickProyectoFromResponse(res, String(cod));
         if (p) {
+          const id = (p as any).id ?? (p as any).proyecto_id ?? null;
           const nombre = (p as any).nombre
             ?? (p as any).tema
             ?? (p as any).nombre_tema
@@ -1381,8 +1382,16 @@ cargarDetallesTabla() {
             ?? (p as any).descripcion
             ?? (p as any).resumen
             ?? null;
+          const segEstado = (p as any).seguimiento_estado ?? null;
+          const segPdf = (p as any).seguimiento_pdf ?? null;
           (ins as any).proyecto_existe = true;
-          ins.proyecto = { nombre: nombre ? String(nombre) : null, objetivo: objetivo ? String(objetivo) : null };
+          ins.proyecto = {
+            id: (id !== undefined && id !== null) ? Number(id) : null,
+            nombre: nombre ? String(nombre) : null,
+            objetivo: objetivo ? String(objetivo) : null,
+            seguimiento_estado: segEstado ? String(segEstado) : null,
+            seguimiento_pdf: segPdf ? String(segPdf) : null,
+          };
         } else {
           ins.proyecto = null;
         }
@@ -1638,6 +1647,41 @@ tieneDesignacion(ins: PostulanteInscrito): boolean {
   const d: any = ins?.designacion || null;
   if (!d) return false;
   return !!(d.tutor_nombre || d.numero_documento || d.cite || d.area);
+}
+
+// --- Seguimiento de proyecto ---
+seguimientoEstadoUI(ins: PostulanteInscrito): string {
+  const raw: any = (ins as any)?.proyecto?.seguimiento_estado;
+  if (raw === undefined || raw === null || String(raw).trim() === '') return 'En proceso';
+  const s = String(raw).toLowerCase();
+  if (s === 'aprobado') return 'Aprobado';
+  if (s === 'reprobado') return 'Reprobado';
+  if (s === 'reprogramado') return 'Reprogramado';
+  if (s === 'abandono') return 'Abandono';
+  return 'En proceso';
+}
+
+isSeguimientoEnProceso(ins: PostulanteInscrito): boolean {
+  return this.seguimientoEstadoUI(ins) === 'En proceso';
+}
+
+irSeguimiento(ins: PostulanteInscrito) {
+  const cod = ins?.cod_ceta;
+  if (!cod) return;
+  try {
+    const estudiante = this.mapInscritoToEstudiante(ins);
+    const raw = sessionStorage.getItem('datos_postulacion');
+    const parsed = raw ? JSON.parse(raw) : {};
+    parsed.estudiante = { ...(parsed.estudiante || {}), ...estudiante };
+    sessionStorage.setItem('datos_postulacion', JSON.stringify(parsed));
+    if ((ins as any)?.proyecto) {
+      sessionStorage.setItem('proyecto_cache', JSON.stringify((ins as any).proyecto));
+    }
+  } catch {}
+  const pid = (ins as any)?.proyecto?.id;
+  const params: any = { cod_ceta: String(cod) };
+  if (pid !== undefined && pid !== null) params.proyecto_id = String(pid);
+  this.router.navigate(['/seguimiento'], { queryParams: params });
 }
 
 verDesignacionDesdeFila(ins: PostulanteInscrito) {
