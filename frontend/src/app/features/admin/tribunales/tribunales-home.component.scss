@@ -48,3 +48,48 @@ $transition: all 0.3s ease;
     }
   }
 }
+
+// Modal: estilos consistentes (header celeste, bordes redondeados)
+.modal .modal-header {
+  background: $primary-color;
+  color: white;
+  .modal-title {
+    font-weight: 600;
+  }
+  .btn-close {
+    filter: invert(1) grayscale(100%);
+    opacity: 1;
+    &:hover {
+      opacity: 0.85;
+    }
+  }
+}
+
+.modal .modal-content {
+  border-radius: $border-radius;
+  box-shadow: $shadow;
+}
+
+// Botón outline secundario (iconos mantienen color)
+.btn-outline-secondary {
+  .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+    color: $primary-color !important;
+  }
+  &:hover {
+    .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+      color: white !important;
+    }
+  }
+}
+
+// Alertas informativas al estilo Modalidad de Graduación
+.alert-info {
+  background: rgba(23, 162, 184, 0.1);
+  color: #0c5460;
+  border-left: 4px solid #17a2b8;
+  border-radius: 8px;
+  border: none;
+  .bi:before, [class^=bi-]:before, [class*=" bi-"]:before {
+    color: $info-color !important;
+  }
+}

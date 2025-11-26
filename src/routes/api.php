@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\TutorController;
 use App\Http\Controllers\Api\PertinenciaController;
 use App\Http\Controllers\Api\ConvocatoriaController;
 use App\Http\Controllers\Api\DefensaController;
+use App\Http\Controllers\Api\TribunalController;
 
 // 🔐 RUTAS DE AUTENTICACIÓN (Sin middleware)
 Route::prefix('auth')->group(function () {
@@ -188,6 +189,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('tutores/designar', [TutorController::class, 'designar'])
         ->middleware('permission:tutores.designar');
     
+    // Tribunales externos (listado y registro básico)
+    Route::get('tribunales', [TribunalController::class, 'index'])
+        ->middleware('permission:tutores.leer');
+    Route::post('tribunales', [TribunalController::class, 'store'])
+        ->middleware('permission:tutores.crear');
+    Route::patch('tribunales/{id}/toggle', [TribunalController::class, 'toggle'])
+        ->where(['id' => '\\d+'])
+        ->middleware('permission:tutores.activar_desactivar');
 
     // Defensas (programación de defensa de proyecto)
     Route::post('defensas', [DefensaController::class, 'store'])

@@ -623,7 +623,6 @@ class TutorController extends Controller
                 $query->where('carrera.nombre_carrera', 'like', "%$carrera%");
             }
         }
-
         $rows = $query->orderBy('tutores.nombre')->get();
 
         $data = $rows->map(function ($t) {
@@ -645,6 +644,7 @@ class TutorController extends Controller
                 'pertinencia_ids' => $pertIds,
                 'pertinencias' => $pertNoms,
                 'activo' => (bool)$t->activo,
+                'es_tribunal' => (bool)($t->es_tribunal ?? false),
                 'tipo_tutor_id' => $t->tipo_tutor_id,
                 'tipo_tutor' => optional(TipoTutor::find($t->tipo_tutor_id))->nombre,
             ];

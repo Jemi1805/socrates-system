@@ -141,6 +141,7 @@ export interface TutorReg {
   pertinencia_ids?: number[];
   pertinencias?: string[];
   activo?: boolean;
+  es_tribunal?: boolean;
   tipo_tutor_id?: number | null;
   tipo_tutor?: string;
 }
@@ -473,9 +474,41 @@ export class SgaService {
   }
 
   // --- TUTORES: generar documento de designación on-demand ---
-  generarDocDesignacion(payload: { tutor_id: number; cod_ceta: number; seleccionados_cod_ceta?: number[] }): Observable<ApiResponse<{ designacion_id: number; numero_documento?: string; cite?: string }>> {
+  generateDocDesignacion(payload: { tutor_id: number; cod_ceta: number; seleccionados_cod_ceta?: number[] }): Observable<ApiResponse<{ designacion_id: number; numero_documento?: string; cite?: string }>> {
     return this.http
       .post<ApiResponse<{ designacion_id: number; numero_documento?: string; cite?: string }>>(`${environment.apiUrl}/tutores/generar-doc-designacion`, payload)
+      .pipe(catchError(this.handleError));
+  }
+
+  // Alias para compatibilidad con componentes antiguos (uso de nombre en español)
+  generarDocDesignacion(payload: { tutor_id: number; cod_ceta: number; seleccionados_cod_ceta?: number[] }) {
+    return this.generateDocDesignacion(payload);
+  }
+
+  // --- TRIBUNALES EXTERNOS ---
+  createTribunalExterno(data: {
+    nombre: string;
+    apellido_p: string;
+    apellido_m?: string;
+    ci: string;
+    celular: string;
+    profesion: string;
+    titulo_academico: string;
+  }): Observable<ApiResponse<any>> {
+    return this.http
+      .post<ApiResponse<any>>(`${environment.apiUrl}/tribunales`, data)
+      .pipe(catchError(this.handleError));
+  }
+
+  getTribunalesExternos(): Observable<ApiResponse<any[]>> {
+    return this.http
+      .get<ApiResponse<any[]>>(`${environment.apiUrl}/tribunales`)
+      .pipe(catchError(this.handleError));
+  }
+
+  toggleTribunal(id: number, activo: boolean): Observable<ApiResponse<{ id: number; activo: boolean }>> {
+    return this.http
+      .patch<ApiResponse<{ id: number; activo: boolean }>>(`${environment.apiUrl}/tribunales/${id}/toggle`, { activo })
       .pipe(catchError(this.handleError));
   }
 
