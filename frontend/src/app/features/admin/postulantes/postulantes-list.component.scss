@@ -47,7 +47,15 @@ $transition: all 0.3s ease;
 .postulantes-container .table-card .card-body .table-responsive {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  // Scroll horizontal siempre que la tabla sea más ancha que el contenedor
+  overflow-x: auto;
+  // Mantener visible el desborde vertical (dropdowns, tooltips, etc.)
+  overflow-y: visible;
+
+  // Asegurar que la tabla pueda crecer lo suficiente para no verse apretada
+  .table {
+    min-width: 2000px;
+  }
 }
 
 // Badge de estado de pagos
@@ -139,7 +147,6 @@ $transition: all 0.3s ease;
     border-radius: 8px;
     font-size: 0.75rem;
     font-weight: 600;
-    line-height: 1.2;
   }
   .status-badge.vigente {
     background: rgba(76, 157, 189, 0.15);
@@ -188,11 +195,6 @@ $transition: all 0.3s ease;
 
   .card-body { overflow: visible; position: relative; }
 
-  .table-responsive {
-    overflow-x: visible !important;   // permitir que el dropdown se muestre hacia afuera
-    overflow-y: visible; // permitir que el dropdown salga por debajo/arriba
-  }
-
   td.docs-cell {
     overflow: visible;  // visible aunque la tabla use layout fijo
     position: relative;
@@ -224,8 +226,8 @@ $transition: all 0.3s ease;
 
 // Celdas compactas para Tema y Designación
 .registro-tema-cell {
-  width: 320px;
-  max-width: 320px;
+  width: 420px;
+  max-width: 420px;
   .tema-row { display: flex; align-items: flex-start; gap: .5rem; }
   .tema-text { flex: 1 1 auto; min-width: 0; }
   .tema-titulo { color: $primary-color; font-weight: 600; font-size: .98rem; line-height: 1.22; }
@@ -235,7 +237,8 @@ $transition: all 0.3s ease;
 }
 
 .designacion-cell {
-  max-width: 320px;
+  width: 280px;
+  max-width: 280px;
   .tutor-nombre { font-weight: 600; font-size: .95rem; line-height: 1.2; }
   .tutor-area { font-size: .85rem; color: $text-light; }
   .tutor-cel { font-size: .85rem; color: $text-light; }
@@ -247,7 +250,8 @@ $transition: all 0.3s ease;
 
 // Celda de defensa: chip compacto con icono
 .defensa-cell {
-  max-width: 380px;
+  width: 220px;
+  max-width: 220px;
   .defensa-resumen {
     display: flex;
     flex-direction: column;
@@ -817,6 +821,51 @@ input {
 
     // Hacer más angosta la columna de Estado de Pagos
     .table-fixed thead th.pagos-col, .table-fixed tbody td.pagos-cell { width: 120px; max-width: 120px; }
+
+    // Hacer más estrecha la columna de Postulante
+    .table-fixed thead th.postulante-col, .table-fixed tbody td.postulante-cell {
+      width: 180px;
+      max-width: 180px;
+    }
+
+    // Hacer más compacta la columna de Inscripción (2da columna)
+    .table-fixed thead th:nth-child(2),
+    .table-fixed tbody td:nth-child(2) {
+      width: 220px;
+      max-width: 220px;
+    }
+
+    // Dar un ancho más claro a la columna de Registro de Tema
+    .table-fixed thead th.registro-tema-col, .table-fixed tbody td.registro-tema-cell {
+      width: 420px;
+      max-width: 420px;
+    }
+
+    // Columna de Designación de Tutor un poco más angosta
+    .table-fixed thead th:nth-child(5),
+    .table-fixed tbody td.designacion-cell {
+      width: 280px;
+      max-width: 280px;
+    }
+
+    // Columnas más compactas para seguimiento, defensa y documentos
+    .table-fixed thead th:nth-child(6),
+    .table-fixed tbody td.seguimiento-cell {
+      width: 180px;
+      max-width: 180px;
+    }
+
+    .table-fixed thead th:nth-child(7),
+    .table-fixed tbody td.defensa-cell {
+      width: 200px;
+      max-width: 200px;
+    }
+
+    .table-fixed thead th:nth-child(8),
+    .table-fixed tbody td.docs-cell {
+      width: 200px;
+      max-width: 200px;
+    }
 
     @media (max-width: 768px) {
       .table-stackable { table-layout: auto; }

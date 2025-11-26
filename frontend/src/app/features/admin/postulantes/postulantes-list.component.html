@@ -64,10 +64,10 @@
           <table class="table table-hover table-sm align-middle table-fixed table-stackable">
             <thead class="table-dark">
               <tr>
-                <th scope="col">Postulante</th>
+                <th scope="col" class="postulante-col">Postulante</th>
                 <th scope="col">Inscripción</th>
                 <th scope="col" class="pagos-col">Estado de Arancel</th>
-                <th scope="col">Registro de Tema</th>
+                <th scope="col" class="registro-tema-col">Registro de Tema</th>
                 <th scope="col">Designación de Tutor</th>
                 <th scope="col">Estado de seguimiento</th>
                 <th scope="col">Defensa</th>
@@ -77,7 +77,7 @@
             <tbody>
               <ng-container *ngFor="let ins of postulantesInscritos">
               <tr>
-                <td data-label="Postulante">
+                <td class="postulante-cell" data-label="Postulante">
                   <div class="fw-semibold"> {{ ins.cod_ceta }}</div>
                   <div>{{ ins.ap_pat }} {{ ins.ap_mat }} {{ ins.nombres_est }}</div>
                   <div class="text-muted" *ngIf="ins.celular as cel">
