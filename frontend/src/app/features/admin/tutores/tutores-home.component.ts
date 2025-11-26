@@ -2173,36 +2173,46 @@ export class TutoresHomeComponent implements OnInit {
     return hasTipo && hasPert;
   }
 
-  onToggleActivo(t: TutorReg, checked: boolean) {
+  onToggleActivo(event: Event, t: TutorReg) {
+    const input = event.target as HTMLInputElement | null;
+    const checked = input?.checked ?? false;
     this.pendingDisableDocente = null;
+
     if (checked) {
-      // Si se intenta habilitar sin datos completos, revertir
+      // Habilitar tutor
       if (!this.canEnableTutor(t)) {
         this.errorTutores = 'No se puede habilitar: requiere Tipo de Tutor y Pertinencia académica';
-        // Revertir visualmente en el próximo ciclo de cambio de detección
-        setTimeout(() => { t.activo = false; }, 0);
+        // Revertir visualmente
+        if (input) input.checked = !!t.activo;
         return;
       }
       this.sga.toggleTutor(t.id, true).subscribe({
         next: (resp) => {
           if (resp?.success && resp.data) {
             t.activo = !!resp.data.activo;
+            if (input) input.checked = !!t.activo;
+          } else {
+            t.activo = false;
+            if (input) input.checked = false;
+            this.errorTutores = 'No se pudo habilitar al tutor';
           }
         },
         error: (err) => {
+          t.activo = false;
+          if (input) input.checked = false;
           this.errorTutores = err?.message || 'No se pudo cambiar el estado del tutor';
         }
       });
       return;
     }
 
-    // Confirmar antes de deshabilitar
+    // Intento de deshabilitar: mantener visualmente activo hasta confirmar
+    if (input) input.checked = true;
+    t.activo = true;
     this.errorTutores = null;
     this.pendingDisableTutor = t;
     this.pendingDisableDocente = null;
     this.confirmDisableModalVisible = true;
-    // Mantener switch activado hasta confirmar
-    setTimeout(() => { t.activo = true; }, 0);
   }
 
   onToggleDocenteActivo(event: Event, doc: Docente) {

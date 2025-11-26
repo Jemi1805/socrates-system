@@ -382,7 +382,7 @@
                       <input class="form-check-input" type="checkbox"
                              [checked]="!!t.activo"
                              [disabled]="!canEnableTutor(t) && !t.activo"
-                             (change)="onToggleActivo(t, $event.target.checked)" />
+                             (change)="onToggleActivo($event, t)" />
                     </div>
                   </td>
                 </tr>
