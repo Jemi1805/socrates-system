@@ -66,7 +66,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
     { label: 'Postulantes inscritos', route: '/postulantes', active: true },
     { label: 'Inscripción de postulantes', route: '/modalidad-graduacion', active: false },
     { label: 'Tutores', route: '/tutores', active: false },
-    { label: 'Seguimiento de Proyecto', route: '/seguimiento-proyecto', active: false },
+    { label: 'Tribunales', route: '/tribunales', active: false },
     { label: 'Defensa', route: '/defensa', active: false },
     { label: 'Seguimiento del trámite', route: '/seguimiento-tramite', active: false }
   ];
