@@ -176,6 +176,7 @@ export interface Convocatoria {
   fecha_fin: string;
   mes_defensa?: string;
   descripcion?: string;
+  numero_tribunales?: number;
   es_activo: boolean;
   creado_por?: number | null;
   created_at?: string;

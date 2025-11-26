@@ -22,6 +22,7 @@ class ConvocatoriaController extends Controller
                 'fecha_fin' => 'required|date',
                 'mes_defensa' => 'nullable|date_format:Y-m',
                 'descripcion' => 'nullable|string|max:100',
+                'numero_tribunales' => 'nullable|integer|min:1|max:10',
                 'es_activo' => 'nullable|boolean',
             ];
         }
@@ -34,6 +35,7 @@ class ConvocatoriaController extends Controller
             'fecha_fin' => 'sometimes|date',
             'mes_defensa' => 'nullable|date_format:Y-m',
             'descripcion' => 'nullable|string|max:100',
+            'numero_tribunales' => 'sometimes|integer|min:1|max:10',
             'es_activo' => 'sometimes|boolean',
         ];
     }

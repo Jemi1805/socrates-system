@@ -269,6 +269,7 @@ export class ConfiguracionComponent implements OnInit {
       fecha_fin: ['', [Validators.required, this.validarFechaEnAnioActual()]],
       mes_defensa: [''],
       descripcion: ['', [Validators.maxLength(100)]],
+      numero_tribunales: [3, [Validators.required, Validators.min(1), Validators.max(10)]],
       es_activo: [true],
     }, { validators: this.validarRangoFechas() });
   }
@@ -748,6 +749,7 @@ export class ConfiguracionComponent implements OnInit {
           ...c,
           anio: Number(c.anio ?? c.anio_convocatoria ?? this.anioActual),
           numero_convocatoria: Number(c.numero_convocatoria ?? c.numero ?? 1),
+          numero_tribunales: c.numero_tribunales != null ? Number(c.numero_tribunales) : 3,
           es_activo: !!c.es_activo,
         }));
         this.actualizarMetadatosConvocatorias();
@@ -779,6 +781,7 @@ export class ConfiguracionComponent implements OnInit {
       fecha_fin: '',
       mes_defensa: '',
       descripcion: '',
+      numero_tribunales: 3,
       es_activo: true,
     });
     anioCtrl?.disable({ emitEvent: false });
@@ -812,6 +815,7 @@ export class ConfiguracionComponent implements OnInit {
       fecha_fin: val.fecha_fin,
       mes_defensa: val.mes_defensa || undefined,
       descripcion: val.descripcion || '',
+      numero_tribunales: Number(val.numero_tribunales) || 3,
       es_activo: !!val.es_activo,
     };
     this.convModalSaving = true;
@@ -846,6 +850,7 @@ export class ConfiguracionComponent implements OnInit {
       fecha_fin: fin,
       mes_defensa: conv.mes_defensa || '',
       descripcion: conv.descripcion || '',
+      numero_tribunales: conv.numero_tribunales != null ? conv.numero_tribunales : 3,
       es_activo: conv.es_activo,
     });
     this.editConvForm.get('anio')?.disable();

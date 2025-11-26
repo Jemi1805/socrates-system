@@ -23,6 +23,7 @@ class Convocatoria extends Model
         'fecha_fin',
         'mes_defensa',
         'descripcion',
+        'numero_tribunales',
         'es_activo',
         'creado_por',
     ];
@@ -31,6 +32,7 @@ class Convocatoria extends Model
         'fecha_inicio' => 'date',
         'fecha_fin' => 'date',
         'es_activo' => 'boolean',
+        'numero_tribunales' => 'integer',
     ];
 
     public function creador()

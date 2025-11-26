@@ -121,6 +121,36 @@ $transition: all 0.3s ease;
 // Asegurar contraste de etiquetas en el modal
 .modal .form-label { color: $text-dark-blue; }
 
+// Ajustes tipográficos suaves para formularios en modales
+.modal .form-control {
+  font-size: 0.9rem;
+}
+
+.modal .form-text {
+  font-size: 0.78rem;
+  color: $text-light;
+}
+
+.modal .form-check-label {
+  color: $text-dark-blue;
+  font-size: 0.9rem;
+}
+
+// Destacar el toggle de "Activa" en los modales de convocatorias
+.conv-activa-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+
+  .form-check-input {
+    cursor: pointer;
+  }
+
+  .form-check-label {
+    font-weight: 500;
+  }
+}
+
 // Grid de permisos en dos columnas (responsivo)
 .perms-grid {
   display: grid;
