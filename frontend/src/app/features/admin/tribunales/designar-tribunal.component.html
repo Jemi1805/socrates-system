@@ -1,0 +1,120 @@
+<div class="tribunales-container">
+  <app-header
+    pageTitle="Designar Tribunal"
+    [breadcrumbItems]="[
+      { label: 'Tribunales', route: '/tribunales' },
+      { label: 'Designar tribunal' }
+    ]">
+  </app-header>
+
+  <div class="content-wrapper">
+    <div class="d-flex justify-content-start mb-3">
+      <button type="button" class="btn btn-success btn-sm d-flex align-items-center gap-2" (click)="volverALista()">
+        <i class="bi bi-arrow-left"></i>
+        Volver a Postulantes inscritos
+      </button>
+    </div>
+
+    <!-- Resumen de postulante / tema / defensa (simplificado) -->
+    <div class="modalidad-card mb-3">
+      <div class="card-body">
+        <h5 class="card-title d-flex align-items-center gap-2">
+          <i class="bi bi-person-vcard"></i>
+          Datos del Postulante y Defensa Programada
+        </h5>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="border rounded p-2 bg-light">
+              <div class="fw-semibold mb-1"><i class="bi bi-person-circle me-1"></i> Información del Postulante</div>
+              <div class="small" *ngIf="codCeta">
+                <strong class="text-muted">Código CETA:</strong> {{ codCeta }}
+              </div>
+              <div class="small" *ngIf="estudiante">
+                <strong class="text-muted">Nombre completo:</strong>
+                {{ (estudiante?.ap_pat || '') + ' ' + (estudiante?.ap_mat || '') + ' ' + (estudiante?.nombres || '') }}
+              </div>
+              <div class="small" *ngIf="estudiante?.carrera">
+                <strong class="text-muted">Carrera:</strong> {{ estudiante?.carrera }}
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="border rounded p-2 bg-light">
+              <div class="fw-semibold mb-1"><i class="bi bi-journal-text me-1"></i> Defensa programada</div>
+              <div class="small" *ngIf="defensa?.fecha_defensa">
+                <strong class="text-muted">Fecha:</strong> {{ defensa?.fecha_defensa | date:'dd/MM/yyyy' }}
+              </div>
+              <div class="small" *ngIf="defensa?.hora_inicio">
+                <strong class="text-muted">Hora:</strong> {{ defensa?.hora_inicio }} - {{ defensa?.hora_fin || '-' }}
+              </div>
+              <div class="small" *ngIf="defensa?.aula || defensa?.grupo">
+                <strong class="text-muted">Aula / Grupo:</strong>
+                {{ defensa?.aula || '-' }}<span *ngIf="defensa?.grupo"> · Grupo: {{ defensa?.grupo }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Selección de miembros del tribunal -->
+    <div class="modalidad-card mb-3 miembros-tribunal-card">
+      <div class="card-body">
+        <h5 class="card-title d-flex align-items-center gap-2">
+          <i class="bi bi-people"></i>
+          Seleccionar miembros del tribunal (3)
+        </h5>
+        <p class="text-muted small mb-3">
+          Define exactamente tres miembros: Presidente de tribunal, Delegado interno y Delegado externo.
+        </p>
+
+        <div class="table-responsive miembros-table-wrapper">
+          <table class="table table-sm align-middle miembros-table">
+            <thead>
+              <tr>
+                <th>Miembro / tribunal</th>
+                <th style="width: 25%">Rol</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let m of miembros; let i = index">
+                <td>
+                  <select
+                    class="form-select form-select-sm"
+                    [ngModel]="buildMiembroSelectValue(i)"
+                    (ngModelChange)="onMiembroSeleccionChange(i, $event)"
+                  >
+                    <option [ngValue]="null">Selecciona miembro / tribunal</option>
+                    <option *ngFor="let opt of tribunalesDisponiblesCombinados" [ngValue]="opt.value">
+                      {{ opt.label }}
+                    </option>
+                  </select>
+                </td>
+                <td>
+                  <select class="form-select form-select-sm" [(ngModel)]="miembros[i].rol">
+                    <option value="">Selecciona rol</option>
+                    <option *ngFor="let r of rolesTribunal" [ngValue]="r.value">{{ r.label }}</option>
+                  </select>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="text-danger small mt-2" *ngIf="showErrors && !canSaveDesignacion()">
+          Debes seleccionar los tres miembros, sin repetir roles, y tener un código CETA válido.
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 mt-3">
+          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="volverALista()">
+            Cancelar
+          </button>
+          <button type="button" class="btn btn-success btn-sm" [disabled]="saving" (click)="guardarDesignacionTribunal()">
+            <i class="bi" [ngClass]="saving ? 'bi-arrow-repeat spin' : 'bi-check2-circle'"></i>
+            <span class="ms-1">{{ saving ? 'Guardando...' : 'Guardar designación' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

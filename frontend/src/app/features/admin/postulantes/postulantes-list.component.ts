@@ -1716,7 +1716,11 @@ irDesignarTribunal(ins: PostulanteInscrito) {
   if (!cod) return;
   if (!this.tieneProyecto(ins)) return;
   const carreraKey = this.normalizeCarreraKey(ins?.carrera || null) || undefined;
-  this.router.navigate(['/tribunales'], { queryParams: { cod_ceta: String(cod), carrera: carreraKey } });
+  try {
+    sessionStorage.setItem('defensa_actual', JSON.stringify((ins as any).defensa || null));
+    sessionStorage.setItem('postulante_defensa_actual', JSON.stringify(ins || null));
+  } catch {}
+  this.router.navigate(['/tribunales/designar'], { queryParams: { cod_ceta: String(cod), carrera: carreraKey } });
 }
 
 tieneDesignacion(ins: PostulanteInscrito): boolean {
