@@ -188,6 +188,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Tutores: designación
     Route::post('tutores/designar', [TutorController::class, 'designar'])
         ->middleware('permission:tutores.designar');
+    Route::patch('tutores/{id}/es-tribunal', [TutorController::class, 'toggleEsTribunal'])
+        ->where(['id' => '\\d+'])
+        ->middleware('permission:tutores.activar_desactivar');
     
     // Tribunales externos (listado y registro básico)
     Route::get('tribunales', [TribunalController::class, 'index'])

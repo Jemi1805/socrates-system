@@ -512,6 +512,12 @@ export class SgaService {
       .pipe(catchError(this.handleError));
   }
 
+  toggleTutorEsTribunal(id: number, es_tribunal: boolean): Observable<ApiResponse<{ id: number; es_tribunal: boolean }>> {
+    return this.http
+      .patch<ApiResponse<{ id: number; es_tribunal: boolean }>>(`${environment.apiUrl}/tutores/${id}/es-tribunal`, { es_tribunal })
+      .pipe(catchError(this.handleError));
+  }
+
   // --- TUTORES: Planilla de Seguimiento DOCX ---
   downloadPlanillaSeguimiento(codCeta: number | string) {
     const cod = encodeURIComponent(String(codCeta));

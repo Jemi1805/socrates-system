@@ -19,8 +19,18 @@ export class TribunalesHomeComponent implements OnInit {
   errorDisponibles: string | null = null;
   tribunalesInternos: Array<TutorReg & { es_tribunal?: boolean }> = [];
   showDisponibles = true;
-  // Placeholder: tribunales externos (a futuro se cargarán desde backend)
-  tribunalesExternos: Array<{ id: number; nombre: string; apellido_p?: string; apellido_m?: string; ci: string; celular?: string; profesion?: string; titulo_academico?: string }> = [];
+  // Tribunales externos (cargados desde backend)
+  tribunalesExternos: Array<{
+    id: number;
+    nombre: string;
+    apellido_p?: string;
+    apellido_m?: string;
+    ci: string;
+    celular?: string;
+    profesion?: string;
+    titulo_academico?: string;
+    activo?: boolean;
+  }> = [];
 
   // UI: sección de tribunales designados por postulante
   showDesignados = false;
@@ -68,6 +78,11 @@ export class TribunalesHomeComponent implements OnInit {
 
   // Opciones de título académico (alineadas con tutores)
   tituloAcademicoOpciones: string[] = ['T.S.', 'Ing.', 'Lic.', 'MSc.', 'Dr.', 'Sr.'];
+
+  // Confirmación para deshabilitar "es tribunal" (interno/externo)
+  confirmDisableModalVisible = false;
+  disableSaving = false;
+  pendingDisableTribunal: { tipo: 'interno' | 'externo'; id: number; nombre?: string; apellido_p?: string; apellido_m?: string } | null = null;
 
   constructor(private sga: SgaService, private loadingService: LoadingService) {}
 
@@ -200,19 +215,114 @@ export class TribunalesHomeComponent implements OnInit {
     }
   }
 
-  // Switch en tabla de disponibles: internos usan es_tribunal, externos usan activo
-  onToggleTribunal(t: any, checked: boolean) {
-    if (t.tipo === 'externo') {
-      t.activo = checked;
-      this.sga.toggleTribunal(t.id, checked).subscribe({
-        next: () => {},
+  // Click en switch Es tribunal: internos usan es_tribunal, externos usan activo
+  onClickEsTribunal(tipo: 'interno' | 'externo', t: any, event: MouseEvent) {
+    const isExterno = tipo === 'externo';
+    const list = isExterno ? this.tribunalesExternos : this.tribunalesInternos;
+    const idx = list.findIndex((row: any) => Number(row.id) === Number(t.id));
+    if (idx < 0) return;
+    const target = list[idx] as any;
+    const isActive = isExterno ? !!target.activo : !!target.es_tribunal;
+
+    // Si está activo y se quiere deshabilitar: NO cambiar switch todavía, solo confirmar
+    if (isActive) {
+      event.preventDefault();
+      this.pendingDisableTribunal = {
+        tipo,
+        id: Number(target.id),
+        nombre: target.nombre,
+        apellido_p: target.apellido_p,
+        apellido_m: target.apellido_m,
+      };
+      this.confirmDisableModalVisible = true;
+      return;
+    }
+
+    // Si está inactivo y se quiere habilitar: cambio directo
+    if (isExterno) {
+      this.sga.toggleTribunal(target.id, true).subscribe({
+        next: (resp) => {
+          target.activo = (resp as any)?.data?.activo ?? true;
+        },
         error: (err) => {
-          console.error('[Tribunales] Error al togglear tribunal externo', err);
+          console.error('[Tribunales] Error al habilitar tribunal externo', err);
+          target.activo = false;
         },
       });
     } else {
-      t.es_tribunal = checked;
-      console.debug('[Tribunales] toggle es_tribunal interno', { tutorId: t.id, es_tribunal: checked });
+      // Interno: actualizar es_tribunal en BD y en memoria
+      this.sga.toggleTutorEsTribunal(target.id, true).subscribe({
+        next: (resp) => {
+          target.es_tribunal = (resp as any)?.data?.es_tribunal ?? true;
+        },
+        error: (err) => {
+          console.error('[Tribunales] Error al habilitar tutor como tribunal', err);
+          target.es_tribunal = false;
+        },
+      });
+    }
+  }
+
+  cancelarDeshabilitarTribunal() {
+    this.confirmDisableModalVisible = false;
+    this.pendingDisableTribunal = null;
+  }
+
+  confirmarDeshabilitarTribunal() {
+    const ref = this.pendingDisableTribunal;
+    if (!ref) {
+      this.confirmDisableModalVisible = false;
+      return;
+    }
+
+    this.disableSaving = true;
+
+    if (ref.tipo === 'externo') {
+      const ext = this.tribunalesExternos.find((row) => Number(row.id) === ref.id) as any;
+      if (!ext) {
+        this.disableSaving = false;
+        this.confirmDisableModalVisible = false;
+        this.pendingDisableTribunal = null;
+        return;
+      }
+      this.sga.toggleTribunal(ext.id, false).subscribe({
+        next: (resp) => {
+          this.disableSaving = false;
+          const activo = (resp as any)?.data?.activo ?? false;
+          ext.activo = !!activo;
+          this.confirmDisableModalVisible = false;
+          this.pendingDisableTribunal = null;
+        },
+        error: (err) => {
+          console.error('[Tribunales] Error al deshabilitar tribunal externo', err);
+          this.disableSaving = false;
+          this.confirmDisableModalVisible = false;
+          this.pendingDisableTribunal = null;
+        },
+      });
+    } else {
+      const interno = this.tribunalesInternos.find((row) => Number(row.id) === ref.id) as any;
+      if (!interno) {
+        this.disableSaving = false;
+        this.confirmDisableModalVisible = false;
+        this.pendingDisableTribunal = null;
+        return;
+      }
+      this.sga.toggleTutorEsTribunal(interno.id, false).subscribe({
+        next: (resp) => {
+          interno.es_tribunal = (resp as any)?.data?.es_tribunal ?? false;
+          this.disableSaving = false;
+          this.confirmDisableModalVisible = false;
+          this.pendingDisableTribunal = null;
+          console.debug('[Tribunales] desmarcar interno como tribunal', { tutorId: interno.id, es_tribunal: interno.es_tribunal });
+        },
+        error: (err) => {
+          console.error('[Tribunales] Error al deshabilitar tutor como tribunal', err);
+          this.disableSaving = false;
+          this.confirmDisableModalVisible = false;
+          this.pendingDisableTribunal = null;
+        },
+      });
     }
   }
 
@@ -255,14 +365,8 @@ export class TribunalesHomeComponent implements OnInit {
   }
 
   get todosTribunalesDisponibles(): Array<any> {
-    const internos = (this.tribunalesInternos || []).map(t => ({
-      ...t,
-      tipo: 'interno' as const,
-    }));
-    const externos = (this.tribunalesExternos || []).map(e => ({
-      ...e,
-      tipo: 'externo' as const,
-    }));
+    const internos = (this.tribunalesInternos || []).map(t => ({ ...t, tipo: 'interno' as const }));
+    const externos = (this.tribunalesExternos || []).map(e => ({ ...e, tipo: 'externo' as const }));
     return [...internos, ...externos];
   }
 

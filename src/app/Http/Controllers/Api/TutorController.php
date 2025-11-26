@@ -657,6 +657,22 @@ class TutorController extends Controller
         ]);
     }
 
+    public function toggleEsTribunal($id, Request $request)
+    {
+        $tutor = Tutor::findOrFail($id);
+        $nuevo = $request->has('es_tribunal') ? (bool)$request->boolean('es_tribunal') : !$tutor->es_tribunal;
+        $tutor->es_tribunal = $nuevo;
+        $tutor->save();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => $tutor->id,
+                'es_tribunal' => (bool)$tutor->es_tribunal,
+            ],
+        ]);
+    }
+
     /**
      * Listado de tutores designados agrupados por tutor y filtrables por convocatoria.
      */

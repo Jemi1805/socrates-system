@@ -36,7 +36,7 @@
               </button>
             </div>
           </div>
-        </div>
+        </div> 
       </div>
     </div>
 
@@ -66,17 +66,33 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let t of todosTribunalesDisponibles">
+                  <!-- Internos -->
+                  <tr *ngFor="let t of tribunalesInternos">
                     <td>{{ t.apellido_p || '-' }} {{ t.nombre }} {{ t.apellido_m || '-' }}</td>
                     <td>{{ t.ci }}</td>
                     <td>{{ t.celular || '-' }}</td>
-                    <td>{{ t.titulo || t.profesion || '-' }}</td>
-                    <td>{{ t.tipo === 'externo' ? 'Externo' : 'Interno' }}</td>
+                    <td>{{ t.titulo || '-' }}</td>
+                    <td>Interno</td>
                     <td class="text-center">
                       <div class="form-check form-switch d-inline-flex justify-content-center">
                         <input class="form-check-input" type="checkbox"
-                               [checked]="t.tipo === 'externo' ? t.activo : t.es_tribunal"
-                               (change)="onToggleTribunal(t, $event.target.checked)" />
+                               [checked]="t.es_tribunal"
+                               (click)="onClickEsTribunal('interno', t, $event)" />
+                      </div>
+                    </td>
+                  </tr>
+                  <!-- Externos -->
+                  <tr *ngFor="let t of tribunalesExternos">
+                    <td>{{ t.apellido_p || '-' }} {{ t.nombre }} {{ t.apellido_m || '-' }}</td>
+                    <td>{{ t.ci }}</td>
+                    <td>{{ t.celular || '-' }}</td>
+                    <td>{{ t.profesion || '-' }}</td>
+                    <td>Externo</td>
+                    <td class="text-center">
+                      <div class="form-check form-switch d-inline-flex justify-content-center">
+                        <input class="form-check-input" type="checkbox"
+                               [checked]="t.activo"
+                               (click)="onClickEsTribunal('externo', t, $event)" />
                       </div>
                     </td>
                   </tr>
@@ -305,5 +321,36 @@
       </div>
     </div>
     <div class="modal-backdrop fade show" (click)="closeDesignacionModal()"></div>
+  </ng-container>
+
+  <!-- Modal: Confirmar deshabilitar tribunal -->
+  <ng-container *ngIf="confirmDisableModalVisible">
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalConfirmDisableTribunalLabel">
+      <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h5 class="modal-title" id="modalConfirmDisableTribunalLabel">
+              <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>
+              Deshabilitar tribunal
+            </h5>
+            <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="cancelarDeshabilitarTribunal()"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2">¿Confirmas deshabilitar al tribunal seleccionado?</p>
+            <p class="mb-0 text-muted small" *ngIf="pendingDisableTribunal">
+              {{ pendingDisableTribunal?.apellido_p || '-' }} {{ pendingDisableTribunal?.nombre }} {{ pendingDisableTribunal?.apellido_m || '' }}
+              <span class="ms-1">({{ pendingDisableTribunal?.tipo === 'externo' ? 'Externo' : 'Interno' }})</span>
+            </p>
+          </div>
+          <div class="modal-footer py-2 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-secondary btn-sm" (click)="cancelarDeshabilitarTribunal()" [disabled]="disableSaving">Cancelar</button>
+            <button type="button" class="btn btn-danger btn-sm" (click)="confirmarDeshabilitarTribunal()" [disabled]="disableSaving">
+              {{ disableSaving ? 'Deshabilitando...' : 'Deshabilitar' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade show" (click)="cancelarDeshabilitarTribunal()"></div>
   </ng-container>
 </div>
