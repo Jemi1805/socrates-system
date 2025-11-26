@@ -54,7 +54,7 @@ $transition: all 0.3s ease;
 
   // Asegurar que la tabla pueda crecer lo suficiente para no verse apretada
   .table {
-    min-width: 2000px;
+    min-width: 2400px;
   }
 }
 
@@ -337,7 +337,7 @@ $transition: all 0.3s ease;
 }
 
 .content-wrapper.table-view {
-  max-width: 1800px;
+  max-width: 1920px;
 }
 
 .content-wrapper.form-view {
@@ -831,8 +831,8 @@ input {
     // Hacer más compacta la columna de Inscripción (2da columna)
     .table-fixed thead th:nth-child(2),
     .table-fixed tbody td:nth-child(2) {
-      width: 220px;
-      max-width: 220px;
+      width: 250px;
+      max-width: 250px;
     }
 
     // Dar un ancho más claro a la columna de Registro de Tema
@@ -863,8 +863,8 @@ input {
 
     .table-fixed thead th:nth-child(8),
     .table-fixed tbody td.docs-cell {
-      width: 200px;
-      max-width: 200px;
+      width: 220px;
+      max-width: 220px;
     }
 
     @media (max-width: 768px) {

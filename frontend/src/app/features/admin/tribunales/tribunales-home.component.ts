@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HeaderComponent } from '../../../shared/components/header/header.component';
 import { SgaService, TutorReg } from '../../../shared/services/sga.service';
 import { LoadingService } from '../../../core/services/loading.service';
@@ -84,10 +84,25 @@ export class TribunalesHomeComponent implements OnInit {
   disableSaving = false;
   pendingDisableTribunal: { tipo: 'interno' | 'externo'; id: number; nombre?: string; apellido_p?: string; apellido_m?: string } | null = null;
 
-  constructor(private sga: SgaService, private loadingService: LoadingService) {}
+  constructor(private sga: SgaService, private loadingService: LoadingService, private route: ActivatedRoute) {}
 
   ngOnInit(): void {
     this.loadTribunalesDisponibles();
+
+    // Si venimos desde la tabla de Postulantes inscritos con un cod_ceta en query params,
+    // preseleccionar el postulante y abrir directamente la interfaz de designación.
+    const codFromQuery = this.route.snapshot.queryParamMap.get('cod_ceta');
+    if (codFromQuery) {
+      this.selectedPostulanteCodCeta = codFromQuery.toString().trim();
+      if (this.selectedPostulanteCodCeta) {
+        this.showDesignados = true;
+        this.showDisponibles = false;
+        // Abrir el modal después de que Angular pinte la vista
+        setTimeout(() => {
+          this.openDesignacionModal();
+        }, 0);
+      }
+    }
   }
 
   loadTribunalesDisponibles() {

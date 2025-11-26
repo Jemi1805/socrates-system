@@ -1711,6 +1711,14 @@ irDesignarTutor(ins: PostulanteInscrito) {
   this.router.navigate(['/tutores/designar'], { queryParams: { cod_ceta: String(cod), carrera: carreraKey } });
 }
 
+irDesignarTribunal(ins: PostulanteInscrito) {
+  const cod = ins?.cod_ceta;
+  if (!cod) return;
+  if (!this.tieneProyecto(ins)) return;
+  const carreraKey = this.normalizeCarreraKey(ins?.carrera || null) || undefined;
+  this.router.navigate(['/tribunales'], { queryParams: { cod_ceta: String(cod), carrera: carreraKey } });
+}
+
 tieneDesignacion(ins: PostulanteInscrito): boolean {
   const d: any = ins?.designacion || null;
   if (!d) return false;

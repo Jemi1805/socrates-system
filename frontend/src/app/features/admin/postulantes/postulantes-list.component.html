@@ -71,6 +71,7 @@
                 <th scope="col">Designación de Tutor</th>
                 <th scope="col">Estado de seguimiento</th>
                 <th scope="col">Defensa</th>
+                <th scope="col">Designación de tribunal</th>
                 <th scope="col">Documentos</th>
               </tr>
             </thead>
@@ -149,67 +150,112 @@
                 </td>
                 <td class="seguimiento-cell" data-label="Estado de seguimiento">
                   <ng-container *ngIf="tieneProyecto(ins); else segNoTemaTpl">
-                    <div class="d-flex align-items-center gap-2">
-                      <span class="badge" [ngClass]="{
-                        'bg-secondary': seguimientoEstadoUI(ins) === 'En proceso',
-                        'bg-success': seguimientoEstadoUI(ins) === 'Aprobado',
-                        'bg-danger': seguimientoEstadoUI(ins) === 'Reprobado',
-                        'bg-warning text-dark': seguimientoEstadoUI(ins) === 'Reprogramado',
-                        'bg-dark': seguimientoEstadoUI(ins) === 'Abandono'
-                      }">{{ seguimientoEstadoUI(ins) }}</span>
-                      <button *ngIf="isSeguimientoEnProceso(ins)" type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irSeguimiento(ins)">
-                        <i class="bi bi-journal-plus"></i>
-                        <span class="ms-1">Registrar</span>
-                      </button>
-                      <button *ngIf="!isSeguimientoEnProceso(ins)" type="button" class="btn btn-outline-secondary btn-sm px-2 py-1" (click)="irSeguimiento(ins)" title="Editar seguimiento">
-                        <i class="bi bi-pencil"></i>
-                      </button>
-                    </div>
+                    <ng-container *ngIf="tieneDesignacion(ins); else segSinTutorTpl">
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="badge" [ngClass]="{
+                          'bg-secondary': seguimientoEstadoUI(ins) === 'En proceso',
+                          'bg-success': seguimientoEstadoUI(ins) === 'Aprobado',
+                          'bg-danger': seguimientoEstadoUI(ins) === 'Reprobado',
+                          'bg-warning text-dark': seguimientoEstadoUI(ins) === 'Reprogramado',
+                          'bg-dark': seguimientoEstadoUI(ins) === 'Abandono'
+                        }">{{ seguimientoEstadoUI(ins) }}</span>
+                        <button *ngIf="isSeguimientoEnProceso(ins)" type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irSeguimiento(ins)">
+                          <i class="bi bi-journal-plus"></i>
+                          <span class="ms-1">Registrar</span>
+                        </button>
+                        <button *ngIf="!isSeguimientoEnProceso(ins)" type="button" class="btn btn-outline-secondary btn-sm px-2 py-1" (click)="irSeguimiento(ins)" title="Editar seguimiento">
+                          <i class="bi bi-pencil"></i>
+                        </button>
+                      </div>
+                    </ng-container>
                   </ng-container>
                   <ng-template #segNoTemaTpl>
                     <span class="badge rounded-pill bg-warning text-dark">Falta registro de tema</span>
                   </ng-template>
+                  <ng-template #segSinTutorTpl>
+                    <span class="badge rounded-pill bg-warning text-dark">Falta designación de tutor</span>
+                  </ng-template>
                 </td>
                 <td class="defensa-cell" data-label="Defensa">
                   <ng-container *ngIf="tieneProyecto(ins); else defNoTemaTpl">
-                    <div class="defensa-resumen" *ngIf="tieneDefensaProgramada(ins); else sinDefensaTpl">
-                      <div class="defensa-col defensa-col-fecha">
-                        <i class="bi bi-calendar-event me-1"></i>
-                        <span>{{ defensaFechaUI(ins) }}</span>
-                      </div>
-                      <div class="defensa-col defensa-col-hora">
-                        <i class="bi bi-clock me-1"></i>
-                        <span>{{ defensaHoraUI(ins) }}</span>
-                      </div>
-                      <div class="defensa-col defensa-col-detalle">
-                        <span>{{ defensaDetalleUI(ins) }}</span>
-                      </div>
-                    </div>
-                    <ng-template #sinDefensaTpl>
-                      <span class="badge rounded-pill bg-secondary">Sin defensa</span>
-                    </ng-template>
-                    <div class="d-flex gap-2 ms-auto">
-                      <button
-                        type="button"
-                        class="btn btn-outline-primary btn-sm px-2 py-1"
-                        *ngIf="puedeProgramarDefensa(ins) && !tieneDefensaProgramada(ins)"
-                        (click)="abrirModalDefensa(ins, 'programar')">
-                        <i class="bi bi-calendar-plus"></i>
-                        <span class="ms-1">Programar</span>
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-outline-warning btn-sm px-2 py-1"
-                        *ngIf="puedeProgramarDefensa(ins) && tieneDefensaProgramada(ins)"
-                        (click)="abrirModalDefensa(ins, 'reprogramar')">
-                        <i class="bi bi-arrow-repeat"></i>
-                        <span class="ms-1">Reprogramar</span>
-                      </button>
-                    </div>
+                    <ng-container *ngIf="tieneDesignacion(ins); else defSinTutorTpl">
+                      <ng-container *ngIf="seguimientoEstadoUI(ins) !== 'En proceso'; else defSinSeguimientoTpl">
+                        <div class="defensa-resumen" *ngIf="tieneDefensaProgramada(ins); else sinDefensaTpl">
+                          <div class="defensa-col defensa-col-fecha">
+                            <i class="bi bi-calendar-event me-1"></i>
+                            <span>{{ defensaFechaUI(ins) }}</span>
+                          </div>
+                          <div class="defensa-col defensa-col-hora">
+                            <i class="bi bi-clock me-1"></i>
+                            <span>{{ defensaHoraUI(ins) }}</span>
+                          </div>
+                          <div class="defensa-col defensa-col-detalle">
+                            <span>{{ defensaDetalleUI(ins) }}</span>
+                          </div>
+                        </div>
+                        <ng-template #sinDefensaTpl>
+                          <span class="badge rounded-pill bg-secondary">Sin defensa</span>
+                        </ng-template>
+                        <div class="d-flex gap-2 ms-auto">
+                          <button
+                            type="button"
+                            class="btn btn-outline-primary btn-sm px-2 py-1"
+                            *ngIf="puedeProgramarDefensa(ins) && !tieneDefensaProgramada(ins)"
+                            (click)="abrirModalDefensa(ins, 'programar')">
+                            <i class="bi bi-calendar-plus"></i>
+                            <span class="ms-1">Programar</span>
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-outline-warning btn-sm px-2 py-1"
+                            *ngIf="puedeProgramarDefensa(ins) && tieneDefensaProgramada(ins)"
+                            (click)="abrirModalDefensa(ins, 'reprogramar')">
+                            <i class="bi bi-arrow-repeat"></i>
+                            <span class="ms-1">Reprogramar</span>
+                          </button>
+                        </div>
+                      </ng-container>
+                    </ng-container>
                   </ng-container>
                   <ng-template #defNoTemaTpl>
                     <span class="badge rounded-pill bg-warning text-dark">Falta registro de tema</span>
                   </ng-template>
+                  <ng-template #defSinTutorTpl>
+                    <span class="badge rounded-pill bg-warning text-dark">Falta designación de tutor</span>
+                  </ng-template>
+                  <ng-template #defSinSeguimientoTpl>
+                    <span class="badge rounded-pill bg-warning text-dark">Falta marcar estado de proyecto</span>
+                  </ng-template>
+                </td>
+                <td class="designacion-cell" data-label="Designación de tribunal">
+                  <div class="d-flex align-items-center justify-content-between gap-2">
+                    <div class="flex-grow-1">
+                      <ng-container *ngIf="tieneProyecto(ins); else tribNoTemaTpl">
+                        <ng-container *ngIf="tieneDesignacion(ins); else tribSinTutorTpl">
+                          <ng-container *ngIf="seguimientoEstadoUI(ins) !== 'En proceso'; else tribSinSeguimientoTpl">
+                            <ng-container *ngIf="tieneDefensaProgramada(ins); else tribSinDefensaTpl">
+                              <button type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irDesignarTribunal(ins)">
+                                <i class="bi bi-people"></i>
+                                <span class="ms-1">Designar</span>
+                              </button>
+                            </ng-container>
+                          </ng-container>
+                        </ng-container>
+                      </ng-container>
+                      <ng-template #tribNoTemaTpl>
+                        <span class="badge rounded-pill bg-warning text-dark">Falta registro de tema</span>
+                      </ng-template>
+                      <ng-template #tribSinTutorTpl>
+                        <span class="badge rounded-pill bg-warning text-dark">Falta designación de tutor</span>
+                      </ng-template>
+                      <ng-template #tribSinSeguimientoTpl>
+                        <span class="badge rounded-pill bg-warning text-dark">Falta marcar estado de proyecto</span>
+                      </ng-template>
+                      <ng-template #tribSinDefensaTpl>
+                        <span class="badge rounded-pill bg-warning text-dark">Falta programar defensa</span>
+                      </ng-template>
+                    </div>
+                  </div>
                 </td>
                 <td class="docs-cell" data-label="Documentos">
                   <ng-container *ngIf="ins?.proyecto?.nombre || ins?.designacion?.numero_documento || ins?.proyecto?.seguimiento_pdf; else noDocsTpl">
