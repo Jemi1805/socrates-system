@@ -105,7 +105,7 @@ export class DesignarTribunalComponent implements OnInit {
     this.codCeta = (cod || this.estudiante?.cod_ceta || '').toString() || null;
 
     // Cargas HTTP una sola vez en OnInit usando snapshot
-    // this.loadTribunalesDisponibles(); // Desactivado temporalmente por error de NG0103
+    this.loadTribunalesDisponibles();
     this.loadNumeroTribunales();
   }
 
