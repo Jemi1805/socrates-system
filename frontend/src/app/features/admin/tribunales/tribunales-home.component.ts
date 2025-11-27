@@ -564,8 +564,12 @@ export class TribunalesHomeComponent implements OnInit {
   }
 
   get todosTribunalesDisponibles(): Array<any> {
-    const internos = (this.tribunalesInternos || []).map(t => ({ ...t, tipo: 'interno' as const }));
-    const externos = (this.tribunalesExternos || []).map(e => ({ ...e, tipo: 'externo' as const }));
+    const internos = (this.tribunalesInternos || []).map(t => ({ ...t, tipo: (t as any).tipo || 'interno' as const }));
+    const externos = (this.tribunalesExternos || []).map(e => ({
+      ...e,
+      // Respetar el tipo real almacenado en BD; si viene vacío, asumir externo
+      tipo: (e as any).tipo === 'interno' ? 'interno' as const : 'externo' as const,
+    }));
     return [...internos, ...externos];
   }
 
