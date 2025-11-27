@@ -221,10 +221,6 @@ export class DesignarTutorComponent implements OnInit {
         const parsed = JSON.parse(dp);
         this.estudiante = parsed?.estudiante || null;
         this.inscripcion = (parsed?.inscripcion as InscripModalidad) || null;
-        this.lastDesignation = parsed?.last_designation
-          || parsed?.designacion
-          || parsed?.lastDesignation
-          || null;
         if (!this.inscripcion) {
           const ins = (this.estudiante as any)?.inscripcion
             || parsed?.inscripcion_modalidad
@@ -237,20 +233,8 @@ export class DesignarTutorComponent implements OnInit {
         if (this.estudiante && this.inscripcion) {
           this.estudiante = { ...this.estudiante, inscripcion: this.inscripcion };
         }
-        // Si la última designación no tiene convocatoria_nom, intentar tomarla de la inscripción
-        if (this.lastDesignation && !this.lastDesignation.convocatoria_nom && this.inscripcion) {
-          const insConvNom = (this.inscripcion as any).convocatoria_nom ?? (this.inscripcion as any).nom_convocatoria;
-          if (insConvNom) {
-            this.lastDesignation.convocatoria_nom = String(insConvNom);
-          }
-        }
-        if (this.lastDesignation) {
-          this.confirmConvocatoriaNombre = this.lastDesignation?.convocatoria_nom || this.confirmConvocatoriaNombre;
-          const storedInicio = this.resolveConvocatoriaFechaInicioFromSource(this.lastDesignation);
-          const storedFin = this.resolveConvocatoriaFechaFinFromSource(this.lastDesignation);
-          if (storedInicio) this.confirmConvocatoriaInicio = storedInicio;
-          if (storedFin) this.confirmConvocatoriaFin = storedFin;
-        }
+        // No restaurar lastDesignation desde sesión; solo el backend decide si existe designación para este postulante
+        this.lastDesignation = null;
       }
       const pc = sessionStorage.getItem('proyecto_cache');
       if (pc) {
@@ -260,10 +244,11 @@ export class DesignarTutorComponent implements OnInit {
 
     if (this.lastDesignation) {
       this.showResumenDesignacion = true;
-      this.showSeleccionTutores = false;
     } else {
       this.showResumenDesignacion = false;
     }
+    // Siempre permitir ver y seleccionar tutores, incluso si ya hay una designación previa
+    this.showSeleccionTutores = true;
 
     // Tomar query params (cod_ceta, carrera)
     this.route.queryParamMap.subscribe(params => {
@@ -272,8 +257,47 @@ export class DesignarTutorComponent implements OnInit {
       this.codCeta = cod;
       this.carreraKey = this.normalizeCarreraKey(carr || (this.estudiante?.carrera || this.estudiante?.carrera_nombre)) || 'mecanica';
 
+      // Si la designación guardada pertenece a otro cod_ceta, limpiarla para no arrastrar datos
+      const currentCod = (this.codCeta || this.estudiante?.cod_ceta || '').toString().trim();
+      const lastCod = (this.lastDesignation?.cod_ceta || '').toString().trim();
+      if (currentCod && lastCod && currentCod !== lastCod) {
+        this.lastDesignation = null;
+        this.showResumenDesignacion = false;
+        this.showSeleccionTutores = true;
+        this.persistLastDesignation(null);
+      }
+
       const codNumeric = cod ? Number(cod) : this.estudiante?.cod_ceta ? Number(this.estudiante.cod_ceta) : null;
       this.fetchInscripcionForCod(codNumeric);
+
+      // Rehidratar SIEMPRE los datos del postulante desde backend para el cod_ceta actual
+      if (codNumeric && Number.isFinite(codNumeric)) {
+        this.postulanteService.getById(codNumeric as any).subscribe({
+          next: (p: any) => {
+            if (!p) return;
+            const nombres = (p.nombres_est || p.nombres || '').toString().trim();
+            const apPat = (p.ap_pat || '').toString().trim();
+            const apMat = (p.ap_mat || '').toString().trim();
+            const carrera = ((p as any).carrera_nombre || p.carrera || '').toString();
+            this.estudiante = {
+              cod_ceta: cod,
+              nombres,
+              ap_pat: apPat,
+              ap_mat: apMat,
+              ci: (p.ci || '').toString(),
+              carrera,
+              pensum: (p as any).pensum,
+            };
+            try {
+              const raw = sessionStorage.getItem('datos_postulacion');
+              const datos = raw ? JSON.parse(raw) : {};
+              datos.estudiante = { ...(datos.estudiante || {}), ...this.estudiante };
+              sessionStorage.setItem('datos_postulacion', JSON.stringify(datos));
+            } catch {}
+          },
+          error: () => {},
+        });
+      }
 
       // Completar/recuperar designación real desde backend (tabla designacion_tutor)
       this.loadLastDesignationFromBackend(this.codCeta || (this.estudiante?.cod_ceta ? String(this.estudiante.cod_ceta) : null));
@@ -328,10 +352,9 @@ export class DesignarTutorComponent implements OnInit {
           this.confirmConvocatoriaNombre = this.lastDesignation.convocatoria_nom;
         }
 
-        // Mostrar el resumen si hay una designación válida
+        // Mostrar el resumen si hay una designación válida, pero mantener la lista de tutores disponible
         if (this.lastDesignation && (this.lastDesignation.tutor_nombre || this.lastDesignation.convocatoria_nom)) {
           this.showResumenDesignacion = true;
-          this.showSeleccionTutores = false;
         }
       },
       error: () => {
@@ -539,6 +562,17 @@ export class DesignarTutorComponent implements OnInit {
       return;
     }
     this.selectedTutor = t;
+
+    // Si aún no hay convocatoria seleccionada, intentar usar la convocatoria de la inscripción del postulante
+    if (!this.selectedConvocatoriaId) {
+      const insConvId = (this.inscripcion as any)?.convocatoria_id
+        ?? (this.estudiante as any)?.inscripcion?.convocatoria_id
+        ?? null;
+      if (insConvId) {
+        this.selectedConvocatoriaId = Number(insConvId);
+      }
+    }
+
     this.syncSelectedConvocatoriaWithConvocatorias();
     const convRow = this.convocatorias.find(c => Number(c.id) === this.selectedConvocatoriaId) || null;
     if (convRow) {
