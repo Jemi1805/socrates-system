@@ -57,7 +57,7 @@ export class TribunalesHomeComponent implements OnInit {
   registroModalVisible = false;
   registroSaving = false;
   registroShowErrors = false;
-  // Solo registro de tribunal externo
+  // Registro de tribunal (interno o externo)
   registroExterno: {
     nombre: string;
     apellido_p: string;
@@ -66,6 +66,7 @@ export class TribunalesHomeComponent implements OnInit {
     celular: string;
     profesion: string;
     titulo_academico: string;
+    tipo: 'interno' | 'externo';
   } = {
     nombre: '',
     apellido_p: '',
@@ -74,6 +75,7 @@ export class TribunalesHomeComponent implements OnInit {
     celular: '',
     profesion: '',
     titulo_academico: '',
+    tipo: 'externo',
   };
 
   // Opciones de título académico (alineadas con tutores)
@@ -157,6 +159,7 @@ export class TribunalesHomeComponent implements OnInit {
       celular: '',
       profesion: '',
       titulo_academico: '',
+      tipo: 'externo',
     };
     this.registroModalVisible = true;
   }

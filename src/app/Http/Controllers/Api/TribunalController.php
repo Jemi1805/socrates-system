@@ -46,12 +46,13 @@ class TribunalController extends Controller
             'celular' => 'required|string|regex:/^\\d{8}$/',
             'profesion' => 'required|string|max:255',
             'titulo_academico' => 'required|string|max:10',
+            'tipo' => 'nullable|in:interno,externo',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Datos inválidos para tribunal externo',
+                'message' => 'Datos inválidos para tribunal',
                 'errors' => $validator->errors(),
             ], 422);
         }
@@ -65,6 +66,7 @@ class TribunalController extends Controller
                 'celular' => $data['celular'],
                 'profesion' => $data['profesion'],
                 'titulo_academico' => $data['titulo_academico'],
+                'tipo' => $data['tipo'] ?? 'externo',
                 'activo' => true,
             ]);
 
@@ -73,14 +75,14 @@ class TribunalController extends Controller
                 'data' => $tribunal,
             ]);
         } catch (\Throwable $e) {
-            Log::error('Error al registrar tribunal externo', [
+            Log::error('Error al registrar tribunal', [
                 'exception' => $e->getMessage(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Error al registrar tribunal externo',
-            ], 500);
+                'message' => 'Error al registrar tribunal',
+            ]); 
         }
     }
 }

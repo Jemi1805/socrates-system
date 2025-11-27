@@ -19,6 +19,7 @@ class Tribunal extends Model
         'celular',
         'profesion',
         'titulo_academico',
+        'tipo',
         'activo',
     ];
 }

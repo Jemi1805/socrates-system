@@ -24,7 +24,7 @@
             <div class="mt-1 d-flex gap-2 flex-wrap">
               <button class="btn btn-primary" type="button" (click)="openRegistroTribunalModal()">
                 <i class="bi bi-plus-lg me-1"></i>
-                Registrar  Tribunal Externo
+                Registrar Nuevo Tribunal
               </button>
               <button class="btn btn-outline-secondary" type="button" (click)="toggleDisponiblesSection()">
                 <i class="bi bi-people-fill me-1"></i>
@@ -159,7 +159,7 @@
     </div>
   </div>
 
-  <!-- Modal: Registro de Tribunal Externo -->
+  <!-- Modal: Registro de Tribunal (interno o externo) -->
   <ng-container *ngIf="registroModalVisible">
     <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalRegistrarTribunalLabel">
       <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
@@ -167,14 +167,14 @@
           <div class="modal-header py-2">
             <h5 class="modal-title" id="modalRegistrarTribunalLabel">
               <i class="bi bi-people me-2"></i>
-              Registro de tribunal externo
+              Registro de tribunal
             </h5>
             <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="closeRegistroTribunalModal()"></button>
           </div>
           <div class="modal-body">
             <div class="alert alert-info py-2 mb-3">
               <i class="bi bi-info-circle me-1"></i>
-              Registra aquí los datos de un tribunal externo.
+              Registra aquí los datos de un tribunal y define si es interno o externo.
             </div>
 
             <div class="row g-3">
@@ -227,6 +227,13 @@
                 <select class="form-select" [(ngModel)]="registroExterno.titulo_academico">
                   <option value="" disabled>Seleccione título académico</option>
                   <option *ngFor="let titulo of tituloAcademicoOpciones" [value]="titulo">{{ titulo }}</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Tipo de tribunal <span class="text-danger">*</span></label>
+                <select class="form-select" [(ngModel)]="registroExterno.tipo">
+                  <option value="externo">Externo</option>
+                  <option value="interno">Interno</option>
                 </select>
               </div>
               <div class="col-12">

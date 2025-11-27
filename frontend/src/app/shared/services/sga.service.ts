@@ -510,6 +510,7 @@ export class SgaService {
     celular: string;
     profesion: string;
     titulo_academico: string;
+    tipo?: 'interno' | 'externo';
   }): Observable<ApiResponse<any>> {
     return this.http
       .post<ApiResponse<any>>(`${environment.apiUrl}/tribunales`, data)
