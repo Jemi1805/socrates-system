@@ -210,6 +210,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('defensas/{id}/reprogramar', [DefensaController::class, 'reprogramar'])
         ->where(['id' => '\\d+'])
         ->middleware('permission:defensas.reprogramar');
+    Route::post('defensas/{id}/tribunal', [DefensaController::class, 'setTribunal'])
+        ->where(['id' => '\\d+'])
+        ->middleware('permission:defensas.programar');
     Route::get('proyecto/{id}/defensas', [DefensaController::class, 'byProyecto'])
         ->where(['id' => '\\d+'])
         ->middleware('permission:defensas.leer');

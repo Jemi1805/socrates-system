@@ -486,6 +486,14 @@ export class SgaService {
     return this.generateDocDesignacion(payload);
   }
 
+  // --- DEFENSAS: designación de tribunal ---
+  setDefensaTribunal(defensaId: number, miembros: Array<{ tipo: 'interno' | 'externo'; miembro_id: number; rol: string }>): Observable<ApiResponse<any>> {
+    const url = `${environment.apiUrl}/defensas/${defensaId}/tribunal`;
+    return this.http
+      .post<ApiResponse<any>>(url, { miembros })
+      .pipe(catchError(this.handleError));
+  }
+
   // --- TRIBUNALES EXTERNOS ---
   createTribunalExterno(data: {
     nombre: string;

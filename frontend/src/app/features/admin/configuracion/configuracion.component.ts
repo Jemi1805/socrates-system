@@ -682,6 +682,7 @@ export class ConfiguracionComponent implements OnInit {
         fecha_fin: ['', [Validators.required, this.validarFechaEnAnioActual()]],
         mes_defensa: [''],
         descripcion: ['', [Validators.maxLength(100)]],
+        numero_tribunales: [3, [Validators.required, Validators.min(1), Validators.max(10)]],
         es_activo: [true],
       }, { validators: this.validarRangoFechas() });
     }
@@ -885,6 +886,7 @@ export class ConfiguracionComponent implements OnInit {
       fecha_fin: val.fecha_fin,
       mes_defensa: val.mes_defensa || undefined,
       descripcion: val.descripcion || '',
+      numero_tribunales: val.numero_tribunales != null ? Number(val.numero_tribunales) : this.editingConv.numero_tribunales ?? 3,
       es_activo: !!val.es_activo,
     };
     this.convModalSaving = true;

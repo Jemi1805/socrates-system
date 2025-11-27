@@ -39,4 +39,9 @@ class Defensa extends Model
     {
         return $this->belongsTo(Convocatoria::class, 'convocatoria_id');
     }
+
+    public function miembrosTribunal()
+    {
+        return $this->hasMany(DefensaTribunal::class, 'defensa_id');
+    }
 }

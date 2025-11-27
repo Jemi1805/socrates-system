@@ -20,6 +20,9 @@ export class DesignarTribunalComponent implements OnInit {
   codCeta: string | null = null;
   defensa: any = null;
 
+  // Número de miembros de tribunal a designar (se toma de la convocatoria)
+  numeroTribunales = 3;
+
   // Tribunales disponibles (internos y externos)
   tribunalesInternos: Array<TutorReg & { es_tribunal?: boolean }> = [];
   tribunalesExternos: Array<{
@@ -97,20 +100,71 @@ export class DesignarTribunalComponent implements OnInit {
       }
     } catch {}
 
-    this.route.queryParamMap.subscribe((params) => {
-      const cod = params.get('cod_ceta');
-      this.codCeta = (cod || this.estudiante?.cod_ceta || '').toString() || null;
-      this.loadTribunalesDisponibles();
-      this.resetMiembros();
-    });
+    const params = this.route.snapshot.queryParamMap;
+    const cod = params.get('cod_ceta');
+    this.codCeta = (cod || this.estudiante?.cod_ceta || '').toString() || null;
+
+    // Cargas HTTP una sola vez en OnInit usando snapshot
+    // this.loadTribunalesDisponibles(); // Desactivado temporalmente por error de NG0103
+    this.loadNumeroTribunales();
   }
 
   private resetMiembros() {
-    this.miembros = [
-      { tipo: 'interno', miembroId: null, rol: 'PRESIDENTE' },
-      { tipo: 'interno', miembroId: null, rol: 'DELEGADO_INTERNO' },
-      { tipo: 'externo', miembroId: null, rol: 'DELEGADO_EXTERNO' },
+    const baseRoles: Array<'PRESIDENTE' | 'DELEGADO_INTERNO' | 'DELEGADO_EXTERNO'> = [
+      'PRESIDENTE',
+      'DELEGADO_INTERNO',
+      'DELEGADO_EXTERNO',
     ];
+
+    const total = this.numeroTribunales && this.numeroTribunales > 0 ? this.numeroTribunales : 3;
+
+    this.miembros = Array.from({ length: total }, (_, idx) => ({
+      tipo: idx === total - 1 ? 'externo' : 'interno',
+      miembroId: null,
+      rol: (baseRoles[idx] as any) || '',
+    }));
+  }
+
+  private loadNumeroTribunales() {
+    // 1) Intentar leer directamente desde la defensa o el postulante almacenado
+    const direct =
+      (this.defensa && (this.defensa as any).numero_tribunales != null
+        ? Number((this.defensa as any).numero_tribunales)
+        : null) ??
+      (this.defensa && (this.defensa as any).convocatoria?.numero_tribunales != null
+        ? Number((this.defensa as any).convocatoria.numero_tribunales)
+        : null);
+
+    if (direct != null && !isNaN(direct) && direct > 0) {
+      this.numeroTribunales = direct;
+      console.debug('[DesignarTribunal] numero_tribunales tomado desde defensa/postulante:', direct, this.defensa);
+      this.resetMiembros();
+      return;
+    }
+
+    // 2) Si no viene en la defensa, consultar la convocatoria al backend
+    const convId = this.defensa?.convocatoria_id || this.defensa?.convocatoria?.id;
+    console.debug('[DesignarTribunal] defensa actual para numero_tribunales:', this.defensa, 'convId:', convId);
+
+    if (!convId) {
+      this.numeroTribunales = 3;
+      this.resetMiembros();
+      return;
+    }
+
+    this.sga.getConvocatoriaById(convId).subscribe({
+      next: (conv) => {
+        const n = conv && (conv as any).numero_tribunales != null ? Number((conv as any).numero_tribunales) : 3;
+        this.numeroTribunales = n > 0 ? n : 3;
+        console.debug('[DesignarTribunal] numero_tribunales desde API convocatoria:', this.numeroTribunales, conv);
+        this.resetMiembros();
+      },
+      error: (err) => {
+        console.error('[DesignarTribunal] Error obteniendo convocatoria para numero_tribunales', err);
+        this.numeroTribunales = 3;
+        this.resetMiembros();
+      },
+    });
   }
 
   private loadTribunalesDisponibles() {
@@ -189,14 +243,14 @@ export class DesignarTribunalComponent implements OnInit {
   }
 
   canSaveDesignacion(): boolean {
-    if (!this.miembros || this.miembros.length !== 3) return false;
+    if (!this.miembros || this.miembros.length !== this.numeroTribunales) return false;
     const roles = new Set<string>();
     for (const m of this.miembros) {
       if (!m.miembroId || !m.rol) return false;
       if (roles.has(m.rol)) return false;
       roles.add(m.rol);
     }
-    return !!this.codCeta;
+    return !!this.codCeta && !!this.defensa?.id;
   }
 
   guardarDesignacionTribunal() {
@@ -205,24 +259,32 @@ export class DesignarTribunalComponent implements OnInit {
       return;
     }
     const cod = (this.codCeta || '').toString().trim();
-    if (!cod) return;
+    const defensaId = this.defensa?.id;
+    if (!cod || !defensaId) return;
 
-    const payload = this.miembros.map((m) => ({
-      cod_ceta_est: cod,
+    const miembrosPayload = this.miembros.map((m) => ({
       tipo: m.tipo,
-      miembro_id: m.miembroId,
+      miembro_id: m.miembroId as number,
       rol: m.rol,
     }));
 
     this.saving = true;
     this.loadingService.showModal();
-    console.debug('[DesignacionTribunal] payload listo', payload);
-    // TODO: conectar con backend cuando existan los endpoints reales
-    setTimeout(() => {
-      this.saving = false;
-      this.loadingService.hideModal();
-      this.router.navigate(['/postulantes']);
-    }, 400);
+    console.debug('[DesignacionTribunal] payload listo', { defensaId, cod_ceta: cod, miembros: miembrosPayload });
+
+    this.sga
+      .setDefensaTribunal(defensaId, miembrosPayload)
+      .subscribe({
+        next: () => {
+          this.saving = false;
+          this.loadingService.hideModal();
+          this.router.navigate(['/postulantes']);
+        },
+        error: () => {
+          this.saving = false;
+          this.loadingService.hideModal();
+        },
+      });
   }
 
   volverALista() {

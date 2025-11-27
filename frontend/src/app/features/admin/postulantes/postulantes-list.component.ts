@@ -1717,7 +1717,24 @@ irDesignarTribunal(ins: PostulanteInscrito) {
   if (!this.tieneProyecto(ins)) return;
   const carreraKey = this.normalizeCarreraKey(ins?.carrera || null) || undefined;
   try {
-    sessionStorage.setItem('defensa_actual', JSON.stringify((ins as any).defensa || null));
+    const defensaBase: any = (ins as any).defensa || null;
+    const convId = (ins as any)?.convocatoria_id ?? null;
+    let numeroTribunales: number | null = null;
+    if (convId && Array.isArray(this.convocatorias) && this.convocatorias.length) {
+      const conv = this.convocatorias.find(c => Number(c.id) === Number(convId));
+      if (conv && (conv as any).numero_tribunales != null) {
+        numeroTribunales = Number((conv as any).numero_tribunales);
+      }
+    }
+    const defensaExtendida = defensaBase
+      ? {
+          ...defensaBase,
+          convocatoria_id: defensaBase.convocatoria_id ?? convId ?? null,
+          numero_tribunales: defensaBase.numero_tribunales ?? numeroTribunales ?? null,
+        }
+      : null;
+
+    sessionStorage.setItem('defensa_actual', JSON.stringify(defensaExtendida));
     sessionStorage.setItem('postulante_defensa_actual', JSON.stringify(ins || null));
   } catch {}
   this.router.navigate(['/tribunales/designar'], { queryParams: { cod_ceta: String(cod), carrera: carreraKey } });
