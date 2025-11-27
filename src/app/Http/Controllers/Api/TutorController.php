@@ -2268,7 +2268,7 @@ class TutorController extends Controller
                     'conv.fecha_inicio as convocatoria_fecha_inicio',
                     'conv.fecha_fin as convocatoria_fecha_fin'
                 )
-                ->where('dt.tutor_id', $data['tutor_id'])
+                    ->where('dt.tutor_id', $data['tutor_id'])
                 ->where('dt.cod_ceta', $data['cod_ceta'])
                 ->first();
 
@@ -2441,19 +2441,14 @@ class TutorController extends Controller
             $authUserName = $data['user_name'];
         }
 
+        $row = null;
+
         DB::beginTransaction();
         try {
             $now = Carbon::now();
 
-            // Asegurar unicidad por proyecto si se envía
-            if (!empty($data['proyecto_id'])) {
-                $exist = DB::table('designacion_tutor')
-                    ->where('proyecto_id', $data['proyecto_id'])
-                    ->first();
-                if ($exist && ($exist->tutor_id != $data['tutor_id'] || $exist->cod_ceta != $data['cod_ceta'])) {
-                    DB::table('designacion_tutor')->where('id', $exist->id)->delete();
-                }
-            }
+            // Ya se garantiza unicidad por combinación (tutor_id, cod_ceta) mediante updateOrInsert.
+            // No eliminar designaciones previas por proyecto_id, para no borrar registros de otros postulantes.
 
             // Fallback de nombres (por si los triggers no están disponibles)
             $p = DB::table('postulantes')->where('cod_ceta', $data['cod_ceta'])
@@ -2465,6 +2460,8 @@ class TutorController extends Controller
 
             $updateData = [
                 'proyecto_id' => (isset($data['proyecto_id']) ? $data['proyecto_id'] : null),
+                'tutor_id' => $data['tutor_id'],
+                'cod_ceta' => $data['cod_ceta'],
                 'fecha_designacion' => $now->toDateString(),
                 'convocatoria_id' => isset($data['convocatoria_id']) ? $data['convocatoria_id'] : null,
                 'convocatoria_nom' => isset($data['convocatoria_nom']) ? $data['convocatoria_nom'] : null,
@@ -2484,13 +2481,18 @@ class TutorController extends Controller
                 $updateData['user_name'] = $authUserName;
             }
 
-            DB::table('designacion_tutor')->updateOrInsert(
-                [
+            // Clave para updateOrInsert: si hay proyecto_id, usarlo como clave única;
+            // en caso contrario, usar combinación (tutor_id, cod_ceta).
+            if (!empty($data['proyecto_id'])) {
+                $key = ['proyecto_id' => $data['proyecto_id']];
+            } else {
+                $key = [
                     'tutor_id' => $data['tutor_id'],
                     'cod_ceta' => $data['cod_ceta'],
-                ],
-                $updateData
-            );
+                ];
+            }
+
+            DB::table('designacion_tutor')->updateOrInsert($key, $updateData);
 
             $baseRow = DB::table('designacion_tutor as dt')
                 ->leftJoin('tutores as t', 'dt.tutor_id', '=', 't.id')
@@ -2532,7 +2534,7 @@ class TutorController extends Controller
 
             DB::commit();
 
-            $row = DB::table('designacion_tutor as dt')
+            $rowQuery = DB::table('designacion_tutor as dt')
                 ->leftJoin('tutores as t', 'dt.tutor_id', '=', 't.id')
                 ->leftJoin('tipo_tutor as tt', 't.tipo_tutor_id', '=', 'tt.id')
                 ->leftJoin('doc_designaciones as dd', 'dd.designacion_tutor_id', '=', 'dt.id')

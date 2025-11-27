@@ -236,10 +236,8 @@ export class DesignarTutorComponent implements OnInit {
         // No restaurar lastDesignation desde sesión; solo el backend decide si existe designación para este postulante
         this.lastDesignation = null;
       }
-      const pc = sessionStorage.getItem('proyecto_cache');
-      if (pc) {
-        this.proyecto = JSON.parse(pc);
-      }
+      // Ya no se restaura un proyecto_cache global para evitar mostrar el tema de otro postulante.
+      this.proyecto = null;
     } catch {}
 
     if (this.lastDesignation) {
@@ -254,7 +252,9 @@ export class DesignarTutorComponent implements OnInit {
     this.route.queryParamMap.subscribe(params => {
       const cod = params.get('cod_ceta');
       const carr = params.get('carrera');
+      // Cada vez que cambia cod_ceta, limpiar proyecto para evitar arrastrar el tema de otro postulante
       this.codCeta = cod;
+      this.proyecto = null;
       this.carreraKey = this.normalizeCarreraKey(carr || (this.estudiante?.carrera || this.estudiante?.carrera_nombre)) || 'mecanica';
 
       // Si la designación guardada pertenece a otro cod_ceta, limpiarla para no arrastrar datos
@@ -302,11 +302,13 @@ export class DesignarTutorComponent implements OnInit {
       // Completar/recuperar designación real desde backend (tabla designacion_tutor)
       this.loadLastDesignationFromBackend(this.codCeta || (this.estudiante?.cod_ceta ? String(this.estudiante.cod_ceta) : null));
 
-      // Si no hay proyecto cache, intentar traerlo por código
-      if (!this.proyecto && cod) {
+      // Cargar siempre el proyecto correspondiente al cod_ceta actual
+      if (cod) {
         this.proyectoService.getByCod(cod).subscribe({ next: (res) => {
           this.proyecto = (Array.isArray(res?.data) ? res.data[0] : (res?.data || res)) || null;
-        }, error: () => {} });
+        }, error: () => { this.proyecto = null; } });
+      } else {
+        this.proyecto = null;
       }
       // Cargar áreas (pertinencias) y tutores
       this.loadAreas();

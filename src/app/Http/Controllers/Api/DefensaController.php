@@ -23,7 +23,7 @@ class DefensaController extends Controller
             'hora_inicio' => 'required',
             'hora_fin' => 'required',
             'grupo' => 'nullable|string|max:50',
-            'aula' => 'nullable|string|max:100',
+            'aula' => 'required|string|max:100',
             'observaciones' => 'nullable|string',
         ]);
 
@@ -81,7 +81,7 @@ class DefensaController extends Controller
             'hora_inicio' => 'required',
             'hora_fin' => 'required',
             'grupo' => 'nullable|string|max:50',
-            'aula' => 'nullable|string|max:100',
+            'aula' => 'required|string|max:100',
             'convocatoria_id' => 'required|integer|exists:convocatorias,id',
             'observaciones' => 'nullable|string',
         ]);

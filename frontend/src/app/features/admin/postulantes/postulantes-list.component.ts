@@ -2161,7 +2161,11 @@ guardarDefensa() {
   this.defensaHoraError = null;
 
   const fecha = (this.defensaForm.fecha_defensa || '').trim();
-  if (fecha && (this.defensaFechaMin || this.defensaFechaMax)) {
+  if (!fecha) {
+    this.defensaFechaError = 'Debes seleccionar la fecha de defensa.';
+    return;
+  }
+  if (this.defensaFechaMin || this.defensaFechaMax) {
     if (this.defensaFechaMin && fecha < this.defensaFechaMin) {
       this.defensaFechaError = 'La fecha de defensa debe estar dentro del mes de defensa definido en la convocatoria.';
       return;
@@ -2174,6 +2178,10 @@ guardarDefensa() {
 
   const hi = (this.defensaForm.hora_inicio || '').trim();
   const hf = (this.defensaForm.hora_fin || '').trim();
+  if (!hi || !hf) {
+    this.defensaHoraError = 'Debes definir la hora de inicio y fin de la defensa.';
+    return;
+  }
   if (hi && hf) {
     const toMinutes = (h: string) => {
       const [HH, MM] = h.split(':');
