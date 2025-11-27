@@ -494,6 +494,13 @@ export class SgaService {
       .pipe(catchError(this.handleError));
   }
 
+  // --- ROLES DE TRIBUNAL ---
+  getRolesTribunal(): Observable<ApiResponse<Array<{ id: number; codigo: string; nombre: string }>>> {
+    return this.http
+      .get<ApiResponse<Array<{ id: number; codigo: string; nombre: string }>>>(`${environment.apiUrl}/roles_tribunal`)
+      .pipe(catchError(this.handleError));
+  }
+
   // --- TRIBUNALES EXTERNOS ---
   createTribunalExterno(data: {
     nombre: string;

@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\PensumController;
 use App\Http\Controllers\Api\DocenteController;
 use App\Http\Controllers\Api\TutorController;
 use App\Http\Controllers\Api\PertinenciaController;
+use App\Http\Controllers\Api\RolTribunalController;
 use App\Http\Controllers\Api\ConvocatoriaController;
 use App\Http\Controllers\Api\DefensaController;
 use App\Http\Controllers\Api\TribunalController;
@@ -216,6 +217,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('proyecto/{id}/defensas', [DefensaController::class, 'byProyecto'])
         ->where(['id' => '\\d+'])
         ->middleware('permission:defensas.leer');
+
+    // Catálogo de roles de tribunal
+    Route::get('roles_tribunal', [RolTribunalController::class, 'index'])
+        ->middleware('permission:defensas.programar');
 });
 // 📦 RUTAS DE PRODUCTOS (Mantener existentes)
 // Route::get('/productos', [ProductosController::class, 'index']);

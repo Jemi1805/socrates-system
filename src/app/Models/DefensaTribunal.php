@@ -16,6 +16,7 @@ class DefensaTribunal extends Model
         'miembro_id',
         'tipo',
         'rol',
+        'rol_tribunal_id',
     ];
 
     public function defensa()

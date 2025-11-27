@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Defensa;
 use App\Models\DefensaTribunal;
+use App\Models\RolTribunal;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -131,18 +132,26 @@ class DefensaController extends Controller
             'miembros' => 'required|array|min:1',
             'miembros.*.tipo' => 'required|in:interno,externo',
             'miembros.*.miembro_id' => 'required|integer|min:1',
-            'miembros.*.rol' => 'required|in:PRESIDENTE,DELEGADO_INTERNO,DELEGADO_EXTERNO',
+            'miembros.*.rol' => 'required|in:PRESIDENTE,DELEGADO_INTERNO,DELEGADO_EXTERNO,VOCAL',
         ]);
 
         return DB::transaction(function () use ($defensa, $data) {
             DefensaTribunal::where('defensa_id', $defensa->id)->delete();
 
+            $codigos = array_values(array_unique(array_map(fn ($m) => $m['rol'], $data['miembros'])));
+            $rolesMap = RolTribunal::query()
+                ->whereIn('codigo', $codigos)
+                ->get()
+                ->keyBy('codigo');
+
             foreach ($data['miembros'] as $m) {
+                $rolModel = $rolesMap[$m['rol']] ?? null;
                 DefensaTribunal::create([
                     'defensa_id' => $defensa->id,
                     'miembro_id' => $m['miembro_id'],
                     'tipo' => $m['tipo'],
                     'rol' => $m['rol'],
+                    'rol_tribunal_id' => $rolModel ? $rolModel->id : null,
                 ]);
             }
 

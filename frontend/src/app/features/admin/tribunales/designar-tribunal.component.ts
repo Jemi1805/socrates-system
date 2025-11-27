@@ -43,14 +43,16 @@ export class DesignarTribunalComponent implements OnInit {
   miembros: Array<{
     tipo: 'interno' | 'externo';
     miembroId: number | null;
-    rol: 'PRESIDENTE' | 'DELEGADO_INTERNO' | 'DELEGADO_EXTERNO' | '';
+    rol: 'PRESIDENTE' | 'DELEGADO_INTERNO' | 'DELEGADO_EXTERNO' | 'VOCAL' | '';
   }> = [];
 
-  readonly rolesTribunal = [
+  // Roles de tribunal cargados desde backend (fallback local si falla la API)
+  rolesTribunal: Array<{ value: string; label: string }> = [
     { value: 'PRESIDENTE', label: 'Presidente de tribunal' },
     { value: 'DELEGADO_INTERNO', label: 'Delegado interno' },
     { value: 'DELEGADO_EXTERNO', label: 'Delegado externo' },
-  ] as const;
+    { value: 'VOCAL', label: 'Vocal' },
+  ];
 
   saving = false;
   showErrors = false;
@@ -107,13 +109,34 @@ export class DesignarTribunalComponent implements OnInit {
     // Cargas HTTP una sola vez en OnInit usando snapshot
     this.loadTribunalesDisponibles();
     this.loadNumeroTribunales();
+    this.loadRolesTribunal();
+  }
+
+  private loadRolesTribunal() {
+    this.sga.getRolesTribunal().subscribe({
+      next: (resp) => {
+        const rows = (resp as any)?.data ?? resp;
+        const list: any[] = Array.isArray(rows) ? rows : Array.isArray(rows?.data) ? rows.data : [];
+        if (!Array.isArray(list) || !list.length) {
+          return;
+        }
+        this.rolesTribunal = list.map((r: any) => ({
+          value: String(r?.codigo || ''),
+          label: String(r?.nombre || r?.codigo || ''),
+        })).filter(x => x.value);
+      },
+      error: () => {
+        // Mantener fallback local definido en la propiedad
+      },
+    });
   }
 
   private resetMiembros() {
-    const baseRoles: Array<'PRESIDENTE' | 'DELEGADO_INTERNO' | 'DELEGADO_EXTERNO'> = [
+    const baseRoles: Array<'PRESIDENTE' | 'DELEGADO_INTERNO' | 'DELEGADO_EXTERNO' | 'VOCAL'> = [
       'PRESIDENTE',
       'DELEGADO_INTERNO',
       'DELEGADO_EXTERNO',
+      'VOCAL',
     ];
 
     const total = this.numeroTribunales && this.numeroTribunales > 0 ? this.numeroTribunales : 3;
@@ -121,7 +144,7 @@ export class DesignarTribunalComponent implements OnInit {
     this.miembros = Array.from({ length: total }, (_, idx) => ({
       tipo: idx === total - 1 ? 'externo' : 'interno',
       miembroId: null,
-      rol: (baseRoles[idx] as any) || '',
+      rol: (baseRoles[idx] as any) || 'VOCAL',
     }));
   }
 
