@@ -220,6 +220,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('proyecto/{id}/defensas', [DefensaController::class, 'byProyecto'])
         ->where(['id' => '\\d+'])
         ->middleware('permission:defensas.leer');
+    Route::get('defensas/{id}/tribunal', [DefensaController::class, 'tribunalMiembros'])
+        ->where(['id' => '\\d+'])
+        ->middleware('permission:defensas.leer');
 
     // Catálogo de roles de tribunal
     Route::get('roles_tribunal', [RolTribunalController::class, 'index'])

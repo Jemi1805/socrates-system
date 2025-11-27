@@ -104,6 +104,12 @@ interface PostulanteInscrito {
     aula?: string | null;
     estado?: string | null;
   } | null;
+  tribunal?: Array<{
+    rol: string;
+    tipo: 'interno' | 'externo';
+    miembro_id: number;
+    nombre: string | null;
+  }> | null;
 }
 
 @Component({
@@ -1415,7 +1421,7 @@ cargarDetallesTabla() {
   if (!Array.isArray(this.postulantesInscritos) || this.postulantesInscritos.length === 0) return;
   this.loadingDetalles = true;
   const items = this.postulantesInscritos.slice();
-  let remaining = items.length * 5; // proyecto + designación + postulante(SGA) + inscripciones + aranceles
+  let remaining = items.length * 6; // proyecto + designación + postulante(SGA) + inscripciones + aranceles
   const done = () => { remaining--; if (remaining <= 0) { this.loadingDetalles = false; this.loadingService.hideModal(); } };
   for (const ins of items) {
     const cod = ins.cod_ceta;
@@ -1491,6 +1497,32 @@ cargarDetallesTabla() {
       error: () => { ins.designacion = ins.designacion || null; },
       complete: () => done()
     });
+    // Tribunal de defensa (miembros y roles)
+    const defensaId: number | null =
+      (ins as any)?.defensa_id ??
+      ((ins as any)?.defensa?.id ?? null);
+
+    if (defensaId) {
+      this.sgaService.getDefensaTribunal(defensaId).subscribe({
+        next: (resp) => {
+          const base = (resp as any)?.data ?? resp;
+          const list: any[] = Array.isArray(base) ? base : [];
+          ins.tribunal = list.map((m) => ({
+            rol: m.rol_nombre || m.rol_codigo || m.rol,
+            tipo: m.tipo,
+            miembro_id: Number(m.miembro_id),
+            nombre: m.nombre ?? null,
+          }));
+        },
+        error: () => {
+          ins.tribunal = ins.tribunal || null;
+        },
+        complete: () => done(),
+      });
+    } else {
+      // No hay defensa aún; no se carga tribunal
+      done();
+    }
     // Datos del postulante desde SGA (para celular seguro y otros campos)
     this.sgaService.getPostulanteById(cod).subscribe({
       next: (resp) => {

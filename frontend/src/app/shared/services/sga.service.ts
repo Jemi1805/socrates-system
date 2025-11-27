@@ -494,6 +494,13 @@ export class SgaService {
       .pipe(catchError(this.handleError));
   }
 
+  getDefensaTribunal(defensaId: number): Observable<ApiResponse<Array<{ rol: string; tipo: 'interno' | 'externo'; miembro_id: number; nombre: string }>>> {
+    const url = `${environment.apiUrl}/defensas/${defensaId}/tribunal`;
+    return this.http
+      .get<ApiResponse<Array<{ rol: string; tipo: 'interno' | 'externo'; miembro_id: number; nombre: string }>>>(url)
+      .pipe(catchError(this.handleError));
+  }
+
   // --- ROLES DE TRIBUNAL ---
   getRolesTribunal(): Observable<ApiResponse<Array<{ id: number; codigo: string; nombre: string }>>> {
     return this.http

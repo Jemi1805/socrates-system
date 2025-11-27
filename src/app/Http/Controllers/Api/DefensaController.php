@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Defensa;
 use App\Models\DefensaTribunal;
+use App\Models\Tutor;
+use App\Models\Tribunal;
 use App\Models\RolTribunal;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -122,6 +124,61 @@ class DefensaController extends Controller
             ->get();
 
         return response()->json($items);
+    }
+
+    public function tribunalMiembros($id)
+    {
+        $defensa = Defensa::findOrFail($id);
+
+        $rows = DefensaTribunal::where('defensa_id', $defensa->id)->get();
+
+        $result = $rows->map(function (DefensaTribunal $row) {
+            $nombre = null;
+            if ($row->tipo === 'interno') {
+                $tutor = Tutor::find($row->miembro_id);
+                if ($tutor) {
+                    $nombre = trim(implode(' ', array_filter([
+                        $tutor->apellido_p,
+                        $tutor->apellido_m,
+                        $tutor->nombre,
+                    ])));
+                }
+            } else {
+                $tribunal = Tribunal::find($row->miembro_id);
+                if ($tribunal) {
+                    $nombre = trim(implode(' ', array_filter([
+                        $tribunal->apellido_p,
+                        $tribunal->apellido_m,
+                        $tribunal->nombre,
+                    ])));
+                }
+            }
+
+            // Código del rol (ENUM en defensa_tribunal)
+            $rolCodigo = $row->rol;
+
+            // Nombre descriptivo desde rol_tribunal
+            $rolNombre = $rolCodigo;
+            if ($row->rol_tribunal_id) {
+                $rolModel = RolTribunal::find($row->rol_tribunal_id);
+                if ($rolModel) {
+                    $rolNombre = $rolModel->nombre;
+                }
+            }
+
+            return [
+                'rol_codigo' => $rolCodigo,
+                'rol_nombre' => $rolNombre,
+                'tipo'       => $row->tipo,
+                'miembro_id' => $row->miembro_id,
+                'nombre'     => $nombre,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data'    => $result,
+        ]);
     }
 
     public function setTribunal(Request $request, $id)

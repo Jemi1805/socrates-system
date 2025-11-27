@@ -93,6 +93,15 @@ class RolPermisoSeeder extends Seeder
             }
         }
 
+        // Permiso específico para lecturas de defensas (usado por middleware permission:defensas.leer)
+        Permiso::updateOrCreate(
+            ['codigo' => 'defensas.leer'],
+            [
+                'nombre' => 'Ver/Leer Defensas',
+                'descripcion' => 'Permite ver y leer la información de defensas programadas',
+            ]
+        );
+
         // Sin asignación de permisos por rol: solo permisos directos por usuario
 
         // Crear usuarios por defecto

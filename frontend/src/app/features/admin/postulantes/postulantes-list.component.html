@@ -234,10 +234,21 @@
                         <ng-container *ngIf="tieneDesignacion(ins); else tribSinTutorTpl">
                           <ng-container *ngIf="seguimientoEstadoUI(ins) !== 'En proceso'; else tribSinSeguimientoTpl">
                             <ng-container *ngIf="tieneDefensaProgramada(ins); else tribSinDefensaTpl">
-                              <button type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irDesignarTribunal(ins)">
-                                <i class="bi bi-people"></i>
-                                <span class="ms-1">Designar</span>
-                              </button>
+                              <div *ngIf="ins.tribunal?.length; else tribDesignarBtn">
+                                <div *ngFor="let m of ins.tribunal" class="small">
+                                  <strong>{{ m.rol }}: </strong>
+                                  <span *ngIf="m.nombre; else sinNombreTpl">{{ m.nombre }}</span>
+                                  <ng-template #sinNombreTpl>
+                                    <span>Miembro #{{ m.miembro_id }}</span>
+                                  </ng-template>
+                                </div>
+                              </div>
+                              <ng-template #tribDesignarBtn>
+                                <button type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irDesignarTribunal(ins)">
+                                  <i class="bi bi-people"></i>
+                                  <span class="ms-1">Designar</span>
+                                </button>
+                              </ng-template>
                             </ng-container>
                           </ng-container>
                         </ng-container>
