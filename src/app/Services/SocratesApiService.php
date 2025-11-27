@@ -1623,8 +1623,24 @@ class SocratesApiService
     public function getPagosMaterialExtra($codCeta, $carrera = null)
     {
         if ($carrera) {
-            $this->setCarrera($carrera);
+            // Para Material Extra, ignorar doc_config y forzar directamente la URL base
+            // según el slug de carrera, para que no dependa de la configuración de documentos.
+            $slug = $this->normalizeCarreraSlug($carrera);
+            $urls = $this->getAvailableUrls();
+
+            if (isset($urls[$slug])) {
+                $this->currentUrl = $urls[$slug];
+                $this->currentCarreraSlug = $slug;
+                Log::info('getPagosMaterialExtra: forzando baseUrl por slug', [
+                    'slug' => $slug,
+                    'url' => $this->currentUrl,
+                ]);
+            } else {
+                // Fallback a la lógica general si por alguna razón no hay URL para el slug
+                $this->setCarrera($carrera);
+            }
         }
+
         return $this->buscarPagosMaterialExtraPorCodigo($codCeta);
     }
 

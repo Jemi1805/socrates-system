@@ -329,17 +329,19 @@ class SgaController extends Controller
      */
     public function getPagosMaterialExtra(Request $request, $codCeta)
     {
-        $carreraRaw = $request->get('carrera');
-        $carreraNorm = $this->normalizeCarrera($carreraRaw);
-        $slugs = [];
-
-        if (!empty($carreraNorm)) {
-            $slugs = [$carreraNorm];
-        } else {
-            $slugs = ['mecanica', 'electricidad'];
-        }
+        // Para pagos de material extra, siempre probar en ambos SGA (electricidad y mecánica),
+        // independientemente de la carrera indicada en el frontend o de la configuración
+        // usada para otros módulos (como generación de documentos).
+        // Se intenta primero "electricidad" porque la mayoría de los casos de prueba actuales
+        // pertenecen a Electricidad y Electrónica Automotriz.
+        $slugs = ['electricidad', 'mecanica'];
 
         foreach ($slugs as $slug) {
+            \Log::info('SGA getPagosMaterialExtra: intentando slug', [
+                'slug' => $slug,
+                'cod_ceta' => $codCeta,
+            ]);
+
             $result = $this->sgaService->getPagosMaterialExtra($codCeta, $slug);
 
             if ($result && isset($result['success']) && $result['success']) {
@@ -359,7 +361,7 @@ class SgaController extends Controller
             'success' => true,
             'data' => [],
             'total' => 0,
-            'carrera' => $carreraNorm ?: 'default',
+            'carrera' => 'default',
             'message' => 'Sin pagos de material extra o endpoint no disponible'
         ]);
     }
