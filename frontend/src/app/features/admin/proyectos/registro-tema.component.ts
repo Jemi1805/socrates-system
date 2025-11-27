@@ -115,6 +115,8 @@ export class RegistroTemaComponent implements OnInit {
           const tipo = pc?.tipo ?? '';
           const nombreSeed = (pc?.nombre ?? pc?.tema ?? pc?.nombre_tema ?? pc?.titulo ?? pc?.title ?? pc?.nombre_proyecto ?? pc?.proyecto ?? pc?.tema_nombre ?? '') as any;
           const objSeed = (pc?.objetivo ?? pc?.objetivos ?? pc?.objetivo_general ?? pc?.objetivo_especifico ?? pc?.descripcion ?? pc?.resumen ?? '') as any;
+          // Guardar solo como referencia para el resumen/edición, pero NO prellenar
+          // directamente los campos del formulario al iniciar un nuevo registro.
           this.proyectoGuardado = {
             ...(this.proyectoGuardado || {}),
             estado: estado || (this.proyectoGuardado?.estado || undefined),
@@ -122,8 +124,6 @@ export class RegistroTemaComponent implements OnInit {
             nombre: (nombreSeed || (this.proyectoGuardado as any)?.nombre || undefined),
             objetivo: (objSeed || (this.proyectoGuardado as any)?.objetivo || undefined),
           };
-          if (nombreSeed && !this.tema) this.tema = String(nombreSeed);
-          if (objSeed && !this.objetivos) this.objetivos = String(objSeed);
         } catch {
           // Ignorar cache inválido
         }
@@ -446,6 +446,9 @@ export class RegistroTemaComponent implements OnInit {
       return;
     }
 
+    // Mostrar modal de carga para todo el flujo de registro
+    this.loadingService.showModal();
+
     const payload: any = {
       cod_ceta: this.codCeta || undefined,
       nombres: this.nombres?.trim() || undefined,
@@ -474,7 +477,10 @@ export class RegistroTemaComponent implements OnInit {
           console.error('Error al registrar tema:', err);
           this.error = (err?.error?.message || err?.message || 'No se pudo registrar el tema');
         },
-        complete: () => this.loading = false,
+        complete: () => {
+          this.loading = false;
+          this.loadingService.hideModal();
+        },
       });
     };
 
@@ -550,6 +556,8 @@ export class RegistroTemaComponent implements OnInit {
 
   guardarEdicionResumen() {
     if (!this.proyectoGuardado?.id) { this.editResumen = false; this.editFromResumen = false; return; }
+    // Mostrar modal de carga durante todo el proceso de guardado
+    this.loadingService.showModal();
     // Tomar de los campos del formulario cuando venimos desde el formulario original
     const nombreTema = (this.editFromResumen ? (this.tema || '') : (this.editTema || '')).trim();
     const objetivos = (this.editFromResumen ? (this.objetivos || '') : (this.editObjetivos || '')).trim();
@@ -596,6 +604,7 @@ export class RegistroTemaComponent implements OnInit {
                 this.editResumen = false; this.editFromResumen = false; this.resumenVisible = true;
                 this.cambiosGuardados = diffs;
                 this.showModalCambios = true;
+                this.loadingService.hideModal();
               };
               if (id) {
                 console.log('[RegistroTema] updateInscripModalidad(id, body):', id, toSend);
@@ -608,15 +617,19 @@ export class RegistroTemaComponent implements OnInit {
                 this.postulanteService.updateInscripModalidadByCod(String(cod), toSend).subscribe({ next: (u3) => { console.log('[RegistroTema] updateInscripModalidadByCod OK:', u3); onOk(); this.verificarInscripModalidad(String(cod), nombreElegido, (toSend as any).modalidad_id ?? null); }, error: (err3) => { console.error('[RegistroTema] updateInscripModalidadByCod FALLÓ:', err3); this.editResumen = false; } });
               }
             },
-            error: (e) => { console.error('[RegistroTema] getInscripModalidadByCodCeta error:', e); this.editResumen = false; }
+            error: (e) => { console.error('[RegistroTema] getInscripModalidadByCodCeta error:', e); this.editResumen = false; this.loadingService.hideModal(); }
           });
         } else {
           this.editResumen = false; this.editFromResumen = false; this.resumenVisible = true;
           this.cambiosGuardados = diffs;
           this.showModalCambios = true;
+          this.loadingService.hideModal();
         }
       },
-      error: () => { this.editResumen = false; this.editFromResumen = false; this.resumenVisible = true; }
+      error: () => {
+        this.editResumen = false; this.editFromResumen = false; this.resumenVisible = true;
+        this.loadingService.hideModal();
+      }
     });
   }
 
