@@ -18,6 +18,7 @@ class Tribunal extends Model
         'ci',
         'celular',
         'profesion',
+        'institucion',
         'titulo_academico',
         'tipo',
         'activo',

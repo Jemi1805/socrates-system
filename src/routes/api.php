@@ -198,6 +198,9 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:tutores.leer');
     Route::post('tribunales', [TribunalController::class, 'store'])
         ->middleware('permission:tutores.crear');
+    Route::put('tribunales/{id}', [TribunalController::class, 'update'])
+        ->where(['id' => '\\d+'])
+        ->middleware('permission:tutores.actualizar');
     Route::patch('tribunales/{id}/toggle', [TribunalController::class, 'toggle'])
         ->where(['id' => '\\d+'])
         ->middleware('permission:tutores.activar_desactivar');

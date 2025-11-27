@@ -509,11 +509,28 @@ export class SgaService {
     ci: string;
     celular: string;
     profesion: string;
+    institucion?: string;
     titulo_academico: string;
     tipo?: 'interno' | 'externo';
   }): Observable<ApiResponse<any>> {
     return this.http
       .post<ApiResponse<any>>(`${environment.apiUrl}/tribunales`, data)
+      .pipe(catchError(this.handleError));
+  }
+
+  updateTribunal(id: number, data: {
+    nombre?: string;
+    apellido_p?: string;
+    apellido_m?: string;
+    ci?: string;
+    celular?: string;
+    profesion?: string;
+    institucion?: string;
+    titulo_academico?: string;
+    tipo?: 'interno' | 'externo';
+  }): Observable<ApiResponse<any>> {
+    return this.http
+      .put<ApiResponse<any>>(`${environment.apiUrl}/tribunales/${id}`, data)
       .pipe(catchError(this.handleError));
   }
 

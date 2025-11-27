@@ -34,6 +34,41 @@ class TribunalController extends Controller
         ]);
     }
 
+    public function update(Request $request, $id)
+    {
+        $tribunal = Tribunal::findOrFail($id);
+
+        $data = $request->all();
+
+        $validator = Validator::make($data, [
+            'nombre' => 'sometimes|required|string|max:150',
+            'apellido_p' => 'sometimes|required|string|max:150',
+            'apellido_m' => 'nullable|string|max:150',
+            'ci' => 'sometimes|required|string|regex:/^\\d{7,8}$/',
+            'celular' => 'sometimes|required|string|regex:/^\\d{8}$/',
+            'profesion' => 'sometimes|required|string|max:255',
+            'institucion' => 'nullable|string|max:255',
+            'titulo_academico' => 'sometimes|required|string|max:10',
+            'tipo' => 'nullable|in:interno,externo',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Datos inválidos para tribunal',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $tribunal->fill($validator->validated());
+        $tribunal->save();
+
+        return response()->json([
+            'success' => true,
+            'data' => $tribunal,
+        ]);
+    }
+
     public function store(Request $request)
     {
         $data = $request->all();
@@ -45,6 +80,7 @@ class TribunalController extends Controller
             'ci' => 'required|string|regex:/^\\d{7,8}$/',
             'celular' => 'required|string|regex:/^\\d{8}$/',
             'profesion' => 'required|string|max:255',
+            'institucion' => 'nullable|string|max:255',
             'titulo_academico' => 'required|string|max:10',
             'tipo' => 'nullable|in:interno,externo',
         ]);
@@ -65,6 +101,7 @@ class TribunalController extends Controller
                 'ci' => $data['ci'],
                 'celular' => $data['celular'],
                 'profesion' => $data['profesion'],
+                'institucion' => $data['institucion'] ?? null,
                 'titulo_academico' => $data['titulo_academico'],
                 'tipo' => $data['tipo'] ?? 'externo',
                 'activo' => true,

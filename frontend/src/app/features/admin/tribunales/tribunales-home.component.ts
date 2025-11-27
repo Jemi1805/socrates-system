@@ -28,7 +28,9 @@ export class TribunalesHomeComponent implements OnInit {
     ci: string;
     celular?: string;
     profesion?: string;
+    institucion?: string;
     titulo_academico?: string;
+    tipo?: 'interno' | 'externo';
     activo?: boolean;
   }> = [];
 
@@ -57,6 +59,8 @@ export class TribunalesHomeComponent implements OnInit {
   registroModalVisible = false;
   registroSaving = false;
   registroShowErrors = false;
+  editingTribunalId: number | null = null;
+  editingTutorId: number | null = null;
   // Registro de tribunal (interno o externo)
   registroExterno: {
     nombre: string;
@@ -65,6 +69,7 @@ export class TribunalesHomeComponent implements OnInit {
     ci: string;
     celular: string;
     profesion: string;
+    institucion: string;
     titulo_academico: string;
     tipo: 'interno' | 'externo';
   } = {
@@ -74,6 +79,7 @@ export class TribunalesHomeComponent implements OnInit {
     ci: '',
     celular: '',
     profesion: '',
+    institucion: '',
     titulo_academico: '',
     tipo: 'externo',
   };
@@ -151,6 +157,8 @@ export class TribunalesHomeComponent implements OnInit {
   openRegistroTribunalModal() {
     this.registroShowErrors = false;
     this.registroSaving = false;
+    this.editingTribunalId = null;
+    this.editingTutorId = null;
     this.registroExterno = {
       nombre: '',
       apellido_p: '',
@@ -158,9 +166,31 @@ export class TribunalesHomeComponent implements OnInit {
       ci: '',
       celular: '',
       profesion: '',
+      institucion: '',
       titulo_academico: '',
       tipo: 'externo',
     };
+    this.registroModalVisible = true;
+  }
+
+  openEditarInterno(t: TutorReg) {
+    this.registroShowErrors = false;
+    this.registroSaving = false;
+    this.editingTutorId = t.id;
+    this.editingTribunalId = null;
+
+    this.registroExterno = {
+      nombre: t.nombre || '',
+      apellido_p: t.apellido_p || '',
+      apellido_m: t.apellido_m || '',
+      ci: t.ci || '',
+      celular: t.celular || '',
+      profesion: (t as any).titulo || '',
+      institucion: '',
+      titulo_academico: t.titulo_academico || '',
+      tipo: 'interno',
+    };
+
     this.registroModalVisible = true;
   }
 
@@ -207,18 +237,71 @@ export class TribunalesHomeComponent implements OnInit {
       ...this.registroExterno,
     };
 
-    this.sga.createTribunalExterno(payload).subscribe({
+    let obs;
+    if (this.editingTutorId) {
+      // Actualizar datos del tutor (tribunal interno) en la tabla tutores
+      obs = this.sga.updateTutor(this.editingTutorId, {
+        nombre: payload.nombre,
+        apellido_p: payload.apellido_p,
+        apellido_m: payload.apellido_m,
+        ci: payload.ci,
+        celular: payload.celular,
+        titulo: payload.profesion,
+        titulo_academico: payload.titulo_academico,
+      } as any);
+    } else if (this.editingTribunalId) {
+      // Actualizar tribunal externo existente
+      obs = this.sga.updateTribunal(this.editingTribunalId, payload);
+    } else {
+      // Crear nuevo tribunal (por defecto externo)
+      obs = this.sga.createTribunalExterno(payload);
+    }
+
+    obs.subscribe({
       next: () => {
         this.registroSaving = false;
         this.registroModalVisible = false;
         this.loadingService.hideModal();
+        this.loadTribunalesDisponibles();
       },
       error: (err) => {
-        console.error('[RegistroTribunal] Error al guardar tribunal externo', err);
+        console.error('[RegistroTribunal] Error al guardar tribunal', err);
         this.registroSaving = false;
         this.loadingService.hideModal();
       }
     });
+  }
+
+  openEditarTribunal(t: {
+    id: number;
+    nombre: string;
+    apellido_p?: string;
+    apellido_m?: string;
+    ci: string;
+    celular?: string;
+    profesion?: string;
+    institucion?: string;
+    titulo_academico?: string;
+    tipo?: 'interno' | 'externo';
+  }) {
+    this.registroShowErrors = false;
+    this.registroSaving = false;
+    this.editingTribunalId = t.id;
+    this.editingTutorId = null;
+
+    this.registroExterno = {
+      nombre: t.nombre || '',
+      apellido_p: t.apellido_p || '',
+      apellido_m: t.apellido_m || '',
+      ci: t.ci || '',
+      celular: t.celular || '',
+      profesion: t.profesion || '',
+      institucion: t.institucion || '',
+      titulo_academico: t.titulo_academico || '',
+      tipo: (t.tipo as any) || 'externo',
+    };
+
+    this.registroModalVisible = true;
   }
 
   // Solo permitir números en inputs de CI y celular

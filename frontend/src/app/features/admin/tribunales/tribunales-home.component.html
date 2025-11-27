@@ -63,6 +63,7 @@
                     <th>Título(s)</th>
                     <th>Tipo</th>
                     <th class="text-center">Es tribunal</th>
+                    <th class="text-end">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -80,6 +81,11 @@
                                (click)="onClickEsTribunal('interno', t, $event)" />
                       </div>
                     </td>
+                    <td class="text-end">
+                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditarInterno(t)">
+                        <i class="bi bi-pencil-square"></i>
+                      </button>
+                    </td>
                   </tr>
                   <!-- Externos -->
                   <tr *ngFor="let t of tribunalesExternos">
@@ -94,6 +100,11 @@
                                [checked]="t.activo"
                                (click)="onClickEsTribunal('externo', t, $event)" />
                       </div>
+                    </td>
+                    <td class="text-end">
+                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditarTribunal(t)">
+                        <i class="bi bi-pencil-square"></i>
+                      </button>
                     </td>
                   </tr>
                 </tbody>
@@ -235,6 +246,10 @@
                   <option value="externo">Externo</option>
                   <option value="interno">Interno</option>
                 </select>
+              </div>
+              <div class="col-md-6" *ngIf="registroExterno.tipo === 'externo'">
+                <label class="form-label">Institución (si es externo)</label>
+                <input type="text" class="form-control" [(ngModel)]="registroExterno.institucion">
               </div>
               <div class="col-12">
                 <div class="invalid-feedback d-block" *ngIf="registroShowErrors && !isRegistroValido()">
