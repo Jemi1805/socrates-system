@@ -364,8 +364,15 @@ class InscripModalidadController extends CrudController
                 $codCeta = (int)($yearPrefix . $flag . str_pad((string)$seq, 3, '0', STR_PAD_LEFT));
                 $data['cod_ceta_est'] = $codCeta;
             }
-            $ins = new InscripModalidad();
-            $ins->cod_ceta_est = $data['cod_ceta_est'];
+            // Reutilizar inscripción existente para este cod_ceta_est (último registro)
+            $ins = InscripModalidad::query()
+                ->where('cod_ceta_est', $data['cod_ceta_est'])
+                ->orderByDesc('id')
+                ->first();
+            if (!$ins) {
+                $ins = new InscripModalidad();
+                $ins->cod_ceta_est = $data['cod_ceta_est'];
+            }
             if (isset($data['nombres_est'])) $ins->nombres_est = $data['nombres_est'];
             if (isset($data['apellidos_est'])) $ins->apellidos_est = $data['apellidos_est'];
             if (isset($data['modalidad_id'])) $ins->modalidad_id = $data['modalidad_id'];
@@ -381,9 +388,13 @@ class InscripModalidadController extends CrudController
             } else if ($user) {
                 $ins->user_name = $user->nombre_usuario;
             }
-            // Valores por defecto
-            $ins->fecha_inscripcion = now()->toDateString();
-            $ins->estado = 'pendiente';
+            // Valores por defecto solo al crear por primera vez
+            if (!$ins->exists || !$ins->fecha_inscripcion) {
+                $ins->fecha_inscripcion = now()->toDateString();
+            }
+            if (!$ins->exists || !$ins->estado) {
+                $ins->estado = 'pendiente';
+            }
             $ins->save();
             
             $allPaid = true;
@@ -392,31 +403,9 @@ class InscripModalidadController extends CrudController
             if (!empty($data['aranceles'])) {
                 foreach ($data['aranceles'] as $a) {
                     $item = null;
+                    // Si viene id explícito, actualizar ese arancel; si no, crear SIEMPRE uno nuevo
                     if (!empty($a['id'])) {
                         $item = ArancelesEst::find($a['id']);
-                    }
-                    // Evitar duplicados: intentar localizar registro existente por claves fuertes
-                    if (!$item) {
-                        $base = DB::table('aranceles_est')->where('cod_ceta_est', $ins->cod_ceta_est);
-                        $nf = (isset($a['num_factura']) && trim((string)$a['num_factura']) !== '') ? trim((string)$a['num_factura']) : '';
-                        $nc = (isset($a['num_comprobante']) && trim((string)$a['num_comprobante']) !== '') ? trim((string)$a['num_comprobante']) : '';
-                        $fecha = array_key_exists('fecha', $a) ? $a['fecha'] : null;
-                        $concepto = array_key_exists('concepto', $a) ? $a['concepto'] : null;
-                        $monto = array_key_exists('monto', $a) ? $a['monto'] : null;
-                        $q = clone $base;
-                        if ($nf !== '' && $nf !== '0') {
-                            $q->where('num_factura', $nf);
-                        } elseif ($nc !== '' && $nc !== '0') {
-                            $q->where('num_comprobante', $nc);
-                        } else {
-                            if ($fecha !== null) $q->where('fecha', $fecha);
-                            if ($concepto !== null) $q->where('concepto', $concepto);
-                            if ($monto !== null) $q->where('monto', $monto);
-                        }
-                        $exists = $q->first();
-                        if ($exists) {
-                            $item = ArancelesEst::find($exists->id);
-                        }
                     }
                     if (!$item) {
                         $item = new ArancelesEst();
