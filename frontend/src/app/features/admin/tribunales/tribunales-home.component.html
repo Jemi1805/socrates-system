@@ -119,50 +119,113 @@
       </div>
     </div>
 
-    <!-- Tribunales designados por postulante -->
-    <div class="row g-3 align-items-start mt-3" *ngIf="showDesignados">
+    <!-- Tribunales designados (listado global) -->
+    <div class="row g-3 align-items-start" *ngIf="showDesignados">
       <div class="col-12">
         <div class="card action-card">
           <div class="card-body">
-            <h5 class="card-title d-flex align-items-center gap-2">
+            <h5 class="card-title gap-2 align-items-center">
               <i class="bi bi-journal-text text-primary"></i>
-              Tribunales designados por postulante
+              Tribunales designados
             </h5>
-
-            <div class="border rounded-3 p-3 bg-light mb-2">
-              <div class="row g-2 align-items-center">
-                <div class="col-12 col-md-4 col-lg-3">
-                  <label class="form-label mb-1">Código CETA del postulante</label>
-                  <input
-                    type="text"
-                    class="form-control form-control-sm"
-                    [(ngModel)]="selectedPostulanteCodCeta"
-                  >
-                  <div class="text-danger small mt-1" *ngIf="designacionShowErrors && !selectedPostulanteCodCeta">
-                    Ingresa el código CETA del postulante
+            <div class="filters-bar d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 mt-2">
+              <div class="d-flex align-items-end gap-2 flex-wrap">
+                <div class="d-flex flex-column">
+                  <label class="form-label fw-semibold mb-1">Convocatoria</label>
+                  <select
+                    class="form-select form-select-sm"
+                    [(ngModel)]="selectedConvocatoriaDesignados"
+                    (ngModelChange)="onDesignadosConvocatoriaChange()"
+                    [disabled]="loadingConvocatoriasDesignados">
+                    <option [ngValue]="null">Todas</option>
+                    <option *ngFor="let conv of designadosConvocatorias" [ngValue]="conv.id">
+                      {{ conv.numero_convocatoria ? conv.numero_convocatoria + ' - ' : '' }}{{ conv.nombre || conv.convocatoria_nom || 'Convocatoria' }}
+                    </option>
+                  </select>
+                </div>
+                <div class="d-flex flex-column">
+                  <label class="form-label mb-1 fw-semibold">Buscar tribunal</label>
+                  <div class="input-group input-group-sm">
+                    <input
+                      type="text"
+                      class="form-control"
+                      [(ngModel)]="designadosSearchTerm"
+                      (keyup.enter)="onDesignadosSearchEnter()"
+                      placeholder="Nombre del tribunal" />
+                    <button class="btn btn-outline-secondary" type="button" (click)="onDesignadosSearchEnter()">
+                      <i class="bi bi-search"></i>
+                    </button>
                   </div>
                 </div>
-                <div class="col-12 col-md-4 col-lg-3 d-flex align-items-end mt-2 mt-md-0">
-                  <button
-                    class="btn btn-success btn-sm w-100 d-flex align-items-center justify-content-center gap-2"
-                    type="button"
-                    (click)="openDesignacionModal()">
-                    <i class="bi bi-people-fill"></i>
-                    <span>Designar tribunal (3 miembros)</span>
-                  </button>
-                </div>
-                <div class="col-12 col-lg-6 mt-2 mt-lg-0">
-                  <div class="text-muted small">
-                    Selecciona el postulante y luego define los tres miembros del tribunal
-                    (Presidente, Delegado interno y Delegado externo).
-                  </div>
-                </div>
+                <button class="btn btn-outline-secondary btn-sm" type="button" (click)="clearDesignadosFilters()">
+                  <i class="bi bi-eraser me-1"></i>
+                  Limpiar filtros
+                </button>
+              </div>
+              <div class="d-flex align-items-center gap-3">
+                <small class="text-muted">Total tribunales: <strong>{{ totalTribunalesDesignados }}</strong></small>
+                <small class="text-muted">Total designaciones: <strong>{{ totalDesignacionesTribunal }}</strong></small>
+                <button class="btn btn-outline-secondary btn-sm" type="button" (click)="cargarTribunalesDesignados()" [disabled]="loadingDesignados">
+                  <i class="bi" [ngClass]="loadingDesignados ? 'bi-arrow-repeat spin' : 'bi-arrow-clockwise'"></i>
+                  {{ loadingDesignados ? 'Actualizando...' : 'Actualizar' }}
+                </button>
               </div>
             </div>
 
-            <div class="alert alert-info py-2 mb-0">
-              <i class="bi bi-info-circle me-1"></i>
-              El listado detallado de tribunales designados se conectará al backend más adelante.
+            <div class="mt-2">
+
+              <div *ngIf="loadingDesignados" class="text-muted small mb-2">
+                Cargando tribunales designados...
+              </div>
+
+              <div *ngIf="errorDesignados" class="alert alert-danger py-2 mb-2">
+                {{ errorDesignados }}
+              </div>
+
+              <div class="table-responsive" *ngIf="!loadingDesignados && !errorDesignados && tribunalesDesignados.length">
+                <table class="table table-sm table-striped align-middle">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>Tribunal</th>
+                      <th>Tipo</th>
+                      <th>Rol</th>
+                      <th>Fecha defensa</th>
+                      <th>Horario</th>
+                      <th>Aula</th>
+                      <th>Convocatoria</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let t of tribunalesDesignados">
+                      <td>{{ t.nombre || ('Miembro #' + t.miembro_id) }}</td>
+                      <td>{{ t.tipo === 'externo' ? 'Externo' : 'Interno' }}</td>
+                      <td>{{ t.rol_nombre }}</td>
+                      <td>{{ t.fecha_defensa | date:'dd/MM/yyyy' }}</td>
+                      <td>
+                        <ng-container *ngIf="t.hora_inicio || t.hora_fin; else sinHoraTpl">
+                          {{ t.hora_inicio || '-' }} - {{ t.hora_fin || '-' }}
+                        </ng-container>
+                        <ng-template #sinHoraTpl>
+                          <span class="text-muted">Sin hora</span>
+                        </ng-template>
+                      </td>
+                      <td>{{ t.aula || '-' }}</td>
+                      <td>
+                        <ng-container *ngIf="t.convocatoria_nombre; else sinConvocatoriaTpl">
+                          {{ t.convocatoria_numero ? (t.convocatoria_numero + ' - ') : '' }}{{ t.convocatoria_nombre }}
+                        </ng-container>
+                        <ng-template #sinConvocatoriaTpl>
+                          <span class="text-muted">Sin convocatoria</span>
+                        </ng-template>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div *ngIf="!loadingDesignados && !errorDesignados && !tribunalesDesignados.length" class="text-muted small">
+                No se encontraron tribunales designados que coincidan con los filtros.
+              </div>
             </div>
           </div>
         </div>

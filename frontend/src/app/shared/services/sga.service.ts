@@ -501,6 +501,28 @@ export class SgaService {
       .pipe(catchError(this.handleError));
   }
 
+  getTribunalesDesignadosPorPostulante(codCeta: number | string): Observable<ApiResponse<any[]>> {
+    const cod = encodeURIComponent(String(codCeta));
+    const url = `${environment.apiUrl}/defensas/por-postulante/${cod}`;
+    return this.http
+      .get<ApiResponse<any[]>>(url)
+      .pipe(catchError(this.handleError));
+  }
+
+  getTribunalesDesignados(params?: { convocatoria_id?: number | null; search?: string | null }): Observable<ApiResponse<any[]>> {
+    let httpParams = new HttpParams();
+    if (params?.convocatoria_id != null) {
+      httpParams = httpParams.set('convocatoria_id', String(params.convocatoria_id));
+    }
+    if (params?.search && params.search.toString().trim()) {
+      httpParams = httpParams.set('search', params.search.toString().trim());
+    }
+    const url = `${environment.apiUrl}/defensas/tribunales-designados`;
+    return this.http
+      .get<ApiResponse<any[]>>(url, { params: httpParams })
+      .pipe(catchError(this.handleError));
+  }
+
   // --- ROLES DE TRIBUNAL ---
   getRolesTribunal(): Observable<ApiResponse<Array<{ id: number; codigo: string; nombre: string }>>> {
     return this.http

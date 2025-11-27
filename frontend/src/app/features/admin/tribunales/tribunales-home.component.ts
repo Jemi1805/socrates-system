@@ -34,9 +34,33 @@ export class TribunalesHomeComponent implements OnInit {
     activo?: boolean;
   }> = [];
 
-  // UI: sección de tribunales designados por postulante
+  // UI: sección de tribunales designados (listado global)
   showDesignados = false;
   selectedPostulanteCodCeta: string | null = null;
+  loadingDesignados = false;
+  errorDesignados: string | null = null;
+  tribunalesDesignados: Array<{
+    defensa_id: number;
+    cod_ceta: string | number | null;
+    fecha_defensa: string | null;
+    hora_inicio: string | null;
+    hora_fin: string | null;
+    aula: string | null;
+    rol_nombre: string;
+    rol_codigo: string;
+    tipo: 'interno' | 'externo';
+    miembro_id: number;
+    nombre: string | null;
+    convocatoria_id?: number | null;
+    convocatoria_nombre?: string | null;
+    convocatoria_numero?: number | null;
+  }> = [];
+
+  // Filtros para tribunales designados (similar a Tutores designados)
+  designadosConvocatorias: any[] = [];
+  loadingConvocatoriasDesignados = false;
+  selectedConvocatoriaDesignados: number | null = null;
+  designadosSearchTerm = '';
 
   // Modal de designación de tribunal (3 miembros)
   designacionModalVisible = false;
@@ -96,21 +120,6 @@ export class TribunalesHomeComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadTribunalesDisponibles();
-
-    // Si venimos desde la tabla de Postulantes inscritos con un cod_ceta en query params,
-    // preseleccionar el postulante y abrir directamente la interfaz de designación.
-    const codFromQuery = this.route.snapshot.queryParamMap.get('cod_ceta');
-    if (codFromQuery) {
-      this.selectedPostulanteCodCeta = codFromQuery.toString().trim();
-      if (this.selectedPostulanteCodCeta) {
-        this.showDesignados = true;
-        this.showDisponibles = false;
-        // Abrir el modal después de que Angular pinte la vista
-        setTimeout(() => {
-          this.openDesignacionModal();
-        }, 0);
-      }
-    }
   }
 
   loadTribunalesDisponibles() {
@@ -432,15 +441,104 @@ export class TribunalesHomeComponent implements OnInit {
     this.showDesignados = newVal;
     if (newVal) {
       this.showDisponibles = false;
+      this.ensureDesignadosConvocatorias();
+      this.cargarTribunalesDesignados();
+    } else {
+      this.errorDesignados = null;
     }
   }
 
-  openDesignacionModal() {
-    const cod = (this.selectedPostulanteCodCeta || '').toString().trim();
-    if (!cod) {
-      this.designacionShowErrors = true;
+  ensureDesignadosConvocatorias() {
+    if (this.designadosConvocatorias.length || this.loadingConvocatoriasDesignados) {
       return;
     }
+    this.loadingConvocatoriasDesignados = true;
+    this.sga.getConvocatorias({ per_page: 100 }).subscribe({
+      next: (resp) => {
+        const raw: any = (resp as any)?.data ?? resp;
+        const list = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
+        this.designadosConvocatorias = list as any[];
+        this.loadingConvocatoriasDesignados = false;
+      },
+      error: () => {
+        this.designadosConvocatorias = [];
+        this.loadingConvocatoriasDesignados = false;
+      },
+    });
+  }
+
+  onDesignadosConvocatoriaChange() {
+    this.cargarTribunalesDesignados();
+  }
+
+  onDesignadosSearchEnter() {
+    this.cargarTribunalesDesignados();
+  }
+
+  clearDesignadosFilters() {
+    this.designadosSearchTerm = '';
+    this.selectedConvocatoriaDesignados = null;
+    this.cargarTribunalesDesignados();
+  }
+
+  get totalTribunalesDesignados(): number {
+    const ids = new Set<number>();
+    for (const row of this.tribunalesDesignados) {
+      if (row.miembro_id) {
+        ids.add(Number(row.miembro_id));
+      }
+    }
+    return ids.size;
+  }
+
+  get totalDesignacionesTribunal(): number {
+    return this.tribunalesDesignados.length;
+  }
+
+  cargarTribunalesDesignados() {
+    this.errorDesignados = null;
+    this.loadingDesignados = true;
+    this.tribunalesDesignados = [];
+
+    this.sga.getTribunalesDesignados({
+      convocatoria_id: this.selectedConvocatoriaDesignados,
+      search: this.designadosSearchTerm || null,
+    }).subscribe({
+      next: (resp) => {
+        const base = (resp as any)?.data ?? resp;
+        const list: any[] = Array.isArray(base) ? base : [];
+        this.tribunalesDesignados = list.map((row) => {
+          const nombreRaw = (row.nombre ?? '').toString().trim();
+          return {
+            defensa_id: Number(row.defensa_id),
+            cod_ceta: row.cod_ceta ?? null,
+            fecha_defensa: row.fecha_defensa ?? null,
+            hora_inicio: row.hora_inicio ?? null,
+            hora_fin: row.hora_fin ?? null,
+            aula: row.aula ?? null,
+            rol_nombre: row.rol_nombre || row.rol_codigo || '',
+            rol_codigo: row.rol_codigo || '',
+            tipo: row.tipo === 'externo' ? 'externo' : 'interno',
+            miembro_id: Number(row.miembro_id),
+            nombre: nombreRaw || null,
+            convocatoria_id: row.convocatoria_id ?? null,
+            convocatoria_nombre: row.convocatoria_nombre ?? null,
+            convocatoria_numero: row.convocatoria_numero ?? null,
+          };
+        });
+      },
+      error: (err) => {
+        console.error('[Tribunales] Error al cargar tribunales designados', err);
+        this.errorDesignados = err?.message || 'Error al cargar tribunales designados.';
+        this.tribunalesDesignados = [];
+      },
+      complete: () => {
+        this.loadingDesignados = false;
+      },
+    });
+  }
+
+  openDesignacionModal() {
     this.designacionShowErrors = false;
     this.miembros = [
       { tipo: 'interno', miembroId: null, rol: 'PRESIDENTE' },
@@ -493,16 +591,11 @@ export class TribunalesHomeComponent implements OnInit {
     if (!this.canSaveDesignacion()) {
       return;
     }
-    const cod = (this.selectedPostulanteCodCeta || '').toString().trim();
-    if (!cod) {
-      return;
-    }
     this.designacionSaving = true;
 
     // TODO: conectar con backend cuando existan los endpoints.
     // Por ahora, solo mostramos en consola la estructura que se enviaría.
     const payload = this.miembros.map((m) => ({
-      cod_ceta_est: cod,
       tipo: m.tipo,
       miembro_id: m.miembroId,
       rol: m.rol,

@@ -223,6 +223,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('defensas/{id}/tribunal', [DefensaController::class, 'tribunalMiembros'])
         ->where(['id' => '\\d+'])
         ->middleware('permission:defensas.leer');
+    Route::get('defensas/por-postulante/{cod_ceta}', [DefensaController::class, 'byPostulanteWithTribunal'])
+        ->middleware('permission:defensas.leer');
+
+    Route::get('defensas/tribunales-designados', [DefensaController::class, 'tribunalesDesignados'])
+        ->middleware('permission:defensas.leer');
 
     // Catálogo de roles de tribunal
     Route::get('roles_tribunal', [RolTribunalController::class, 'index'])

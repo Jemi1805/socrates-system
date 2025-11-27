@@ -126,6 +126,195 @@ class DefensaController extends Controller
         return response()->json($items);
     }
 
+    public function byPostulanteWithTribunal($codCeta)
+    {
+        $defensas = Defensa::where('cod_ceta', $codCeta)
+            ->orderByDesc('fecha_defensa')
+            ->orderByDesc('id')
+            ->get();
+
+        if ($defensas->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+            ]);
+        }
+
+        $defensas->load('miembrosTribunal');
+
+        $result = [];
+        foreach ($defensas as $defensa) {
+            foreach ($defensa->miembrosTribunal as $row) {
+                $nombre = null;
+                if ($row->tipo === 'interno') {
+                    $tutor = Tutor::find($row->miembro_id);
+                    if ($tutor) {
+                        $nombre = trim(implode(' ', array_filter([
+                            $tutor->apellido_p,
+                            $tutor->apellido_m,
+                            $tutor->nombre,
+                        ])));
+                    }
+                } else {
+                    $tribunal = Tribunal::find($row->miembro_id);
+                    if ($tribunal) {
+                        $nombre = trim(implode(' ', array_filter([
+                            $tribunal->apellido_p,
+                            $tribunal->apellido_m,
+                            $tribunal->nombre,
+                        ])));
+                    }
+                }
+
+                $rolCodigo = $row->rol;
+                $rolNombre = $rolCodigo;
+                if ($row->rol_tribunal_id) {
+                    $rolModel = RolTribunal::find($row->rol_tribunal_id);
+                    if ($rolModel) {
+                        $rolNombre = $rolModel->nombre;
+                    }
+                }
+
+                $result[] = [
+                    'defensa_id' => $defensa->id,
+                    'cod_ceta' => $defensa->cod_ceta,
+                    'fecha_defensa' => $defensa->fecha_defensa,
+                    'hora_inicio' => $defensa->hora_inicio,
+                    'hora_fin' => $defensa->hora_fin,
+                    'aula' => $defensa->aula,
+                    'rol_codigo' => $rolCodigo,
+                    'rol_nombre' => $rolNombre,
+                    'tipo' => $row->tipo,
+                    'miembro_id' => $row->miembro_id,
+                    'nombre' => $nombre,
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $result,
+        ]);
+    }
+
+    public function tribunalesDesignados(Request $request)
+    {
+        $convocatoriaId = $request->query('convocatoria_id');
+        $search = trim((string) $request->query('search', ''));
+
+        $query = Defensa::query()
+            ->join('defensa_tribunal as dt', 'dt.defensa_id', '=', 'defensas.id')
+            ->leftJoin('tutores as tut', function ($join) {
+                $join->on('tut.id', '=', 'dt.miembro_id')
+                    ->where('dt.tipo', '=', 'interno');
+            })
+            ->leftJoin('tribunales as trb', function ($join) {
+                $join->on('trb.id', '=', 'dt.miembro_id')
+                    ->where('dt.tipo', '=', 'externo');
+            })
+            ->leftJoin('convocatorias as conv', 'conv.id', '=', 'defensas.convocatoria_id')
+            ->select([
+                'defensas.id as defensa_id',
+                'defensas.cod_ceta',
+                'defensas.fecha_defensa',
+                'defensas.hora_inicio',
+                'defensas.hora_fin',
+                'defensas.aula',
+                'defensas.convocatoria_id',
+                'dt.tipo',
+                'dt.miembro_id',
+                'dt.rol',
+                'dt.rol_tribunal_id',
+                DB::raw("COALESCE(CONCAT_WS(' ', tut.apellido_p, tut.apellido_m, tut.nombre), CONCAT_WS(' ', trb.apellido_p, trb.apellido_m, trb.nombre)) as nombre_miembro"),
+                DB::raw("COALESCE(trb.tipo, 'interno') as tipo_miembro"),
+                DB::raw("conv.nombre as convocatoria_nombre"),
+                DB::raw("COALESCE(conv.numero_convocatoria, 0) as convocatoria_numero"),
+            ])
+            ->orderByDesc('defensas.fecha_defensa')
+            ->orderByDesc('defensas.id');
+
+        if ($convocatoriaId !== null && $convocatoriaId !== '') {
+            $query->where('defensas.convocatoria_id', $convocatoriaId);
+        }
+
+        if ($search !== '') {
+            $like = '%' . mb_strtolower($search, 'UTF-8') . '%';
+            $query->whereRaw('LOWER(COALESCE(CONCAT_WS(" ", tut.apellido_p, tut.apellido_m, tut.nombre), CONCAT_WS(" ", trb.apellido_p, trb.apellido_m, trb.nombre))) LIKE ?', [$like]);
+        }
+
+        $rows = $query->get();
+
+        if ($rows->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+            ]);
+        }
+
+        $rolIds = $rows->pluck('rol_tribunal_id')->filter()->unique()->all();
+        $rolesMap = collect();
+        if (!empty($rolIds)) {
+            $rolesMap = RolTribunal::query()
+                ->whereIn('id', $rolIds)
+                ->get()
+                ->keyBy('id');
+        }
+
+        $result = $rows->map(function ($row) use ($rolesMap) {
+            $rolCodigo = $row->rol;
+            $rolNombre = $rolCodigo;
+            if ($row->rol_tribunal_id && $rolesMap->has($row->rol_tribunal_id)) {
+                $rolNombre = $rolesMap[$row->rol_tribunal_id]->nombre;
+            }
+
+            // Normalizar nombre del miembro (interno o externo)
+            $nombre = trim((string) ($row->nombre_miembro ?? ''));
+            if ($nombre === '') {
+                if ($row->tipo_miembro === 'externo') {
+                    $tribunal = Tribunal::find($row->miembro_id);
+                    if ($tribunal) {
+                        $nombre = trim(implode(' ', array_filter([
+                            $tribunal->apellido_p,
+                            $tribunal->apellido_m,
+                            $tribunal->nombre,
+                        ])));
+                    }
+                } else {
+                    $tutor = Tutor::find($row->miembro_id);
+                    if ($tutor) {
+                        $nombre = trim(implode(' ', array_filter([
+                            $tutor->apellido_p,
+                            $tutor->apellido_m,
+                            $tutor->nombre,
+                        ])));
+                    }
+                }
+            }
+
+            return [
+                'defensa_id' => (int) $row->defensa_id,
+                'cod_ceta' => $row->cod_ceta,
+                'fecha_defensa' => $row->fecha_defensa,
+                'hora_inicio' => $row->hora_inicio,
+                'hora_fin' => $row->hora_fin,
+                'aula' => $row->aula,
+                'convocatoria_id' => $row->convocatoria_id,
+                'convocatoria_nombre' => $row->convocatoria_nombre,
+                'convocatoria_numero' => (int) $row->convocatoria_numero,
+                'rol_codigo' => $rolCodigo,
+                'rol_nombre' => $rolNombre,
+                'tipo' => $row->tipo_miembro === 'externo' ? 'externo' : 'interno',
+                'miembro_id' => (int) $row->miembro_id,
+                'nombre' => $nombre !== '' ? $nombre : null,
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => $result,
+        ]);
+    }
+
     public function tribunalMiembros($id)
     {
         $defensa = Defensa::findOrFail($id);
