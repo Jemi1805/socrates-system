@@ -6,6 +6,7 @@ use App\Models\InscripModalidad;
 use App\Models\ArancelesEst;
 use App\Models\DiplomaBachiller;
 use App\Models\DatosCarrera;
+use App\Models\DesignacionTutor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -231,6 +232,24 @@ class InscripModalidadController extends CrudController
             $record->save();
         } else {
             $record = InscripModalidad::create($payload);
+        }
+
+        // Sincronizar convocatoria en designacion_tutor si viene en el payload
+        $hasConvId = array_key_exists('convocatoria_id', $data);
+        $hasConvNom = array_key_exists('nom_convocatoria', $data);
+        if (($hasConvId || $hasConvNom) && !empty($data['cod_ceta_est'])) {
+            $updateDt = [];
+            if ($hasConvId) {
+                $updateDt['convocatoria_id'] = $data['convocatoria_id'];
+            }
+            if ($hasConvNom) {
+                $updateDt['convocatoria_nom'] = $data['nom_convocatoria'];
+            }
+            if (!empty($updateDt)) {
+                DesignacionTutor::query()
+                    ->where('cod_ceta', (int) $data['cod_ceta_est'])
+                    ->update($updateDt);
+            }
         }
 
         return response()->json($record);

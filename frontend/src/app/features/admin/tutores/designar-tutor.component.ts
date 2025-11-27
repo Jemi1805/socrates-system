@@ -237,6 +237,13 @@ export class DesignarTutorComponent implements OnInit {
         if (this.estudiante && this.inscripcion) {
           this.estudiante = { ...this.estudiante, inscripcion: this.inscripcion };
         }
+        // Si la última designación no tiene convocatoria_nom, intentar tomarla de la inscripción
+        if (this.lastDesignation && !this.lastDesignation.convocatoria_nom && this.inscripcion) {
+          const insConvNom = (this.inscripcion as any).convocatoria_nom ?? (this.inscripcion as any).nom_convocatoria;
+          if (insConvNom) {
+            this.lastDesignation.convocatoria_nom = String(insConvNom);
+          }
+        }
         if (this.lastDesignation) {
           this.confirmConvocatoriaNombre = this.lastDesignation?.convocatoria_nom || this.confirmConvocatoriaNombre;
           const storedInicio = this.resolveConvocatoriaFechaInicioFromSource(this.lastDesignation);
@@ -268,6 +275,9 @@ export class DesignarTutorComponent implements OnInit {
       const codNumeric = cod ? Number(cod) : this.estudiante?.cod_ceta ? Number(this.estudiante.cod_ceta) : null;
       this.fetchInscripcionForCod(codNumeric);
 
+      // Completar/recuperar designación real desde backend (tabla designacion_tutor)
+      this.loadLastDesignationFromBackend(this.codCeta || (this.estudiante?.cod_ceta ? String(this.estudiante.cod_ceta) : null));
+
       // Si no hay proyecto cache, intentar traerlo por código
       if (!this.proyecto && cod) {
         this.proyectoService.getByCod(cod).subscribe({ next: (res) => {
@@ -278,6 +288,55 @@ export class DesignarTutorComponent implements OnInit {
       this.loadAreas();
       this.loadTutores();
       this.loadConvocatorias();
+    });
+  }
+
+  private loadLastDesignationFromBackend(cod: string | null) {
+    const codStr = (cod || '').toString().trim() || (this.estudiante?.cod_ceta ? String(this.estudiante.cod_ceta) : '');
+    if (!codStr) {
+      return;
+    }
+    this.sga.getTutoresDesignados({ cod_ceta: codStr }).subscribe({
+      next: (resp) => {
+        const base: any = (resp as any)?.data ?? resp;
+        const rows: any[] = Array.isArray(base) ? base : Array.isArray(base?.data) ? base.data : [];
+        if (!Array.isArray(rows) || !rows.length) return;
+        const item: any = rows[0];
+
+        // Si ya hay lastDesignation en sesión, solo completar campos vacíos
+        if (this.lastDesignation) {
+          if (!this.lastDesignation.convocatoria_nom && (item as any).convocatoria_label) {
+            this.lastDesignation.convocatoria_nom = (item as any).convocatoria_label;
+          }
+          if (!this.lastDesignation.area && (item as any).area) {
+            this.lastDesignation.area = (item as any).area;
+          }
+          if (!this.lastDesignation.tutor_nombre && (item as any).tutor_nombre) {
+            this.lastDesignation.tutor_nombre = (item as any).tutor_nombre;
+          }
+        } else {
+          // Crear una designación mínima para mostrar en el resumen
+          this.lastDesignation = {
+            tutor_nombre: (item as any).tutor_nombre || null,
+            area: (item as any).area || null,
+            convocatoria_nom: (item as any).convocatoria_label || null,
+            cod_ceta: codStr,
+          };
+        }
+
+        if (this.lastDesignation?.convocatoria_nom) {
+          this.confirmConvocatoriaNombre = this.lastDesignation.convocatoria_nom;
+        }
+
+        // Mostrar el resumen si hay una designación válida
+        if (this.lastDesignation && (this.lastDesignation.tutor_nombre || this.lastDesignation.convocatoria_nom)) {
+          this.showResumenDesignacion = true;
+          this.showSeleccionTutores = false;
+        }
+      },
+      error: () => {
+        // En caso de error, mantener el estado actual sin romper otras funcionalidades
+      },
     });
   }
 
