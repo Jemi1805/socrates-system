@@ -169,13 +169,11 @@ class DefensaController extends Controller
         $inicioStr = $inicio->format('H:i:s');
         $finStr = $fin->format('H:i:s');
 
+        // Tratar intervalos como [inicio, fin): permiten 08:00-09:00 y 09:00-10:00 sin solape.
+        // Hay conflicto si existe una defensa con: existing_start < new_end AND existing_end > new_start
         $query->where(function ($q) use ($inicioStr, $finStr) {
-            $q->whereBetween('hora_inicio', [$inicioStr, $finStr])
-                ->orWhereBetween('hora_fin', [$inicioStr, $finStr])
-                ->orWhere(function ($q2) use ($inicioStr, $finStr) {
-                    $q2->where('hora_inicio', '<=', $inicioStr)
-                        ->where('hora_fin', '>=', $finStr);
-                });
+            $q->where('hora_inicio', '<', $finStr)
+              ->where('hora_fin', '>', $inicioStr);
         });
 
         if ($query->exists()) {
