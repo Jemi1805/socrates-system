@@ -307,7 +307,11 @@ class DefensaController extends Controller
 
         if ($search !== '') {
             $like = '%' . mb_strtolower($search, 'UTF-8') . '%';
-            $query->whereRaw('LOWER(COALESCE(CONCAT_WS(" ", tut.apellido_p, tut.apellido_m, tut.nombre), CONCAT_WS(" ", trb.apellido_p, trb.apellido_m, trb.nombre))) LIKE ?', [$like]);
+            // Buscar por nombre completo tanto de tutores internos como de tribunales externos
+            $query->where(function ($q) use ($like) {
+                $q->whereRaw('LOWER(CONCAT_WS(" ", tut.apellido_p, tut.apellido_m, tut.nombre)) LIKE ?', [$like])
+                  ->orWhereRaw('LOWER(CONCAT_WS(" ", trb.apellido_p, trb.apellido_m, trb.nombre)) LIKE ?', [$like]);
+            });
         }
 
         $rows = $query->get();
