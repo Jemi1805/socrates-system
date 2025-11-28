@@ -823,6 +823,35 @@ export class TutoresHomeComponent implements OnInit {
         tutor.cronograma_fin = this.resolveFirstNonEmpty(docData.cronograma_fin, tutor.cronograma_fin);
       }
 
+      // Resolver número y cite definitivos para el PDF a partir de todas las fuentes disponibles.
+      // Priorizar SIEMPRE el correlativo real de doc_designaciones (docData.correlativo).
+      let numeroDocPdf = this.normalizeNumeroDocumento(
+        docData?.correlativo
+        ?? (docData as any)?.doc_correlativo
+        ?? primaryData?.doc_correlativo
+        ?? primaryData?.correlativo
+        ?? primaryData?.numero_documento
+        ?? correlativoBusqueda
+        ?? tutor.numero_documento
+        ?? (tutor as any)?.doc_correlativo
+      ) || undefined;
+
+      let citePdf = this.resolveFirstNonEmpty(
+        docData?.cite,
+        (docData as any)?.doc_cite,
+        primaryData?.cite,
+        primaryData?.doc_cite,
+        tutor.cite,
+        (tutor as any)?.doc_cite
+      );
+
+      // Si no vino cite desde backend pero sí tenemos correlativo, construimos el cite
+      // con el correlativo real de doc_designaciones.
+      if (!citePdf && numeroDocPdf) {
+        const yearNow = new Date().getFullYear();
+        citePdf = `CETA/DA/COMINT/${yearNow}/${numeroDocPdf}`;
+      }
+
       // Enriquecer con datos del SGA del postulante (para carrera exacta)
       const sgaByCod = new Map<number, any>();
       for (const est of estudiantesSeleccionados) {
@@ -941,7 +970,7 @@ export class TutoresHomeComponent implements OnInit {
       const firstTema = this.resolveEstudianteTemaFromRaw(mergedFirstRaw, firstN?.tema) || firstN?.tema || undefined;
       const firstNombre = firstN?.nombre || undefined;
 
-      await this.pdfService.generarDesignacionTutorPdf({
+      const pdfData: any = {
         tutorNombre: tutorDisplayName,
         tutorTipo: tutor.tipo_tutor_nombre || undefined,
         tutorCi: tutor.tutor_ci || undefined,
@@ -961,8 +990,9 @@ export class TutoresHomeComponent implements OnInit {
         fecha: fechaDocumento,
         fechaGeneracion,
         lugar: 'Cochabamba',
-        numeroDocumento: tutor.numero_documento || docData?.correlativo || undefined,
-        cite: tutor.cite || docData?.cite || undefined,
+        // Número y cite ya resueltos a partir de primaryData, docData y tutor
+        numeroDocumento: numeroDocPdf,
+        cite: citePdf || undefined,
         elaboradoPor: docData?.elaborado_por || userNombre,
         cargoElaborador: 'Responsable de Modalidad de Graduación',
         estudianteNombre: firstNombre || undefined,
@@ -985,7 +1015,15 @@ export class TutoresHomeComponent implements OnInit {
             fechaDesignacion: est.fechaDesignacion || raw?.fecha_designacion || fechaDocumento,
           };
         }),
-      }, {
+      };
+
+      console.log('PDF DESIGNADOS DOC =>', {
+        numeroDocumento: pdfData.numeroDocumento,
+        cite: pdfData.cite,
+        carrera: pdfData.carrera,
+      });
+
+      await this.pdfService.generarDesignacionTutorPdf(pdfData, {
         fileName: `designacion-${tutor.tutor_nombre.replace(/\s+/g, '-').toLowerCase()}.pdf`
       });
     } catch (err) {

@@ -198,6 +198,24 @@ export class ModalidadGraduacionComponent implements OnInit {
       modalDescripcion
     );
 
+    const yearDoc = (docData && (docData.year || docData.anio))
+      || (designation && (designation.year || designation.anio))
+      || fechaDocumento.getFullYear();
+    const numeroDocRaw = docData?.correlativo || correlativo || designation?.numero_documento || null;
+    const citeDoc = (() => {
+      if (docData?.cite && String(docData.cite).trim().length) return String(docData.cite).trim();
+      if (designation?.cite && String(designation.cite).trim().length) return String(designation.cite).trim();
+      if (numeroDocRaw != null) {
+        const num = String(numeroDocRaw).trim();
+        if (num) {
+          return `CETA/DA/COMINT/${yearDoc}/${num}`;
+        }
+      }
+      return undefined;
+    })();
+
+    const firstEst = estudiantesOrdenados && estudiantesOrdenados.length ? estudiantesOrdenados[0] : undefined;
+
     const documento = {
       tutorNombre,
       tutorApellidoP: tutorApellidoP || undefined,
@@ -209,14 +227,22 @@ export class ModalidadGraduacionComponent implements OnInit {
       tutorTitulo: this.resolvePdfTutorTitulo(docData || designation),
       tutorTituloAcademico: tutorTituloAcademico || undefined,
       area: docData?.area ?? docData?.designacion_area ?? designation?.area ?? undefined,
-      carrera: docData?.carrera_nombre || this.estudiante?.carrera || designation?.carrera_nombre || undefined,
+      carrera:
+        docData?.carrera_nombre
+        || this.estudiante?.carrera
+        || (firstEst && firstEst.carrera)
+        || designation?.carrera_nombre
+        || undefined,
       convocatoria: docData?.convocatoria_nom || designation?.convocatoria_nom || undefined,
       convocatoriaFechaInicio: docData?.convocatoria_fecha_inicio || designation?.convocatoria_fecha_inicio || undefined,
       convocatoriaFechaFin: docData?.convocatoria_fecha_fin || designation?.convocatoria_fecha_fin || undefined,
       cronogramaInicio: docData?.cronograma_inicio || docData?.convocatoria_fecha_inicio || designation?.cronograma_inicio || designation?.convocatoria_fecha_inicio || fechaDocumento,
       cronogramaFin: docData?.cronograma_fin || docData?.convocatoria_fecha_fin || designation?.cronograma_fin || designation?.convocatoria_fecha_fin || fechaDocumento,
-      numeroDocumento: docData?.correlativo || designation?.numero_documento || correlativo,
-      cite: docData?.cite || designation?.cite || undefined,
+      // Forzar que numeroDocumento tenga siempre algo razonable: primero correlativo del backend,
+      // luego el correlativo recibido por parámetro, y por último el numero_documento de la designación
+      numeroDocumento: docData?.correlativo || correlativo || designation?.numero_documento || undefined,
+      // Enviar siempre un cite completo al servicio de PDF
+      cite: citeDoc,
       modalidad: modalidadDoc || undefined,
       fecha: fechaDocumento,
       lugar: 'Cochabamba',
@@ -1516,6 +1542,12 @@ export class ModalidadGraduacionComponent implements OnInit {
         alert('No se pudo preparar el documento para descargar.');
         return;
       }
+
+      console.log('PDF DESIGNACION DOC =>', {
+        numeroDocumento: pdfPayload.documento?.numeroDocumento,
+        cite: pdfPayload.documento?.cite,
+        carrera: pdfPayload.documento?.carrera,
+      });
 
       await this.pdfService.generarDesignacionTutorPdf(pdfPayload.documento, pdfPayload.opciones);
     } catch (err) {

@@ -46,6 +46,7 @@ class TutorController extends Controller
             ->leftJoin('convocatorias as c', 'dt.convocatoria_id', '=', 'c.id')
             ->leftJoin('postulantes as p', 'dt.cod_ceta', '=', 'p.cod_ceta')
             ->leftJoin('proyecto as pr', 'dt.proyecto_id', '=', 'pr.id')
+            ->leftJoin('carrera', 't.cod_carrera', '=', 'carrera.cod_carrera')
             ->select([
                 'dd.id as doc_id',
                 'dd.doc_tipo',
@@ -85,6 +86,7 @@ class TutorController extends Controller
                 't.titulo as tutor_titulo',
                 't.titulo_academico as tutor_titulo_academico',
                 't.cod_carrera',
+                'carrera.nombre_carrera as carrera_nombre',
                 'tipo_tutor.id as tipo_tutor_id',
                 'tipo_tutor.nombre as tipo_tutor_nombre',
                 'c.nombre as convocatoria_nombre',
@@ -158,6 +160,7 @@ class TutorController extends Controller
                 'convocatoria_anio' => $first->convocatoria_anio,
                 'convocatoria_fecha_inicio' => $first->convocatoria_fecha_inicio,
                 'convocatoria_fecha_fin' => $first->convocatoria_fecha_fin,
+                'carrera_nombre' => $first->carrera_nombre,
                 'estudiantes' => $this->mergeEstudiantesResumen($estudiantes),
                 'pie_notas' => $this->decodeJsonColumn($first->pie_notas) ?: static::$docPieNotas,
                 'para_nombre' => $first->para_nombre ?: $tutorNombreResolved,
@@ -2534,7 +2537,7 @@ class TutorController extends Controller
 
             DB::commit();
 
-            $rowQuery = DB::table('designacion_tutor as dt')
+            $row = DB::table('designacion_tutor as dt')
                 ->leftJoin('tutores as t', 'dt.tutor_id', '=', 't.id')
                 ->leftJoin('tipo_tutor as tt', 't.tipo_tutor_id', '=', 'tt.id')
                 ->leftJoin('doc_designaciones as dd', 'dd.designacion_tutor_id', '=', 'dt.id')

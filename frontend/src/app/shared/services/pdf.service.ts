@@ -725,10 +725,18 @@ export class PdfService {
     };
 
     const citeValue = (() => {
+      // Debug mínimo para ver qué llega desde los distintos flujos
+      // (designación desde lista vs. designación desde modalidad)
+      console.log('PDF SERVICE DESIGNACION INPUT =>', {
+        rawCite: data.cite,
+        rawNumeroDocumento: data.numeroDocumento,
+      });
       if (data.cite && data.cite.trim().length) return data.cite.trim();
       const year = String(now.getFullYear());
       const numero = normalizeNumber(data.numeroDocumento);
-      return isMemorandum ? `CETA/DA/MEM/${year}/${numero}` : `CETA/DA/COMINT/${year}/${numero}`;
+      const computed = isMemorandum ? `CETA/DA/MEM/${year}/${numero}` : `CETA/DA/COMINT/${year}/${numero}`;
+      console.log('PDF SERVICE DESIGNACION CITE COMPUTED =>', computed);
+      return computed;
     })();
     const paraCargoResolved = (() => {
       const raw = (data.paraCargo || '').toString().trim();
