@@ -229,6 +229,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('defensas/tribunales-designados', [DefensaController::class, 'tribunalesDesignados'])
         ->middleware('permission:defensas.leer');
 
+    Route::post('defensas/doc-tribunal', [DefensaController::class, 'docDesignacionTribunal'])
+        ->middleware('permission:defensas.leer');
+
     // Catálogo de roles de tribunal
     Route::get('roles_tribunal', [RolTribunalController::class, 'index'])
         ->middleware('permission:defensas.programar');

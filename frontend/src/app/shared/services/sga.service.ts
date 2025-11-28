@@ -524,6 +524,14 @@ export class SgaService {
       .pipe(catchError(this.handleError));
   }
 
+  downloadDocDesignacionTribunal(payload: { miembro_id: number; tipo: 'interno' | 'externo'; rol: string; convocatoria_id?: number | null }) {
+    const url = `${environment.apiUrl}/defensas/doc-tribunal`;
+    return this.http.post(url, payload, {
+      observe: 'response',
+      responseType: 'blob' as 'json',
+    });
+  }
+
   // --- ROLES DE TRIBUNAL ---
   getRolesTribunal(): Observable<ApiResponse<Array<{ id: number; codigo: string; nombre: string }>>> {
     return this.http

@@ -121,6 +121,11 @@ export class TribunalesHomeComponent implements OnInit {
   disableSaving = false;
   pendingDisableTribunal: { tipo: 'interno' | 'externo'; id: number; nombre?: string; apellido_p?: string; apellido_m?: string } | null = null;
 
+  // Confirmación para generación de documento de designación de tribunal
+  confirmDocModalVisible = false;
+  confirmDocRow: any | null = null;
+  confirmDocLoading = false;
+
   constructor(private sga: SgaService, private loadingService: LoadingService, private route: ActivatedRoute) {}
 
   ngOnInit(): void {
@@ -635,10 +640,6 @@ export class TribunalesHomeComponent implements OnInit {
     });
   }
 
-  onGenerarDocTribunal(row: any) {
-    console.debug('[Tribunales] Generar documento de designación de tribunal', row);
-  }
-
   openDesignacionModal() {
     this.designacionShowErrors = false;
     this.miembros = [
@@ -683,6 +684,69 @@ export class TribunalesHomeComponent implements OnInit {
       tipo: (e as any).tipo === 'interno' ? 'interno' as const : 'externo' as const,
     }));
     return [...internos, ...externos];
+  }
+
+  onGenerarDocTribunal(row: any) {
+    this.confirmDocRow = row;
+    this.confirmDocModalVisible = true;
+  }
+
+  closeConfirmDocTribunal() {
+    if (this.confirmDocLoading) {
+      return;
+    }
+    this.confirmDocModalVisible = false;
+    this.confirmDocRow = null;
+  }
+
+  confirmarGenerarDocTribunal() {
+    if (!this.confirmDocRow) {
+      return;
+    }
+
+    const row = this.confirmDocRow;
+    const payload = {
+      miembro_id: Number(row.miembro_id),
+      tipo: row.tipo === 'externo' ? ('externo' as const) : ('interno' as const),
+      rol: row.rol_codigo || row.rol_nombre || '',
+      convocatoria_id: row.convocatoria_id ?? null,
+    };
+
+    if (!payload.miembro_id || !payload.rol) {
+      console.error('[Tribunales] Faltan datos para generar documento de tribunal', payload);
+      return;
+    }
+
+    this.confirmDocLoading = true;
+    this.loadingService.showModal();
+
+    this.sga.downloadDocDesignacionTribunal(payload).subscribe({
+      next: (resp) => {
+        this.confirmDocLoading = false;
+        this.loadingService.hideModal();
+        this.confirmDocModalVisible = false;
+        this.confirmDocRow = null;
+
+        const blob = resp.body as Blob;
+        const contentDisposition = resp.headers.get('Content-Disposition') || '';
+        let filename = 'designacion-tribunal.docx';
+        const match = /filename="?([^";]+)"?/i.exec(contentDisposition);
+        if (match && match[1]) {
+          filename = decodeURIComponent(match[1]);
+        }
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: (err) => {
+        console.error('[Tribunales] Error al generar documento de tribunal', err);
+        this.confirmDocLoading = false;
+        this.loadingService.hideModal();
+      },
+    });
   }
 
   canSaveDesignacion(): boolean {

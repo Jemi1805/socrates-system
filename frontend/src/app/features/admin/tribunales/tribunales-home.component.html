@@ -186,13 +186,13 @@
                 <table class="table table-sm table-striped align-middle">
                   <thead class="table-dark">
                     <tr>
-                      <th>Tribunal</th>
-                      <th>Rol</th>
-                      <th>Fecha defensa</th>
-                      <th>Horario</th>
-                      <th>Grupo</th>
-                      <th>Aula</th>
-                      <th>Convocatoria</th>
+                      <th class=>Tribunal</th>
+                      <th class="text-center">Rol</th>
+                      <th class="text-center">Fecha defensa</th>
+                      <th class="text-center">Horario</th>
+                      <th class="text-center">Grupo</th>
+                      <th class="text-center">Aula</th>
+                      <th class="text-center">Convocatoria</th>
                       <th class="text-center">Documento</th>
                     </tr>
                   </thead>
@@ -478,5 +478,72 @@
       </div>
     </div>
     <div class="modal-backdrop fade show" (click)="cancelarDeshabilitarTribunal()"></div>
+  </ng-container>
+
+  <!-- Modal: Confirmar generación de documento de designación de tribunal -->
+  <ng-container *ngIf="confirmDocModalVisible && confirmDocRow">
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalConfirmDocTribunalLabel">
+      <div class="modal-dialog modal-md modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h5 class="modal-title" id="modalConfirmDocTribunalLabel">
+              <i class="bi bi-file-earmark-text me-2 text-primary"></i>
+              Generar documento de designación
+            </h5>
+            <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="closeConfirmDocTribunal()"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2">
+              Se generará el documento de designación para el siguiente tribunal:
+            </p>
+
+            <ul class="list-unstyled mb-2 small">
+              <li><strong>Tribunal:</strong> {{ confirmDocRow.nombre || ('Miembro #' + confirmDocRow.miembro_id) }}</li>
+              <li><strong>Rol:</strong> {{ confirmDocRow.rol_nombre }}</li>
+              <li><strong>Tipo:</strong> {{ confirmDocRow.tipo === 'externo' ? 'Externo' : 'Interno' }}</li>
+              <li>
+                <strong>Fechas:</strong>
+                <ng-container *ngIf="confirmDocRow.fechas_label; else fechaUnicaConfirmTpl">
+                  {{ confirmDocRow.fechas_label }}
+                </ng-container>
+                <ng-template #fechaUnicaConfirmTpl>
+                  {{ confirmDocRow.fecha_defensa | date:'dd/MM/yyyy' }}
+                </ng-template>
+              </li>
+              <li>
+                <strong>Horarios:</strong>
+                <ng-container *ngIf="confirmDocRow.horarios_list?.length; else horarioSimpleConfirmTpl">
+                  {{ confirmDocRow.horarios_list.join(' • ') }}
+                </ng-container>
+                <ng-template #horarioSimpleConfirmTpl>
+                  <ng-container *ngIf="confirmDocRow.hora_inicio || confirmDocRow.hora_fin; else sinHoraConfirmTpl">
+                    {{ (confirmDocRow.hora_inicio || '-') + ' - ' + (confirmDocRow.hora_fin || '-') }}
+                  </ng-container>
+                </ng-template>
+                <ng-template #sinHoraConfirmTpl>
+                  <span class="text-muted">Sin hora</span>
+                </ng-template>
+              </li>
+              <li><strong>Grupo:</strong> {{ confirmDocRow.grupo || '-' }}</li>
+              <li><strong>Aula:</strong> {{ confirmDocRow.aula || '-' }}</li>
+            </ul>
+
+            <p class="mb-0 text-muted small">
+              Al confirmar se solicitará el correlativo al SGA (MEM/COMINT según planta/consultor)
+              y se descargará el documento Word correspondiente.
+            </p>
+          </div>
+          <div class="modal-footer py-2 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="closeConfirmDocTribunal()" [disabled]="confirmDocLoading">
+              Cancelar
+            </button>
+            <button type="button" class="btn btn-success btn-sm" (click)="confirmarGenerarDocTribunal()" [disabled]="confirmDocLoading">
+              {{ confirmDocLoading ? 'Generando...' : 'Confirmar y generar' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade show" (click)="closeConfirmDocTribunal()"></div>
   </ng-container>
 </div>

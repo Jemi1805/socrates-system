@@ -8,9 +8,12 @@ use App\Models\DefensaTribunal;
 use App\Models\Tutor;
 use App\Models\Tribunal;
 use App\Models\RolTribunal;
+use App\Services\SocratesApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use PhpOffice\PhpWord\TemplateProcessor;
 
 class DefensaController extends Controller
 {
@@ -483,5 +486,502 @@ class DefensaController extends Controller
                 'miembros' => $defensa->miembrosTribunal,
             ]);
         });
+    }
+
+    public function docDesignacionTribunal(Request $request)
+    {
+        $data = $request->validate([
+            'miembro_id' => 'required|integer|min:1',
+            'tipo' => 'required|in:interno,externo',
+            'rol' => 'required|string',
+            'convocatoria_id' => 'nullable|integer|exists:convocatorias,id',
+        ]);
+
+        $miembroId = (int) $data['miembro_id'];
+        $tipoMiembro = $data['tipo'] === 'externo' ? 'externo' : 'interno';
+        $rolCodigo = (string) $data['rol'];
+        $convocatoriaId = isset($data['convocatoria_id']) ? (int) $data['convocatoria_id'] : null;
+
+        $query = Defensa::query()
+            ->join('defensa_tribunal as dt', 'dt.defensa_id', '=', 'defensas.id')
+            ->leftJoin('rol_tribunal as rt', 'rt.id', '=', 'dt.rol_tribunal_id')
+            ->where('dt.miembro_id', $miembroId)
+            ->where('dt.tipo', $tipoMiembro)
+            ->where('dt.rol', $rolCodigo);
+
+        if ($convocatoriaId) {
+            $query->where('defensas.convocatoria_id', $convocatoriaId);
+        }
+
+        $rows = $query
+            ->select([
+                'defensas.id as defensa_id',
+                'defensas.cod_ceta',
+                'defensas.fecha_defensa',
+                'defensas.hora_inicio',
+                'defensas.hora_fin',
+                'defensas.grupo',
+                'defensas.aula',
+                'defensas.convocatoria_id',
+                'dt.tipo as tipo_miembro',
+                'dt.miembro_id',
+                'dt.rol',
+                'dt.rol_tribunal_id',
+                'rt.nombre as rol_nombre',
+            ])
+            ->orderBy('defensas.fecha_defensa')
+            ->orderBy('defensas.hora_inicio')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontraron defensas para el tribunal indicado',
+            ], 404);
+        }
+
+        $primerRow = $rows->first();
+
+        if ($tipoMiembro === 'externo') {
+            $trib = Tribunal::find($miembroId);
+            if (!$trib) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tribunal externo no encontrado',
+                ], 404);
+            }
+            $tituloAcad = (string) ($trib->titulo_academico ?? '');
+            $nombrePlano = trim(implode(' ', array_filter([
+                $trib->nombre ?? null,
+                $trib->apellido_p ?? null,
+                $trib->apellido_m ?? null,
+            ])));
+            $paraNombre = trim(trim($tituloAcad . ' ' . $nombrePlano));
+            $condicion = 'consultor';
+        } else {
+            $tutor = Tutor::find($miembroId);
+            if (!$tutor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tutor no encontrado',
+                ], 404);
+            }
+            $tituloAcad = (string) ($tutor->titulo_academico ?? '');
+            $nombrePlano = trim(implode(' ', array_filter([
+                $tutor->nombre ?? null,
+                $tutor->apellido_p ?? null,
+                $tutor->apellido_m ?? null,
+            ])));
+            $paraNombre = trim(trim($tituloAcad . ' ' . $nombrePlano));
+            $condicion = (string) ($tutor->condicion_interna ?? '');
+        }
+
+        $cond = strtolower(trim($condicion));
+        $tipoDocCod = $cond === 'planta' ? 'MEM' : 'COMINT';
+        $tipoDocNombre = $tipoDocCod === 'MEM' ? 'MEMORÁNDUM' : 'COMUNICACIÓN INTERNA';
+
+        $now = Carbon::now();
+        $fechaDoc = $now->format('d/m/Y');
+        $anio = (int) $now->year;
+
+        // Datos fijos de encabezado del documento
+        $paraCargo = 'DOCENTE TÉCNICO';
+        $deNombre = 'Ing. Bradley Jaillita Burgoa';
+        $deCargo = 'DIRECTOR ACADÉMICO';
+        $asunto = 'DESIGNACIÓN TRIBUNAL CALIFICADOR';
+
+        $sga = app(SocratesApiService::class);
+        $abreviaturaBase = rtrim((string) $sga->getAbreviaturaBase(), '/');
+
+        // Usar la misma convención que TutorController::fetchSequenceFromSga
+        // MEM -> id_tipo_documento = 2, COMINT -> id_tipo_documento = 4
+        $docTipoId = $tipoDocCod === 'MEM' ? 2 : 4;
+
+        // Intentar obtener correlativo desde SGA
+        $remoteCorrelativo = null;
+        $corResult = $sga->getCorrelativoAbreviatura($abreviaturaBase . '/', $docTipoId, $anio, null, []);
+        if (!empty($corResult['success']) && !empty($corResult['data']) && is_array($corResult['data'])) {
+            $dataCor = $corResult['data'];
+            if (isset($dataCor['numero']) && is_numeric($dataCor['numero'])) {
+                $remoteCorrelativo = (int) $dataCor['numero'];
+            } elseif (isset($dataCor['correlativo']) && is_numeric($dataCor['correlativo'])) {
+                $remoteCorrelativo = (int) $dataCor['correlativo'];
+            }
+        }
+
+        // Sincronizar con tabla local doc_designacion_secuencias (compartida con tutores)
+        $correlativoInt = null;
+        DB::transaction(function () use ($tipoDocCod, $anio, $remoteCorrelativo, &$correlativoInt) {
+            $seq = DB::table('doc_designacion_secuencias')
+                ->where('doc_tipo', $tipoDocCod)
+                ->where('year', $anio)
+                ->lockForUpdate()
+                ->first();
+
+            $lastLocal = $seq ? (int) $seq->last_correlativo : 0;
+
+            if ($remoteCorrelativo !== null && $remoteCorrelativo > $lastLocal) {
+                // Usar el valor del SGA si es mayor que la secuencia local
+                $correlativoInt = $remoteCorrelativo;
+            } else {
+                // Caso contrario, avanzar secuencia local
+                $correlativoInt = $lastLocal + 1;
+            }
+
+            $newLast = max($lastLocal, $correlativoInt);
+
+            DB::table('doc_designacion_secuencias')->updateOrInsert(
+                ['doc_tipo' => $tipoDocCod, 'year' => $anio],
+                [
+                    'last_correlativo' => $newLast,
+                    'updated_at' => Carbon::now(),
+                    'created_at' => $seq ? $seq->created_at : Carbon::now(),
+                ]
+            );
+        });
+
+        $correlativoStr = str_pad((string) $correlativoInt, 3, '0', STR_PAD_LEFT);
+
+        // Construir CITE base
+        $cite = $abreviaturaBase . '/' . $tipoDocCod . '/' . $anio . '/' . $correlativoStr;
+
+        // Intentar registrar también el documento en el SGA (misma lógica que para tutores)
+        $sgaDoc = $this->createSgaDocumentForTribunal(
+            $tipoDocCod,
+            $anio,
+            $correlativoStr,
+            $paraNombre,
+            $paraCargo,
+            $asunto,
+            null // carreraSlug: por ahora usar configuración por defecto del SGA
+        );
+        if (is_array($sgaDoc)) {
+            if (!empty($sgaDoc['correlativo'])) {
+                $correlativoInt = (int) $sgaDoc['correlativo'];
+                $correlativoStr = str_pad((string) $correlativoInt, 3, '0', STR_PAD_LEFT);
+            }
+            if (!empty($sgaDoc['cite'])) {
+                $cite = (string) $sgaDoc['cite'];
+            } else {
+                $cite = $abreviaturaBase . '/' . $tipoDocCod . '/' . $anio . '/' . $correlativoStr;
+            }
+
+            // Asegurar que la tabla de secuencias local refleje el correlativo final
+            DB::table('doc_designacion_secuencias')->updateOrInsert(
+                ['doc_tipo' => $tipoDocCod, 'year' => $anio],
+                [
+                    'last_correlativo' => $correlativoInt,
+                    'updated_at' => Carbon::now(),
+                ]
+            );
+        }
+
+        $fechasMap = [];
+        $minHoraGlobal = null;
+        $maxHoraGlobal = null;
+
+        foreach ($rows as $r) {
+            if (!$r->fecha_defensa) {
+                continue;
+            }
+            $fechaIso = Carbon::parse($r->fecha_defensa)->format('Y-m-d');
+            $keyParts = [
+                $fechaIso,
+                (string) ($r->rol_tribunal_id ?: $r->rol),
+                (string) ($r->grupo ?? ''),
+                (string) ($r->aula ?? ''),
+            ];
+            $key = implode('|', $keyParts);
+
+            if (!isset($fechasMap[$key])) {
+                $fechasMap[$key] = [
+                    'fecha_iso' => $fechaIso,
+                    'rol_nombre' => $r->rol_nombre ?: $r->rol,
+                    'grupo' => $r->grupo,
+                    'aula' => $r->aula,
+                    'hora_min' => null,
+                    'hora_max' => null,
+                    'count' => 0,
+                ];
+            }
+
+            $horaIni = $r->hora_inicio ? substr((string) $r->hora_inicio, 0, 5) : null;
+            $horaFin = $r->hora_fin ? substr((string) $r->hora_fin, 0, 5) : null;
+
+            if ($horaIni && ($fechasMap[$key]['hora_min'] === null || $horaIni < $fechasMap[$key]['hora_min'])) {
+                $fechasMap[$key]['hora_min'] = $horaIni;
+            }
+            if ($horaFin && ($fechasMap[$key]['hora_max'] === null || $horaFin > $fechasMap[$key]['hora_max'])) {
+                $fechasMap[$key]['hora_max'] = $horaFin;
+            }
+
+            if ($horaIni && ($minHoraGlobal === null || $horaIni < $minHoraGlobal)) {
+                $minHoraGlobal = $horaIni;
+            }
+            if ($horaFin && ($maxHoraGlobal === null || $horaFin > $maxHoraGlobal)) {
+                $maxHoraGlobal = $horaFin;
+            }
+
+            $fechasMap[$key]['count']++;
+        }
+
+        if (empty($fechasMap)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se pudo construir cronograma para el tribunal',
+            ], 400);
+        }
+
+        $rowsArr = array_values($fechasMap);
+        usort($rowsArr, function ($a, $b) {
+            if ($a['fecha_iso'] === $b['fecha_iso']) {
+                $ha = $a['hora_min'] ?? '';
+                $hb = $b['hora_min'] ?? '';
+                return strcmp($ha, $hb);
+            }
+            return strcmp($a['fecha_iso'], $b['fecha_iso']);
+        });
+
+        $fechasUnicas = [];
+        foreach ($rowsArr as $g) {
+            $fechasUnicas[$g['fecha_iso']] = true;
+        }
+        $fechasKeys = array_keys($fechasUnicas);
+        sort($fechasKeys);
+
+        $diasLabels = [];
+        foreach ($fechasKeys as $iso) {
+            $d = Carbon::parse($iso)->day;
+            $diasLabels[] = (string) $d;
+        }
+
+        if (count($diasLabels) === 1) {
+            $diasDefensa = $diasLabels[0];
+        } elseif (count($diasLabels) === 2) {
+            $diasDefensa = $diasLabels[0] . ' y ' . $diasLabels[1];
+        } else {
+            $last = array_pop($diasLabels);
+            $diasDefensa = implode(', ', $diasLabels) . ' y ' . $last;
+        }
+
+        $firstDate = Carbon::parse($fechasKeys[0]);
+        $mesDefensa = mb_strtoupper($firstDate->locale('es')->isoFormat('MMMM'), 'UTF-8');
+        $anioDefensa = $firstDate->year;
+        $carreraNombre = null;
+
+        $templatePath = resource_path('templates/plantilla-designacion-tribunal.docx');
+        if (!is_string($templatePath) || !file_exists($templatePath)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Plantilla de designación de tribunal no encontrada',
+            ], 500);
+        }
+
+        $tpl = new TemplateProcessor($templatePath);
+        $tpl->setValue('FECHA_DOC', $fechaDoc);
+        $tpl->setValue('TIPO_DOC_NOMBRE', $tipoDocNombre);
+        $tpl->setValue('TIPO_DOC_COD', $tipoDocCod);
+        $tpl->setValue('ANIO', (string) $anio);
+        $tpl->setValue('CORRELATIVO', (string) $correlativoStr);
+        $tpl->setValue('CITE', $cite);
+        $tpl->setValue('FOJAS', '1 de 1');
+        $tpl->setValue('PARA_NOMBRE', $paraNombre);
+        $tpl->setValue('PARA_CARGO', $paraCargo);
+        $tpl->setValue('DE_NOMBRE', $deNombre);
+        $tpl->setValue('DE_CARGO', $deCargo);
+        $tpl->setValue('ASUNTO', $asunto);
+        $tpl->setValue('MES_DEFENSA', $mesDefensa);
+        $tpl->setValue('ANIO_DEFENSA', (string) $anioDefensa);
+        $tpl->setValue('DIAS_DEFENSA', $diasDefensa);
+        $tpl->setValue('CARRERA_NOMBRE', (string) $carreraNombre);
+        $tpl->setValue('HORA_INICIO', (string) ($minHoraGlobal ?? ''));
+        $tpl->setValue('HORA_FIN', (string) ($maxHoraGlobal ?? ''));
+        $tpl->setValue('PIE_INICIALES_1', 'BJB');
+        $tpl->setValue('PIE_INICIALES_2', '');
+        $tpl->setValue('PIE_CC', 'CC: REC/DA');
+
+        $totalFilas = count($rowsArr);
+        $tpl->cloneRow('FILA_FECHA', $totalFilas);
+
+        $index = 1;
+        foreach ($rowsArr as $g) {
+            $fechaFmt = Carbon::parse($g['fecha_iso'])->format('d/m/Y');
+            $horaIni = (string) ($g['hora_min'] ?? '');
+            $horaFin = (string) ($g['hora_max'] ?? '');
+            $funcion = (string) ($g['rol_nombre'] ?? '');
+            $grupo = (string) ($g['grupo'] ?? '');
+            $aula = (string) ($g['aula'] ?? '');
+            $nPost = (string) ($g['count'] ?? 0);
+
+            $tpl->setValue('FILA_FECHA#' . $index, $fechaFmt);
+            $tpl->setValue('FILA_HORA_INICIO#' . $index, $horaIni);
+            $tpl->setValue('FILA_HORA_CONCLUSION#' . $index, $horaFin);
+            $tpl->setValue('FILA_FUNCION#' . $index, $funcion);
+            $tpl->setValue('FILA_NRO_POST#' . $index, $nPost);
+            $tpl->setValue('FILA_GRUPO#' . $index, $grupo);
+            $tpl->setValue('FILA_AULA#' . $index, $aula);
+
+            $index++;
+        }
+
+        // Construir resumen de defensas para registro local (similar a estudiantes_resumen)
+        $defensasResumen = [];
+        foreach ($rowsArr as $g) {
+            $defensasResumen[] = [
+                'fecha' => $g['fecha_iso'],
+                'hora_inicio' => $g['hora_min'],
+                'hora_fin' => $g['hora_max'],
+                'rol' => $g['rol_nombre'],
+                'grupo' => $g['grupo'],
+                'aula' => $g['aula'],
+                'nro_postulantes' => $g['count'],
+            ];
+        }
+
+        // Registrar documento de tribunal en tabla local doc_designaciones_tribunal
+        DB::table('doc_designaciones_tribunal')->insert([
+            'doc_tipo' => $tipoDocCod,
+            'year' => $anio,
+            'correlativo' => $correlativoInt,
+            'cite' => $cite,
+            'miembro_id' => $miembroId,
+            'tipo_miembro' => $tipoMiembro,
+            'rol' => $rolCodigo,
+            'convocatoria_id' => $convocatoriaId,
+            'para_nombre' => $paraNombre,
+            'para_cargo' => $paraCargo,
+            'de_nombre' => $deNombre,
+            'de_cargo' => $deCargo,
+            'asunto' => $asunto,
+            'defensas_resumen' => !empty($defensasResumen) ? json_encode($defensasResumen) : null,
+            'created_at' => Carbon::now(),
+            'updated_at' => Carbon::now(),
+        ]);
+
+        $path = storage_path('app/tmp');
+        if (!is_dir($path)) {
+            @mkdir($path, 0777, true);
+        }
+        $fileName = 'designacion-tribunal-' . $tipoMiembro . '-' . (string) $miembroId . '-' . $anio . '-' . $correlativoStr . '.docx';
+        $temp = $path . DIRECTORY_SEPARATOR . $fileName;
+        $tpl->saveAs($temp);
+
+        return response()->download($temp, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ])->deleteFileAfterSend(true);
+    }
+
+    private function createSgaDocumentForTribunal($docType, $year, $numeroStr, $paraNombre, $paraCargo, $asunto, $carreraSlug = null)
+    {
+        try {
+            $sgaService = app(SocratesApiService::class);
+        } catch (\Throwable $e) {
+            Log::warning('SGA service no disponible para crear documento de tribunal', ['error' => $e->getMessage()]);
+            return null;
+        }
+
+        if (!method_exists($sgaService, 'ensureWebSession') || !method_exists($sgaService, 'buildDocumentoPayload') || !method_exists($sgaService, 'crearDocumento')) {
+            Log::warning('SocratesApiService no soporta creación de documentos para tribunal');
+            return null;
+        }
+
+        if ($carreraSlug) {
+            try {
+                $sgaService->setCarrera($carreraSlug);
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo aplicar carrera para documento SGA (tribunal)', [
+                    'carrera' => $carreraSlug,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $config = method_exists($sgaService, 'getSgaConfig') ? $sgaService->getSgaConfig() : null;
+        if (!$config) {
+            Log::warning('No existe configuración SGA en base de datos para documento de tribunal');
+            return null;
+        }
+
+        $sessionResult = $sgaService->ensureWebSession(
+            isset($config->web_user) ? $config->web_user : null,
+            isset($config->web_password) ? $config->web_password : null
+        );
+        if (empty($sessionResult['success'])) {
+            Log::warning('No se pudo iniciar sesión web en el SGA para documento de tribunal', [
+                'message' => isset($sessionResult['message']) ? $sessionResult['message'] : null,
+            ]);
+            return null;
+        }
+
+        $emisorId = isset($config->emisor_id) ? $config->emisor_id : null;
+        if (!$emisorId) {
+            Log::warning('Configuración SGA sin emisor_id para documento de tribunal');
+            return null;
+        }
+
+        $abreviaturaBase = $config->abreviatura ?: 'CETA/DA/';
+        $cargoId = isset($config->cargo_id) ? $config->cargo_id : 3;
+        $cargoNombre = isset($config->cargo_nombre) && $config->cargo_nombre !== '' ? $config->cargo_nombre : 'DIRECTOR ACADÉMICO';
+        $genero = isset($config->emisor_genero) && $config->emisor_genero !== '' ? $config->emisor_genero : 'M';
+        $institucion = isset($config->institucion) ? $config->institucion : '';
+
+        $abreviatura = rtrim($abreviaturaBase, '/') . '/';
+        $codigoDocumento = strtoupper($docType);
+        $numeroStr = $numeroStr ?: '000';
+
+        $idCargoEmite = $cargoId . '|' . $cargoNombre . '|' . $abreviatura;
+
+        $payloadParams = [
+            'codigo_tipo_documento' => $codigoDocumento,
+            'emite' => $emisorId,
+            'nombre_emite' => 'Ing. Bradley Jaillita Burgoa',
+            'cargo_emite' => 'DIRECTOR ACADÉMICO',
+            'id_cargo_emite' => $idCargoEmite,
+            'genero' => $genero,
+            'tiene_via' => 'false',
+            'via_nombre' => '',
+            'via_cargo' => '',
+            'nombre_recibe' => $paraNombre ?: '',
+            'id_cargo_recibe' => '',
+            'cargo_recibe' => $paraCargo ?: '',
+            'institucion' => $institucion,
+            'asunto' => $asunto ?: 'DESIGNACIÓN TRIBUNAL CALIFICADOR',
+        ];
+
+        $payloadResult = $sgaService->buildDocumentoPayload($payloadParams);
+        if (empty($payloadResult['success'])) {
+            Log::warning('No se pudo construir payload para documento SGA (tribunal)', [
+                'message' => isset($payloadResult['message']) ? $payloadResult['message'] : null,
+            ]);
+            return null;
+        }
+
+        $createResult = $sgaService->crearDocumento($payloadResult['data']);
+        if (empty($createResult['success'])) {
+            Log::warning('Fallo al crear documento en SGA (tribunal)', [
+                'status' => isset($createResult['status']) ? $createResult['status'] : null,
+                'message' => isset($createResult['message']) ? $createResult['message'] : null,
+            ]);
+            return null;
+        }
+
+        // Reusar el parser del TutorController sería ideal, pero aquí no lo tenemos.
+        // Como fallback, si el SGA no devuelve un CITE estructurado, construimos uno local.
+        $rawBody = isset($createResult['body']) ? $createResult['body'] : null;
+        if (is_array($rawBody) && (isset($rawBody['cite']) || isset($rawBody['correlativo']))) {
+            $parsedCor = isset($rawBody['correlativo']) ? $rawBody['correlativo'] : null;
+            $parsedCorStr = $parsedCor !== null ? str_pad((string) $parsedCor, 3, '0', STR_PAD_LEFT) : $numeroStr;
+            $cite = $abreviatura . $codigoDocumento . '/' . $year . '/' . $parsedCorStr;
+            return [
+                'cite' => $cite,
+                'correlativo' => $parsedCor !== null ? (int) $parsedCor : (int) ltrim($numeroStr, '0'),
+            ];
+        }
+
+        $cite = $abreviatura . $codigoDocumento . '/' . $year . '/' . $numeroStr;
+        return [
+            'cite' => $cite,
+            'correlativo' => $numeroStr ? (int) ltrim($numeroStr, '0') : null,
+        ];
     }
 }
