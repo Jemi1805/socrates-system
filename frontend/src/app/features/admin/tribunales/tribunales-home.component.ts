@@ -58,6 +58,7 @@ export class TribunalesHomeComponent implements OnInit {
     fechas_label?: string | null;
     horarios_label?: string | null;
     horarios_list?: string[] | null;
+    tiene_doc_tribunal?: boolean;
   }> = [];
 
   // Filtros para tribunales designados (similar a Tutores designados)
@@ -540,6 +541,7 @@ export class TribunalesHomeComponent implements OnInit {
             convocatoria_id: row.convocatoria_id ?? null,
             convocatoria_nombre: row.convocatoria_nombre ?? null,
             convocatoria_numero: row.convocatoria_numero ?? null,
+            tiene_doc_tribunal: !!(row.tiene_doc_tribunal ?? row.doc_tribunal ?? false),
           } as any;
         });
 
@@ -740,6 +742,9 @@ export class TribunalesHomeComponent implements OnInit {
         a.download = filename;
         a.click();
         window.URL.revokeObjectURL(url);
+
+        // Refrescar la lista para que se marque como "Documento generado"
+        this.cargarTribunalesDesignados();
       },
       error: (err) => {
         console.error('[Tribunales] Error al generar documento de tribunal', err);

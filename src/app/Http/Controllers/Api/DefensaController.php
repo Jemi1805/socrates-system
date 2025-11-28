@@ -283,6 +283,11 @@ class DefensaController extends Controller
                 $join->on('trb.id', '=', 'dt.miembro_id')
                     ->where('dt.tipo', '=', 'externo');
             })
+            ->leftJoin('doc_designaciones_tribunal as ddoc', function ($join) {
+                $join->on('ddoc.miembro_id', '=', 'dt.miembro_id')
+                    ->on('ddoc.tipo_miembro', '=', 'dt.tipo')
+                    ->on('ddoc.convocatoria_id', '=', 'defensas.convocatoria_id');
+            })
             ->leftJoin('convocatorias as conv', 'conv.id', '=', 'defensas.convocatoria_id')
             ->select([
                 'defensas.id as defensa_id',
@@ -301,6 +306,7 @@ class DefensaController extends Controller
                 DB::raw("COALESCE(trb.tipo, 'interno') as tipo_miembro"),
                 DB::raw("conv.nombre as convocatoria_nombre"),
                 DB::raw("COALESCE(conv.numero_convocatoria, 0) as convocatoria_numero"),
+                DB::raw('CASE WHEN ddoc.id IS NULL THEN 0 ELSE 1 END as tiene_doc_tribunal'),
             ])
             ->orderByDesc('defensas.fecha_defensa')
             ->orderByDesc('defensas.id');
@@ -383,6 +389,7 @@ class DefensaController extends Controller
                 'tipo' => $row->tipo_miembro === 'externo' ? 'externo' : 'interno',
                 'miembro_id' => (int) $row->miembro_id,
                 'nombre' => $nombre !== '' ? $nombre : null,
+                'tiene_doc_tribunal' => (bool) $row->tiene_doc_tribunal,
             ];
         })->values();
 

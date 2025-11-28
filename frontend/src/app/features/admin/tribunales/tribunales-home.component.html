@@ -236,10 +236,12 @@
                       <td class="text-center">
                         <button
                           type="button"
-                          class="btn btn-sm btn-success d-inline-flex align-items-center gap-2"
-                          (click)="onGenerarDocTribunal(t)">
-                          <i class="bi bi-file-earmark-text"></i>
-                          <span>Generar documento</span>
+                          class="btn btn-sm d-inline-flex align-items-center gap-2"
+                          [ngClass]="t.tiene_doc_tribunal ? 'btn-outline-secondary' : 'btn-success'"
+                          (click)="!t.tiene_doc_tribunal && onGenerarDocTribunal(t)"
+                          [disabled]="t.tiene_doc_tribunal">
+                          <i class="bi" [ngClass]="t.tiene_doc_tribunal ? 'bi-check-circle' : 'bi-file-earmark-text'"></i>
+                          <span>{{ t.tiene_doc_tribunal ? 'Documento generado' : 'Generar documento' }}</span>
                         </button>
                       </td>
                     </tr>
