@@ -255,9 +255,14 @@ export class TribunalesHomeComponent implements OnInit {
     this.registroSaving = true;
     this.loadingService.showModal();
 
-    const payload = {
+    const payload: any = {
       ...this.registroExterno,
     };
+    if (payload.tipo === 'interno') {
+      payload.condicion_interna = this.registroCondicionInterna || null;
+    } else {
+      payload.condicion_interna = null;
+    }
 
     let obs;
     if (this.editingTutorId) {

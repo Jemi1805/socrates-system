@@ -50,6 +50,7 @@ class TribunalController extends Controller
             'institucion' => 'nullable|string|max:255',
             'titulo_academico' => 'sometimes|required|string|max:10',
             'tipo' => 'nullable|in:interno,externo',
+            'condicion_interna' => 'nullable|string|in:planta,consultor',
         ]);
 
         if ($validator->fails()) {
@@ -83,6 +84,7 @@ class TribunalController extends Controller
             'institucion' => 'nullable|string|max:255',
             'titulo_academico' => 'required|string|max:10',
             'tipo' => 'nullable|in:interno,externo',
+            'condicion_interna' => 'nullable|string|in:planta,consultor',
         ]);
 
         if ($validator->fails()) {
@@ -104,6 +106,7 @@ class TribunalController extends Controller
                 'institucion' => $data['institucion'] ?? null,
                 'titulo_academico' => $data['titulo_academico'],
                 'tipo' => $data['tipo'] ?? 'externo',
+                'condicion_interna' => $data['condicion_interna'] ?? null,
                 'activo' => true,
             ]);
 

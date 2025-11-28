@@ -21,6 +21,7 @@ class Tribunal extends Model
         'institucion',
         'titulo_academico',
         'tipo',
+        'condicion_interna',
         'activo',
     ];
 }
