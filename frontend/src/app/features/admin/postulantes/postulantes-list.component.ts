@@ -1508,7 +1508,11 @@ cargarDetallesTabla() {
           const base = (resp as any)?.data ?? resp;
           const list: any[] = Array.isArray(base) ? base : [];
           ins.tribunal = list.map((m) => ({
+            // Nombre descriptivo del rol para UI
             rol: m.rol_nombre || m.rol_codigo || m.rol,
+            rolNombre: m.rol_nombre || m.rol_codigo || m.rol || null,
+            // Código de rol para backend (ENUM)
+            rolCodigo: m.rol_codigo || m.rol || null,
             tipo: m.tipo,
             miembro_id: Number(m.miembro_id),
             nombre: m.nombre ?? null,

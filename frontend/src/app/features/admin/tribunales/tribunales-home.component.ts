@@ -759,6 +759,53 @@ export class TribunalesHomeComponent implements OnInit {
     });
   }
 
+  verDocTribunal(row: any) {
+    if (!row) {
+      return;
+    }
+
+    const payload = {
+      miembro_id: Number(row.miembro_id),
+      tipo: row.tipo === 'externo' ? ('externo' as const) : ('interno' as const),
+      rol: row.rol_codigo || row.rol_nombre || '',
+      convocatoria_id: row.convocatoria_id ?? null,
+    };
+
+    if (!payload.miembro_id || !payload.rol) {
+      console.error('[Tribunales] Faltan datos para ver documento de tribunal', payload);
+      return;
+    }
+
+    this.loadingService.showModal();
+
+    this.sga.downloadDocDesignacionTribunal(payload).subscribe({
+      next: (resp: any) => {
+        try {
+          const blob = resp?.body as Blob | undefined;
+          if (!blob) {
+            return;
+          }
+
+          const url = window.URL.createObjectURL(blob);
+          // Abrir en nueva pesta d1a; el navegador decidir e1 si mostrar o descargar el DOCX
+          window.open(url, '_blank');
+
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+          }, 60_000);
+        } catch (e) {
+          console.error('[Tribunales] Error al abrir documento de tribunal', e);
+        }
+      },
+      error: (err: any) => {
+        console.error('[Tribunales] Error al descargar documento de tribunal', err);
+      },
+      complete: () => {
+        this.loadingService.hideModal();
+      },
+    });
+  }
+
   canSaveDesignacion(): boolean {
     if (!this.miembros || this.miembros.length !== 3) {
       return false;

@@ -236,12 +236,20 @@
                       <td class="text-center">
                         <button
                           type="button"
-                          class="btn btn-sm d-inline-flex align-items-center gap-2"
+                          class="btn btn-sm d-inline-flex align-items-center gap-2 me-1"
                           [ngClass]="t.tiene_doc_tribunal ? 'btn-outline-secondary' : 'btn-success'"
                           (click)="!t.tiene_doc_tribunal && onGenerarDocTribunal(t)"
                           [disabled]="t.tiene_doc_tribunal">
                           <i class="bi" [ngClass]="t.tiene_doc_tribunal ? 'bi-check-circle' : 'bi-file-earmark-text'"></i>
                           <span>{{ t.tiene_doc_tribunal ? 'Documento generado' : 'Generar documento' }}</span>
+                        </button>
+                        <button
+                          *ngIf="t.tiene_doc_tribunal"
+                          type="button"
+                          class="btn btn-sm btn-outline-primary"
+                          title="Ver documento de designación"
+                          (click)="verDocTribunal(t)">
+                          <i class="bi bi-eye"></i>
                         </button>
                       </td>
                     </tr>
