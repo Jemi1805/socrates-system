@@ -509,6 +509,18 @@ class DefensaController extends Controller
         $rolCodigo = (string) $data['rol'];
         $convocatoriaId = isset($data['convocatoria_id']) ? (int) $data['convocatoria_id'] : null;
 
+        // Verificar si ya existe un documento registrado para este tribunal/convocatoria
+        $docExistente = DB::table('doc_designaciones_tribunal')
+            ->where('miembro_id', $miembroId)
+            ->where('tipo_miembro', $tipoMiembro)
+            ->where('rol', $rolCodigo)
+            ->when($convocatoriaId, function ($q) use ($convocatoriaId) {
+                $q->where('convocatoria_id', $convocatoriaId);
+            })
+            ->orderByDesc('year')
+            ->orderByDesc('correlativo')
+            ->first();
+
         $query = Defensa::query()
             ->join('defensa_tribunal as dt', 'dt.defensa_id', '=', 'defensas.id')
             ->leftJoin('rol_tribunal as rt', 'rt.id', '=', 'dt.rol_tribunal_id')
@@ -599,90 +611,99 @@ class DefensaController extends Controller
         $deCargo = 'DIRECTOR ACADÉMICO';
         $asunto = 'DESIGNACIÓN TRIBUNAL CALIFICADOR';
 
-        $sga = app(SocratesApiService::class);
-        $abreviaturaBase = rtrim((string) $sga->getAbreviaturaBase(), '/');
+        // Si ya existe documento, reutilizar sus datos; si no, generar nuevo correlativo/CITE
+        if ($docExistente) {
+            $tipoDocCod = $docExistente->doc_tipo;
+            $anio = (int) $docExistente->year;
+            $correlativoInt = (int) $docExistente->correlativo;
+            $correlativoStr = str_pad((string) $correlativoInt, 3, '0', STR_PAD_LEFT);
+            $cite = (string) $docExistente->cite;
+        } else {
+            $sga = app(SocratesApiService::class);
+            $abreviaturaBase = rtrim((string) $sga->getAbreviaturaBase(), '/');
 
-        // Usar la misma convención que TutorController::fetchSequenceFromSga
-        // MEM -> id_tipo_documento = 2, COMINT -> id_tipo_documento = 4
-        $docTipoId = $tipoDocCod === 'MEM' ? 2 : 4;
+            // Usar la misma convención que TutorController::fetchSequenceFromSga
+            // MEM -> id_tipo_documento = 2, COMINT -> id_tipo_documento = 4
+            $docTipoId = $tipoDocCod === 'MEM' ? 2 : 4;
 
-        // Intentar obtener correlativo desde SGA
-        $remoteCorrelativo = null;
-        $corResult = $sga->getCorrelativoAbreviatura($abreviaturaBase . '/', $docTipoId, $anio, null, []);
-        if (!empty($corResult['success']) && !empty($corResult['data']) && is_array($corResult['data'])) {
-            $dataCor = $corResult['data'];
-            if (isset($dataCor['numero']) && is_numeric($dataCor['numero'])) {
-                $remoteCorrelativo = (int) $dataCor['numero'];
-            } elseif (isset($dataCor['correlativo']) && is_numeric($dataCor['correlativo'])) {
-                $remoteCorrelativo = (int) $dataCor['correlativo'];
-            }
-        }
-
-        // Sincronizar con tabla local doc_designacion_secuencias (compartida con tutores)
-        $correlativoInt = null;
-        DB::transaction(function () use ($tipoDocCod, $anio, $remoteCorrelativo, &$correlativoInt) {
-            $seq = DB::table('doc_designacion_secuencias')
-                ->where('doc_tipo', $tipoDocCod)
-                ->where('year', $anio)
-                ->lockForUpdate()
-                ->first();
-
-            $lastLocal = $seq ? (int) $seq->last_correlativo : 0;
-
-            if ($remoteCorrelativo !== null && $remoteCorrelativo > $lastLocal) {
-                // Usar el valor del SGA si es mayor que la secuencia local
-                $correlativoInt = $remoteCorrelativo;
-            } else {
-                // Caso contrario, avanzar secuencia local
-                $correlativoInt = $lastLocal + 1;
+            // Intentar obtener correlativo desde SGA
+            $remoteCorrelativo = null;
+            $corResult = $sga->getCorrelativoAbreviatura($abreviaturaBase . '/', $docTipoId, $anio, null, []);
+            if (!empty($corResult['success']) && !empty($corResult['data']) && is_array($corResult['data'])) {
+                $dataCor = $corResult['data'];
+                if (isset($dataCor['numero']) && is_numeric($dataCor['numero'])) {
+                    $remoteCorrelativo = (int) $dataCor['numero'];
+                } elseif (isset($dataCor['correlativo']) && is_numeric($dataCor['correlativo'])) {
+                    $remoteCorrelativo = (int) $dataCor['correlativo'];
+                }
             }
 
-            $newLast = max($lastLocal, $correlativoInt);
+            // Sincronizar con tabla local doc_designacion_secuencias (compartida con tutores)
+            $correlativoInt = null;
+            DB::transaction(function () use ($tipoDocCod, $anio, $remoteCorrelativo, &$correlativoInt) {
+                $seq = DB::table('doc_designacion_secuencias')
+                    ->where('doc_tipo', $tipoDocCod)
+                    ->where('year', $anio)
+                    ->lockForUpdate()
+                    ->first();
 
-            DB::table('doc_designacion_secuencias')->updateOrInsert(
-                ['doc_tipo' => $tipoDocCod, 'year' => $anio],
-                [
-                    'last_correlativo' => $newLast,
-                    'updated_at' => Carbon::now(),
-                    'created_at' => $seq ? $seq->created_at : Carbon::now(),
-                ]
+                $lastLocal = $seq ? (int) $seq->last_correlativo : 0;
+
+                if ($remoteCorrelativo !== null && $remoteCorrelativo > $lastLocal) {
+                    // Usar el valor del SGA si es mayor que la secuencia local
+                    $correlativoInt = $remoteCorrelativo;
+                } else {
+                    // Caso contrario, avanzar secuencia local
+                    $correlativoInt = $lastLocal + 1;
+                }
+
+                $newLast = max($lastLocal, $correlativoInt);
+
+                DB::table('doc_designacion_secuencias')->updateOrInsert(
+                    ['doc_tipo' => $tipoDocCod, 'year' => $anio],
+                    [
+                        'last_correlativo' => $newLast,
+                        'updated_at' => Carbon::now(),
+                        'created_at' => $seq ? $seq->created_at : Carbon::now(),
+                    ]
+                );
+            });
+
+            $correlativoStr = str_pad((string) $correlativoInt, 3, '0', STR_PAD_LEFT);
+
+            // Construir CITE base
+            $cite = $abreviaturaBase . '/' . $tipoDocCod . '/' . $anio . '/' . $correlativoStr;
+
+            // Intentar registrar también el documento en el SGA (misma lógica que para tutores)
+            $sgaDoc = $this->createSgaDocumentForTribunal(
+                $tipoDocCod,
+                $anio,
+                $correlativoStr,
+                $paraNombre,
+                $paraCargo,
+                $asunto,
+                null // carreraSlug: por ahora usar configuración por defecto del SGA
             );
-        });
+            if (is_array($sgaDoc)) {
+                if (!empty($sgaDoc['correlativo'])) {
+                    $correlativoInt = (int) $sgaDoc['correlativo'];
+                    $correlativoStr = str_pad((string) $correlativoInt, 3, '0', STR_PAD_LEFT);
+                }
+                if (!empty($sgaDoc['cite'])) {
+                    $cite = (string) $sgaDoc['cite'];
+                } else {
+                    $cite = $abreviaturaBase . '/' . $tipoDocCod . '/' . $anio . '/' . $correlativoStr;
+                }
 
-        $correlativoStr = str_pad((string) $correlativoInt, 3, '0', STR_PAD_LEFT);
-
-        // Construir CITE base
-        $cite = $abreviaturaBase . '/' . $tipoDocCod . '/' . $anio . '/' . $correlativoStr;
-
-        // Intentar registrar también el documento en el SGA (misma lógica que para tutores)
-        $sgaDoc = $this->createSgaDocumentForTribunal(
-            $tipoDocCod,
-            $anio,
-            $correlativoStr,
-            $paraNombre,
-            $paraCargo,
-            $asunto,
-            null // carreraSlug: por ahora usar configuración por defecto del SGA
-        );
-        if (is_array($sgaDoc)) {
-            if (!empty($sgaDoc['correlativo'])) {
-                $correlativoInt = (int) $sgaDoc['correlativo'];
-                $correlativoStr = str_pad((string) $correlativoInt, 3, '0', STR_PAD_LEFT);
+                // Asegurar que la tabla de secuencias local refleje el correlativo final
+                DB::table('doc_designacion_secuencias')->updateOrInsert(
+                    ['doc_tipo' => $tipoDocCod, 'year' => $anio],
+                    [
+                        'last_correlativo' => $correlativoInt,
+                        'updated_at' => Carbon::now(),
+                    ]
+                );
             }
-            if (!empty($sgaDoc['cite'])) {
-                $cite = (string) $sgaDoc['cite'];
-            } else {
-                $cite = $abreviaturaBase . '/' . $tipoDocCod . '/' . $anio . '/' . $correlativoStr;
-            }
-
-            // Asegurar que la tabla de secuencias local refleje el correlativo final
-            DB::table('doc_designacion_secuencias')->updateOrInsert(
-                ['doc_tipo' => $tipoDocCod, 'year' => $anio],
-                [
-                    'last_correlativo' => $correlativoInt,
-                    'updated_at' => Carbon::now(),
-                ]
-            );
         }
 
         $fechasMap = [];
@@ -848,24 +869,27 @@ class DefensaController extends Controller
         }
 
         // Registrar documento de tribunal en tabla local doc_designaciones_tribunal
-        DB::table('doc_designaciones_tribunal')->insert([
-            'doc_tipo' => $tipoDocCod,
-            'year' => $anio,
-            'correlativo' => $correlativoInt,
-            'cite' => $cite,
-            'miembro_id' => $miembroId,
-            'tipo_miembro' => $tipoMiembro,
-            'rol' => $rolCodigo,
-            'convocatoria_id' => $convocatoriaId,
-            'para_nombre' => $paraNombre,
-            'para_cargo' => $paraCargo,
-            'de_nombre' => $deNombre,
-            'de_cargo' => $deCargo,
-            'asunto' => $asunto,
-            'defensas_resumen' => !empty($defensasResumen) ? json_encode($defensasResumen) : null,
-            'created_at' => Carbon::now(),
-            'updated_at' => Carbon::now(),
-        ]);
+        // Solo insertar si no existe un registro previo para este tribunal/convocatoria
+        if (!$docExistente) {
+            DB::table('doc_designaciones_tribunal')->insert([
+                'doc_tipo' => $tipoDocCod,
+                'year' => $anio,
+                'correlativo' => $correlativoInt,
+                'cite' => $cite,
+                'miembro_id' => $miembroId,
+                'tipo_miembro' => $tipoMiembro,
+                'rol' => $rolCodigo,
+                'convocatoria_id' => $convocatoriaId,
+                'para_nombre' => $paraNombre,
+                'para_cargo' => $paraCargo,
+                'de_nombre' => $deNombre,
+                'de_cargo' => $deCargo,
+                'asunto' => $asunto,
+                'defensas_resumen' => !empty($defensasResumen) ? json_encode($defensasResumen) : null,
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
+            ]);
+        }
 
         $path = storage_path('app/tmp');
         if (!is_dir($path)) {
