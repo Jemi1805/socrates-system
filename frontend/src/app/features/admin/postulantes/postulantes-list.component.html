@@ -407,7 +407,12 @@
               </div>
               <div class="col-6 col-md-2">
                 <label class="form-label">Hora inicio</label>
-                <input type="time" class="form-control" [(ngModel)]="defensaForm.hora_inicio" />
+                <input
+                  type="time"
+                  class="form-control"
+                  [(ngModel)]="defensaForm.hora_inicio"
+                  step="3600"
+                />
               </div>
               <div class="col-6 col-md-2">
                 <label class="form-label">Hora fin</label>
@@ -416,6 +421,7 @@
                   class="form-control"
                   [(ngModel)]="defensaForm.hora_fin"
                   [attr.min]="defensaForm.hora_inicio || null"
+                  step="3600"
                   (ngModelChange)="onDefensaHoraFinChange($event)"
                 />
                 <div *ngIf="defensaHoraError" class="invalid-feedback d-block">

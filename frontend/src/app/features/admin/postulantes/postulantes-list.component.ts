@@ -2189,8 +2189,14 @@ guardarDefensa() {
       const mm = parseInt(MM || '0', 10);
       return hh * 60 + mm;
     };
-    if (toMinutes(hf) <= toMinutes(hi)) {
+    const inicioMin = toMinutes(hi);
+    const finMin = toMinutes(hf);
+    if (finMin <= inicioMin) {
       this.defensaHoraError = 'La hora de fin debe ser mayor que la hora de inicio.';
+      return;
+    }
+    if (finMin - inicioMin < 60) {
+      this.defensaHoraError = 'La defensa debe tener una duración mínima de 1 hora entre la hora de inicio y la hora de fin.';
       return;
     }
   }
@@ -2262,6 +2268,16 @@ guardarDefensa() {
       },
       error: (err) => {
         console.error('Error al guardar defensa', err);
+        // Mostrar mensaje de validación del backend (por ejemplo, duración != 1h o choque de horario)
+        const status = (err && (err.status ?? err.code)) ?? null;
+        const backendMessage: string | null = (err && err.error && typeof err.error.message === 'string')
+          ? err.error.message
+          : null;
+        if (status === 422 && backendMessage) {
+          this.defensaHoraError = backendMessage;
+        } else {
+          this.defensaHoraError = 'No se pudo guardar la defensa. Verifica la hora y el aula e inténtalo nuevamente.';
+        }
       },
     });
 }

@@ -10,6 +10,7 @@ use App\Models\Tribunal;
 use App\Models\RolTribunal;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class DefensaController extends Controller
 {
@@ -26,6 +27,8 @@ class DefensaController extends Controller
             'aula' => 'required|string|max:100',
             'observaciones' => 'nullable|string',
         ]);
+
+        $this->validateDefensaHorario($data, null);
 
         $user = $request->user();
 
@@ -62,6 +65,9 @@ class DefensaController extends Controller
             'observaciones' => 'nullable|string',
         ]);
 
+        $merged = array_merge($defensa->toArray(), $data);
+        $this->validateDefensaHorario($merged, (int) $defensa->id);
+
         $defensa->fill($data);
         $user = $request->user();
         if ($user) {
@@ -87,6 +93,9 @@ class DefensaController extends Controller
         ]);
 
         $user = $request->user();
+
+        $merged = array_merge($defensa->toArray(), $data);
+        $this->validateDefensaHorario($merged, (int) $defensa->id);
 
         return DB::transaction(function () use ($defensa, $data, $user) {
             // marca la anterior como reprogramada
@@ -114,6 +123,67 @@ class DefensaController extends Controller
 
             return response()->json($nueva, 201);
         });
+    }
+
+    private function validateDefensaHorario(array $data, ?int $ignoreId = null): void
+    {
+        $fecha = isset($data['fecha_defensa']) ? $data['fecha_defensa'] : null;
+        $horaInicio = isset($data['hora_inicio']) ? $data['hora_inicio'] : null;
+        $horaFin = isset($data['hora_fin']) ? $data['hora_fin'] : null;
+        $grupo = array_key_exists('grupo', $data) ? $data['grupo'] : null;
+        $aula = isset($data['aula']) ? $data['aula'] : null;
+
+        if (!$fecha || !$horaInicio || !$horaFin || !$aula) {
+            return;
+        }
+
+        try {
+            $inicio = Carbon::parse($fecha . ' ' . $horaInicio);
+            $fin = Carbon::parse($fecha . ' ' . $horaFin);
+        } catch (\Throwable $e) {
+            abort(response()->json([
+                'success' => false,
+                'message' => 'Formato de hora o fecha inválido para la defensa.',
+            ], 422));
+        }
+
+        if ($inicio->greaterThanOrEqualTo($fin) || $inicio->diffInMinutes($fin) < 60) {
+            abort(response()->json([
+                'success' => false,
+                'message' => 'La defensa debe tener una duración mínima de 1 hora entre hora de inicio y hora de fin.',
+            ], 422));
+        }
+
+        $query = Defensa::query()
+            ->where('fecha_defensa', $fecha)
+            ->where('aula', $aula);
+
+        if ($grupo !== null && $grupo !== '') {
+            $query->where('grupo', $grupo);
+        }
+
+        if ($ignoreId !== null) {
+            $query->where('id', '!=', $ignoreId);
+        }
+
+        $inicioStr = $inicio->format('H:i:s');
+        $finStr = $fin->format('H:i:s');
+
+        $query->where(function ($q) use ($inicioStr, $finStr) {
+            $q->whereBetween('hora_inicio', [$inicioStr, $finStr])
+                ->orWhereBetween('hora_fin', [$inicioStr, $finStr])
+                ->orWhere(function ($q2) use ($inicioStr, $finStr) {
+                    $q2->where('hora_inicio', '<=', $inicioStr)
+                        ->where('hora_fin', '>=', $finStr);
+                });
+        });
+
+        if ($query->exists()) {
+            abort(response()->json([
+                'success' => false,
+                'message' => 'Ya existe una defensa programada en el mismo horario, grupo y aula.',
+            ], 422));
+        }
     }
 
     public function byProyecto($proyectoId)
