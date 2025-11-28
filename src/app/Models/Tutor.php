@@ -14,6 +14,7 @@ class Tutor extends Model
     protected $fillable = [
         'activo',
         'es_tribunal',
+        'condicion_interna',
         // Snapshot de datos del docente al momento de registro
         'nombre',
         'apellido_p',

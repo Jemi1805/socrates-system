@@ -144,6 +144,7 @@ export interface TutorReg {
   es_tribunal?: boolean;
   tipo_tutor_id?: number | null;
   tipo_tutor?: string;
+  condicion_interna?: 'planta' | 'consultor' | null;
 }
 
 export interface TutorTipo {

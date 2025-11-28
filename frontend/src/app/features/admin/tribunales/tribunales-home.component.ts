@@ -46,6 +46,7 @@ export class TribunalesHomeComponent implements OnInit {
     hora_inicio: string | null;
     hora_fin: string | null;
     aula: string | null;
+    grupo: string | null;
     rol_nombre: string;
     rol_codigo: string;
     tipo: 'interno' | 'externo';
@@ -88,6 +89,7 @@ export class TribunalesHomeComponent implements OnInit {
   registroShowErrors = false;
   editingTribunalId: number | null = null;
   editingTutorId: number | null = null;
+  registroCondicionInterna: '' | 'planta' | 'consultor' = '';
   // Registro de tribunal (interno o externo)
   registroExterno: {
     nombre: string;
@@ -171,6 +173,7 @@ export class TribunalesHomeComponent implements OnInit {
     this.registroSaving = false;
     this.editingTribunalId = null;
     this.editingTutorId = null;
+    this.registroCondicionInterna = '';
     this.registroExterno = {
       nombre: '',
       apellido_p: '',
@@ -190,6 +193,7 @@ export class TribunalesHomeComponent implements OnInit {
     this.registroSaving = false;
     this.editingTutorId = t.id;
     this.editingTribunalId = null;
+    this.registroCondicionInterna = (t as any).condicion_interna || '';
 
     this.registroExterno = {
       nombre: t.nombre || '',
@@ -260,6 +264,7 @@ export class TribunalesHomeComponent implements OnInit {
         celular: payload.celular,
         titulo: payload.profesion,
         titulo_academico: payload.titulo_academico,
+        condicion_interna: this.registroCondicionInterna || null,
       } as any);
     } else if (this.editingTribunalId) {
       // Actualizar tribunal externo existente
@@ -521,6 +526,7 @@ export class TribunalesHomeComponent implements OnInit {
             hora_inicio: row.hora_inicio ?? null,
             hora_fin: row.hora_fin ?? null,
             aula: row.aula ?? null,
+            grupo: row.grupo ?? null,
             rol_nombre: row.rol_nombre || row.rol_codigo || '',
             rol_codigo: row.rol_codigo || '',
             tipo: row.tipo === 'externo' ? 'externo' : 'interno',
@@ -629,6 +635,10 @@ export class TribunalesHomeComponent implements OnInit {
     });
   }
 
+  onGenerarDocTribunal(row: any) {
+    console.debug('[Tribunales] Generar documento de designación de tribunal', row);
+  }
+
   openDesignacionModal() {
     this.designacionShowErrors = false;
     this.miembros = [
@@ -637,6 +647,17 @@ export class TribunalesHomeComponent implements OnInit {
       { tipo: 'externo', miembroId: null, rol: 'DELEGADO_EXTERNO' },
     ];
     this.designacionModalVisible = true;
+  }
+
+  getCondicionInternaLabel(t: any): string {
+    const v = (t && (t as any).condicion_interna) as string | undefined;
+    if (v === 'planta') {
+      return 'Planta';
+    }
+    if (v === 'consultor') {
+      return 'Consultor';
+    }
+    return '-';
   }
 
   closeDesignacionModal() {

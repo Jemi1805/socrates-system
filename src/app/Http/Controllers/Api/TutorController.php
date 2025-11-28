@@ -648,6 +648,7 @@ class TutorController extends Controller
                 'pertinencias' => $pertNoms,
                 'activo' => (bool)$t->activo,
                 'es_tribunal' => (bool)($t->es_tribunal ?? false),
+                'condicion_interna' => $t->condicion_interna,
                 'tipo_tutor_id' => $t->tipo_tutor_id,
                 'tipo_tutor' => optional(TipoTutor::find($t->tipo_tutor_id))->nombre,
             ];

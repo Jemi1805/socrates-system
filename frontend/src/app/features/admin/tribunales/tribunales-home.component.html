@@ -47,7 +47,7 @@
           <div class="card-body">
             <h5 class="card-title d-flex align-items-center gap-2">
               <i class="bi bi-people-fill text-primary"></i>
-              Tribunales disponibles (tutores registrados)
+              Tribunales disponibles
             </h5>
 
             <div *ngIf="errorDisponibles" class="alert alert-danger py-2">{{ errorDisponibles }}</div>
@@ -187,18 +187,18 @@
                   <thead class="table-dark">
                     <tr>
                       <th>Tribunal</th>
-                      <th>Tipo</th>
                       <th>Rol</th>
                       <th>Fecha defensa</th>
                       <th>Horario</th>
+                      <th>Grupo</th>
                       <th>Aula</th>
                       <th>Convocatoria</th>
+                      <th class="text-center">Documento</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr *ngFor="let t of tribunalesDesignados">
                       <td>{{ t.nombre || ('Miembro #' + t.miembro_id) }}</td>
-                      <td>{{ t.tipo === 'externo' ? 'Externo' : 'Interno' }}</td>
                       <td>{{ t.rol_nombre }}</td>
                       <td>
                         <ng-container *ngIf="t.fechas_label; else fechaUnicaTpl">
@@ -223,14 +223,24 @@
                           <span class="text-muted">Sin hora</span>
                         </ng-template>
                       </td>
-                      <td>{{ t.aula || '-' }}</td>
-                      <td>
-                        <ng-container *ngIf="t.convocatoria_nombre; else sinConvocatoriaTpl">
-                          {{ t.convocatoria_numero ? (t.convocatoria_numero + ' - ') : '' }}{{ t.convocatoria_nombre }}
+                      <td class="text-center">{{ t.grupo || '-' }}</td>
+                      <td class="text-center">{{ t.aula || '-' }}</td>
+                      <td class="text-center">
+                        <ng-container *ngIf="t.convocatoria_numero; else sinConvocatoriaTpl">
+                          {{ t.convocatoria_numero }}
                         </ng-container>
                         <ng-template #sinConvocatoriaTpl>
                           <span class="text-muted">Sin convocatoria</span>
                         </ng-template>
+                      </td>
+                      <td class="text-center">
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-success d-inline-flex align-items-center gap-2"
+                          (click)="onGenerarDocTribunal(t)">
+                          <i class="bi bi-file-earmark-text"></i>
+                          <span>Generar documento</span>
+                        </button>
                       </td>
                     </tr>
                   </tbody>
@@ -324,8 +334,16 @@
                   <option value="interno">Interno</option>
                 </select>
               </div>
+              <div class="col-md-6" *ngIf="editingTutorId || registroExterno.tipo === 'interno'">
+                <label class="form-label">Tipo de contrato</label>
+                <select class="form-select" [(ngModel)]="registroCondicionInterna">
+                  <option value="">Seleccione condición</option>
+                  <option value="planta">Planta</option>
+                  <option value="consultor">Consultor</option>
+                </select>
+              </div>
               <div class="col-md-6" *ngIf="registroExterno.tipo === 'externo'">
-                <label class="form-label">Institución (si es externo)</label>
+                <label class="form-label">Institución</label>
                 <input type="text" class="form-control" [(ngModel)]="registroExterno.institucion">
               </div>
               <div class="col-12">
