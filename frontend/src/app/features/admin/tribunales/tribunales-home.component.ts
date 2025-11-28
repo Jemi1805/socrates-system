@@ -54,6 +54,9 @@ export class TribunalesHomeComponent implements OnInit {
     convocatoria_id?: number | null;
     convocatoria_nombre?: string | null;
     convocatoria_numero?: number | null;
+    fechas_label?: string | null;
+    horarios_label?: string | null;
+    horarios_list?: string[] | null;
   }> = [];
 
   // Filtros para tribunales designados (similar a Tutores designados)
@@ -507,7 +510,9 @@ export class TribunalesHomeComponent implements OnInit {
       next: (resp) => {
         const base = (resp as any)?.data ?? resp;
         const list: any[] = Array.isArray(base) ? base : [];
-        this.tribunalesDesignados = list.map((row) => {
+
+        // Mapear filas crudas
+        const mapped = list.map((row) => {
           const nombreRaw = (row.nombre ?? '').toString().trim();
           return {
             defensa_id: Number(row.defensa_id),
@@ -524,8 +529,94 @@ export class TribunalesHomeComponent implements OnInit {
             convocatoria_id: row.convocatoria_id ?? null,
             convocatoria_nombre: row.convocatoria_nombre ?? null,
             convocatoria_numero: row.convocatoria_numero ?? null,
-          };
+          } as any;
         });
+
+        // Agrupar por miembro + tipo + rol + convocatoria, acumulando fechas y horarios
+        const grouped = new Map<string, any>();
+
+        for (const row of mapped) {
+          const keyParts = [
+            row.miembro_id,
+            row.tipo,
+            row.rol_codigo || '',
+            row.convocatoria_id != null ? row.convocatoria_id : 'null',
+          ];
+          const key = keyParts.join('|');
+
+          let agg = grouped.get(key);
+          if (!agg) {
+            agg = {
+              ...row,
+              fechas_label: '',
+              horarios_label: '',
+            };
+            agg._items = [] as any[];
+            grouped.set(key, agg);
+          }
+
+          agg._items.push(row);
+        }
+
+        // Construir etiquetas de fechas y horarios acumulados ordenados por fecha+hora
+        const finalList: any[] = [];
+        grouped.forEach((agg) => {
+          const items: any[] = Array.isArray(agg._items) ? agg._items.slice() : [];
+          items.sort((a, b) => {
+            const fa = (a.fecha_defensa || '') + ' ' + (a.hora_inicio || '');
+            const fb = (b.fecha_defensa || '') + ' ' + (b.hora_inicio || '');
+            return fa.localeCompare(fb);
+          });
+
+          const fechasUnicas = new Set<string>();
+          const horariosUnicos = new Set<string>();
+
+          for (const it of items) {
+            const fechaRaw = (it.fecha_defensa || '').toString();
+            let fecha = '';
+            if (fechaRaw) {
+              // Normalizar fecha tipo ISO (YYYY-MM-DD...) a DD/MM/YYYY
+              const isoDate = fechaRaw.substring(0, 10); // 2025-08-18
+              const parts = isoDate.split('-');
+              if (parts.length === 3) {
+                const [y, m, d] = parts;
+                fecha = `${d}/${m}/${y}`;
+              } else {
+                fecha = fechaRaw;
+              }
+            }
+
+            const horaIniRaw = (it.hora_inicio || '').toString();
+            const horaFinRaw = (it.hora_fin || '').toString();
+            const horaIni = horaIniRaw ? horaIniRaw.substring(0, 5) : '';
+            const horaFin = horaFinRaw ? horaFinRaw.substring(0, 5) : '';
+            if (fecha && horaIni && horaFin) {
+              // Para fechas_label usamos solo la fecha formateada; para horarios_label solo el rango HH:mm-HH:mm
+              // Aula se muestra en su propia columna.
+            }
+
+            if (fecha) {
+              fechasUnicas.add(fecha);
+            }
+
+            if (horaIni && horaFin) {
+              horariosUnicos.add(`${horaIni}-${horaFin}`);
+            }
+          }
+
+          const fechasArr = Array.from(fechasUnicas.values());
+          const horariosArr = Array.from(horariosUnicos.values());
+
+          agg.fechas_label = fechasArr.length ? fechasArr.join(', ') : null;
+          // Horarios como solo rangos "HH:mm-HH:mm" separados por viñetas
+          agg.horarios_list = horariosArr.length ? horariosArr : null;
+          agg.horarios_label = horariosArr.length ? horariosArr.join(' • ') : null;
+
+          delete agg._items;
+          finalList.push(agg);
+        });
+
+        this.tribunalesDesignados = finalList;
       },
       error: (err) => {
         console.error('[Tribunales] Error al cargar tribunales designados', err);

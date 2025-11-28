@@ -200,11 +200,25 @@
                       <td>{{ t.nombre || ('Miembro #' + t.miembro_id) }}</td>
                       <td>{{ t.tipo === 'externo' ? 'Externo' : 'Interno' }}</td>
                       <td>{{ t.rol_nombre }}</td>
-                      <td>{{ t.fecha_defensa | date:'dd/MM/yyyy' }}</td>
                       <td>
-                        <ng-container *ngIf="t.hora_inicio || t.hora_fin; else sinHoraTpl">
-                          {{ t.hora_inicio || '-' }} - {{ t.hora_fin || '-' }}
+                        <ng-container *ngIf="t.fechas_label; else fechaUnicaTpl">
+                          {{ t.fechas_label }}
                         </ng-container>
+                        <ng-template #fechaUnicaTpl>
+                          {{ t.fecha_defensa | date:'dd/MM/yyyy' }}
+                        </ng-template>
+                      </td>
+                      <td>
+                        <ng-container *ngIf="t.horarios_list?.length; else horarioSimpleTpl">
+                          <div *ngFor="let h of t.horarios_list">
+                            - {{ h }}
+                          </div>
+                        </ng-container>
+                        <ng-template #horarioSimpleTpl>
+                          <ng-container *ngIf="t.hora_inicio || t.hora_fin; else sinHoraTpl">
+                            - {{ (t.hora_inicio || '-') + ' - ' + (t.hora_fin || '-') }}
+                          </ng-container>
+                        </ng-template>
                         <ng-template #sinHoraTpl>
                           <span class="text-muted">Sin hora</span>
                         </ng-template>
