@@ -543,6 +543,7 @@ class DefensaController extends Controller
         $primerRow = $rows->first();
 
         if ($tipoMiembro === 'externo') {
+            // Tribunal externo: siempre se maneja como consultor -> COMINT
             $trib = Tribunal::find($miembroId);
             if (!$trib) {
                 return response()->json([
@@ -557,8 +558,9 @@ class DefensaController extends Controller
                 $trib->apellido_m ?? null,
             ])));
             $paraNombre = trim(trim($tituloAcad . ' ' . $nombrePlano));
-            $condicion = 'consultor';
+            $tipoDocCod = 'COMINT';
         } else {
+            // Tribunal interno: decidir MEM/COMINT según tipo_tutor_id (tabla tipo_tutor)
             $tutor = Tutor::find($miembroId);
             if (!$tutor) {
                 return response()->json([
@@ -573,11 +575,11 @@ class DefensaController extends Controller
                 $tutor->apellido_m ?? null,
             ])));
             $paraNombre = trim(trim($tituloAcad . ' ' . $nombrePlano));
-            $condicion = (string) ($tutor->condicion_interna ?? '');
-        }
 
-        $cond = strtolower(trim($condicion));
-        $tipoDocCod = $cond === 'planta' ? 'MEM' : 'COMINT';
+            // En tipo_tutor: 1 = Consultor, 2 = De Planta
+            $tipoTutorId = (int) ($tutor->tipo_tutor_id ?? 1);
+            $tipoDocCod = $tipoTutorId === 2 ? 'MEM' : 'COMINT';
+        }
         $tipoDocNombre = $tipoDocCod === 'MEM' ? 'MEMORÁNDUM' : 'COMUNICACIÓN INTERNA';
 
         $now = Carbon::now();
