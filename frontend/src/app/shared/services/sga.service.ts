@@ -532,6 +532,15 @@ export class SgaService {
     });
   }
 
+  downloadPlanillaEvaluacion(defensaId: number | string) {
+    const id = encodeURIComponent(String(defensaId));
+    const url = `${environment.apiUrl}/defensas/${id}/planilla-evaluacion-docx`;
+    return this.http.get(url, {
+      observe: 'response',
+      responseType: 'blob' as 'json',
+    });
+  }
+
   // --- ROLES DE TRIBUNAL ---
   getRolesTribunal(): Observable<ApiResponse<Array<{ id: number; codigo: string; nombre: string }>>> {
     return this.http

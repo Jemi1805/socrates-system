@@ -1017,4 +1017,144 @@ class DefensaController extends Controller
             'correlativo' => $numeroStr ? (int) ltrim($numeroStr, '0') : null,
         ];
     }
+
+    public function planillaEvaluacionDocx($id)
+    {
+        $defensa = Defensa::find($id);
+        if (!$defensa) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Defensa no encontrada',
+            ], 404);
+        }
+
+        $tieneTribunal = DefensaTribunal::where('defensa_id', $defensa->id)->exists();
+        if (!$tieneTribunal) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se puede generar la planilla de evaluación porque la defensa aún no tiene tribunales designados.',
+            ], 422);
+        }
+
+        $row = DB::table('defensas as d')
+            ->leftJoin('proyecto as pr', 'd.proyecto_id', '=', 'pr.id')
+            ->leftJoin('postulantes as p', 'd.cod_ceta', '=', 'p.cod_ceta')
+            ->leftJoin('inscrip_modalidad as im', 'im.cod_ceta_est', '=', 'd.cod_ceta')
+            ->leftJoin('modalidad as m', 'im.modalidad_id', '=', 'm.id')
+            ->leftJoin('carrera', 'p.carrera', '=', 'carrera.nombre_carrera')
+            ->select([
+                'd.id as defensa_id',
+                'd.cod_ceta',
+                'd.fecha_defensa',
+                'd.aula',
+                'pr.nombre as proyecto_nombre',
+                'pr.objetivo as proyecto_objetivo',
+                'p.nombres_est',
+                'p.ap_pat',
+                'p.ap_mat',
+                'p.ci',
+                'p.carrera as carrera_nombre_raw',
+                'carrera.nombre_carrera as carrera_nombre_cat',
+                'm.nombre as modalidad_nombre',
+            ])
+            ->where('d.id', $defensa->id)
+            ->first();
+
+        if (!$row) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontraron datos suficientes para la planilla de evaluación',
+            ], 404);
+        }
+
+        $postulanteNombre = null;
+        if (isset($row->ap_pat) || isset($row->ap_mat)) {
+            $postulanteNombre = trim(implode(' ', array_filter([
+                $row->ap_pat ?? '',
+                $row->ap_mat ?? '',
+                $row->nombres_est ?? '',
+            ])));
+        } else {
+            $postulanteNombre = (string) ($row->nombres_est ?? '');
+        }
+
+        $carreraNombre = $row->carrera_nombre_cat ?: $row->carrera_nombre_raw;
+        $modalidadNombre = (string) ($row->modalidad_nombre ?? 'PROYECTO DE GRADO');
+        $modalidadNombre = mb_strtoupper($modalidadNombre, 'UTF-8');
+        $temaProyecto = (string) ($row->proyecto_nombre ?? '');
+
+        $fechaDefensa = $defensa->fecha_defensa ? Carbon::parse($defensa->fecha_defensa) : null;
+        if (!$fechaDefensa) {
+            return response()->json([
+                'success' => false,
+                'message' => 'La defensa no tiene fecha registrada',
+            ], 422);
+        }
+
+        try {
+            $mesConv = $fechaDefensa->locale('es')->isoFormat('MMMM');
+        } catch (\Throwable $e) {
+            $mesConv = $fechaDefensa->format('F');
+        }
+        $mesConv = mb_strtoupper($mesConv, 'UTF-8');
+        $anioConv = $fechaDefensa->year;
+
+        try {
+            $pieFecha = $fechaDefensa->locale('es')->isoFormat('D [de] MMMM [del] YYYY');
+        } catch (\Throwable $e) {
+            $pieFecha = $fechaDefensa->format('d/m/Y');
+        }
+
+        $templatePath = resource_path('templates/plantilla-planilla-evaluacion.docx');
+        if (!is_string($templatePath) || !file_exists($templatePath)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Plantilla de planilla de evaluación no encontrada',
+            ], 500);
+        }
+
+        try {
+            $tpl = new TemplateProcessor($templatePath);
+
+            $tpl->setValue('INSTITUTO_NOMBRE', 'INSTITUTO TECNOLÓGICO DE ENSEÑANZA AUTOMOTRIZ');
+            $tpl->setValue('INSTITUTO_SIGLA', 'CETA');
+            $tpl->setValue('INSTITUTO_CIUDAD_PAIS', 'Cochabamba - Bolivia');
+            $tpl->setValue('INSTITUTO_RESOLUCION', 'Resolución Ministerial N° 0595/2019');
+
+            $tpl->setValue('MODALIDAD_NOMBRE', (string) $modalidadNombre);
+            $tpl->setValue('CONVOCATORIA_MES_MAYUS', (string) $mesConv);
+            $tpl->setValue('CONVOCATORIA_ANIO', (string) $anioConv);
+
+            $tpl->setValue('POSTULANTE_NOMBRE_COMPLETO', (string) $postulanteNombre);
+            $tpl->setValue('POSTULANTE_CI', (string) ($row->ci ?? ''));
+            $tpl->setValue('CARRERA_NOMBRE', (string) ($carreraNombre ?? ''));
+            $tpl->setValue('TEMA_PROYECTO', (string) $temaProyecto);
+
+            $tpl->setValue('PIE_LUGAR', 'Cochabamba');
+            $tpl->setValue('PIE_FECHA_TEXTO', (string) $pieFecha);
+
+            $path = storage_path('app/tmp');
+            if (!is_dir($path)) {
+                @mkdir($path, 0777, true);
+            }
+
+            $fileName = 'planilla-evaluacion-' . (string) ($row->cod_ceta ?? $defensa->id) . '.docx';
+            $temp = $path . DIRECTORY_SEPARATOR . $fileName;
+            $tpl->saveAs($temp);
+
+            return response()->download($temp, $fileName, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ])->deleteFileAfterSend(true);
+        } catch (\Throwable $e) {
+            Log::error('Error generando planilla de evaluación DOCX', [
+                'defensa_id' => $defensa->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al generar la planilla de evaluación',
+            ], 500);
+        }
+    }
 }
