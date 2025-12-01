@@ -280,6 +280,56 @@ export class PostulantesListComponent implements OnInit {
       });
   }
 
+  descargarPlanillaEvaluacionFinal(ins: PostulanteInscrito) {
+    const defensaId = ins?.defensa?.id;
+    const tieneTribunal = Array.isArray(ins?.tribunal) && ins!.tribunal!.length > 0;
+    if (!defensaId || !tieneTribunal) {
+      return;
+    }
+
+    this.loadingService.showModal();
+    this.sgaService
+      .downloadPlanillaEvaluacionFinal(defensaId)
+      .pipe(finalize(() => this.loadingService.hideModal()))
+      .subscribe({
+        next: (resp: any) => {
+          const ct = resp?.headers?.get?.('Content-Type') || resp?.headers?.get?.('content-type') || '';
+          const cd = resp?.headers?.get?.('Content-Disposition') || resp?.headers?.get?.('content-disposition') || '';
+          const body = resp?.body as Blob | undefined;
+          if (!body || !(ct.includes('officedocument.wordprocessingml.document') || ct.includes('application/octet-stream') || body.size > 0)) {
+            console.error('Respuesta inválida para DOCX de Planilla de Evaluación Final', { ct, bodySize: body?.size });
+            return;
+          }
+
+          let fileName = `planilla-evaluacion-final-${ins.cod_ceta}.docx`;
+          const match = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(cd || '');
+          if (match) {
+            const encoded = match[1] || match[2];
+            try {
+              fileName = decodeURIComponent(encoded);
+            } catch {
+              fileName = encoded;
+            }
+          }
+
+          const blob = new Blob([body], {
+            type: ct || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+        },
+        error: (err) => {
+          console.error('Error al descargar Planilla de Evaluación Final', err);
+        },
+      });
+  }
+
   descargarPlanillaEvaluacion(ins: PostulanteInscrito) {
     const defensaId = ins?.defensa?.id;
     const tieneTribunal = Array.isArray(ins?.tribunal) && ins!.tribunal!.length > 0;

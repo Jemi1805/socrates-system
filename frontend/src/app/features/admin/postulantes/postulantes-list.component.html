@@ -298,6 +298,19 @@
                           </button>
                         </span>
                       </li>
+                      <li *ngIf="ins?.defensa?.id && ins?.tribunal?.length">
+                        <span class="docs-inline">
+                          <span>Planilla Final de Calificación</span>
+                          <button
+                            type="button"
+                            class="btn btn-success btn-icon-xs ms-1"
+                            (click)="descargarPlanillaEvaluacionFinal(ins)"
+                            title="Descargar"
+                          >
+                            <i class="bi bi-download" aria-hidden="true"></i>
+                          </button>
+                        </span>
+                      </li>
                       <li *ngIf="ins?.proyecto?.seguimiento_pdf">
                         <a [href]="getSeguimientoUrl(ins)" target="_blank">Ver seguimiento cargado</a>
                       </li>
