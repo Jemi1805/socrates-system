@@ -1077,11 +1077,16 @@ class DefensaController extends Controller
         } else {
             $postulanteNombre = (string) ($row->nombres_est ?? '');
         }
+        $postulanteNombre = mb_strtoupper($postulanteNombre, 'UTF-8');
 
         $carreraNombre = $row->carrera_nombre_cat ?: $row->carrera_nombre_raw;
+        $carreraNombre = $carreraNombre ? mb_strtoupper($carreraNombre, 'UTF-8') : $carreraNombre;
+
         $modalidadNombre = (string) ($row->modalidad_nombre ?? 'PROYECTO DE GRADO');
         $modalidadNombre = mb_strtoupper($modalidadNombre, 'UTF-8');
+
         $temaProyecto = (string) ($row->proyecto_nombre ?? '');
+        $temaProyecto = mb_strtoupper($temaProyecto, 'UTF-8');
 
         $fechaDefensa = $defensa->fecha_defensa ? Carbon::parse($defensa->fecha_defensa) : null;
         if (!$fechaDefensa) {
@@ -1370,6 +1375,222 @@ class DefensaController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error al generar la planilla final de evaluación',
+            ], 500);
+        }
+    }
+
+    public function actaDefensaDocx($id)
+    {
+        $defensa = Defensa::find($id);
+        if (!$defensa) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Defensa no encontrada',
+            ], 404);
+        }
+
+        $tieneTribunal = DefensaTribunal::where('defensa_id', $defensa->id)->exists();
+        if (!$tieneTribunal) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se puede generar el acta porque la defensa aún no tiene tribunales designados.',
+            ], 422);
+        }
+
+        $row = DB::table('defensas as d')
+            ->leftJoin('proyecto as pr', 'd.proyecto_id', '=', 'pr.id')
+            ->leftJoin('postulantes as p', 'd.cod_ceta', '=', 'p.cod_ceta')
+            ->leftJoin('inscrip_modalidad as im', 'im.cod_ceta_est', '=', 'd.cod_ceta')
+            ->leftJoin('modalidad as m', 'im.modalidad_id', '=', 'm.id')
+            ->leftJoin('carrera', 'p.carrera', '=', 'carrera.nombre_carrera')
+            ->select([
+                'd.id as defensa_id',
+                'd.cod_ceta',
+                'd.fecha_defensa',
+                'd.hora_inicio',
+                'd.hora_fin',
+                'd.aula',
+                'pr.nombre as proyecto_nombre',
+                'p.nombres_est',
+                'p.ap_pat',
+                'p.ap_mat',
+                'p.ci',
+                'p.carrera as carrera_nombre_raw',
+                'carrera.nombre_carrera as carrera_nombre_cat',
+                'm.nombre as modalidad_nombre',
+            ])
+            ->where('d.id', $defensa->id)
+            ->first();
+
+        if (!$row) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontraron datos suficientes para el acta de defensa',
+            ], 404);
+        }
+
+        $postulanteNombre = null;
+        if (isset($row->ap_pat) || isset($row->ap_mat)) {
+            $postulanteNombre = trim(implode(' ', array_filter([
+                $row->ap_pat ?? '',
+                $row->ap_mat ?? '',
+                $row->nombres_est ?? '',
+            ])));
+        } else {
+            $postulanteNombre = (string) ($row->nombres_est ?? '');
+        }
+
+        $carreraNombre = $row->carrera_nombre_cat ?: $row->carrera_nombre_raw;
+        $modalidadNombre = (string) ($row->modalidad_nombre ?? 'PROYECTO DE GRADO');
+        $modalidadNombre = mb_strtoupper($modalidadNombre, 'UTF-8');
+        $temaProyecto = (string) ($row->proyecto_nombre ?? '');
+
+        $fechaDefensa = $defensa->fecha_defensa ? Carbon::parse($defensa->fecha_defensa) : null;
+        if (!$fechaDefensa) {
+            return response()->json([
+                'success' => false,
+                'message' => 'La defensa no tiene fecha registrada',
+            ], 422);
+        }
+
+        try {
+            $fechaTexto = $fechaDefensa->locale('es')->isoFormat('D [de] MMMM [del] YYYY');
+        } catch (\Throwable $e) {
+            $fechaTexto = $fechaDefensa->format('d/m/Y');
+        }
+        $fechaTexto = mb_strtoupper($fechaTexto, 'UTF-8');
+
+        $horaInicio = $defensa->hora_inicio ? substr((string) $defensa->hora_inicio, 0, 8) : '';
+        $horaFin = $defensa->hora_fin ? substr((string) $defensa->hora_fin, 0, 8) : '';
+
+        $templatePath = resource_path('templates/plantilla-acta-de-defensa.docx');
+        if (!is_string($templatePath) || !file_exists($templatePath)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Plantilla de acta de defensa no encontrada',
+            ], 500);
+        }
+
+        try {
+            $tpl = new TemplateProcessor($templatePath);
+
+            $tpl->setValue('INSTITUTO_NOMBRE', 'INSTITUTO TECNOLÓGICO DE ENSEÑANZA AUTOMOTRIZ "CETA"');
+            $tpl->setValue('CARACTER_ESTUDIO', 'PRIVADO');
+            $tpl->setValue('CARRERA_NOMBRE', (string) ($carreraNombre ?? ''));
+            $tpl->setValue('NIVEL_NOMBRE', 'TÉCNICO SUPERIOR');
+            $tpl->setValue('MODALIDAD_NOMBRE', (string) $modalidadNombre);
+
+            $tpl->setValue('CIUDAD_NOMBRE', 'CERCADO');
+            $tpl->setValue('DEPARTAMENTO_NOMBRE', 'COCHABAMBA');
+            $tpl->setValue('FECHA_DEFENSA_TEXTO', (string) $fechaTexto);
+            $tpl->setValue('HORA_DEFENSA_TEXTO', (string) $horaInicio);
+
+            $tpl->setValue('POSTULANTE_NOMBRE_COMPLETO', (string) $postulanteNombre);
+            $tpl->setValue('POSTULANTE_CI', (string) ($row->ci ?? ''));
+            $tpl->setValue('PROYECTO_TITULO', (string) $temaProyecto);
+
+            // --- Miembros de TRIBUNAL en el acta (lista en un solo placeholder) ---
+            $miembros = DefensaTribunal::where('defensa_id', $defensa->id)->get();
+
+            // Ordenar por nombre completo (apellido paterno, materno, nombre)
+            $miembrosOrdenados = $miembros->sortBy(function (DefensaTribunal $m) {
+                $apellidoP = '';
+                $apellidoM = '';
+                $nombre = '';
+
+                if ($m->tipo === 'interno') {
+                    $tutor = Tutor::find($m->miembro_id);
+                    if ($tutor) {
+                        $apellidoP = (string) ($tutor->apellido_p ?? '');
+                        $apellidoM = (string) ($tutor->apellido_m ?? '');
+                        $nombre = (string) ($tutor->nombre ?? '');
+                    }
+                } else {
+                    $tribunal = Tribunal::find($m->miembro_id);
+                    if ($tribunal) {
+                        $apellidoP = (string) ($tribunal->apellido_p ?? '');
+                        $apellidoM = (string) ($tribunal->apellido_m ?? '');
+                        $nombre = (string) ($tribunal->nombre ?? '');
+                    }
+                }
+
+                return trim($apellidoP . ' ' . $apellidoM . ' ' . $nombre);
+            });
+
+            $lineas = [];
+
+            foreach ($miembrosOrdenados as $m) {
+                $apellidoP = '';
+                $apellidoM = '';
+                $nombre = '';
+                $tituloAcad = '';
+
+                if ($m->tipo === 'interno') {
+                    $tutor = Tutor::find($m->miembro_id);
+                    if ($tutor) {
+                        $apellidoP = (string) ($tutor->apellido_p ?? '');
+                        $apellidoM = (string) ($tutor->apellido_m ?? '');
+                        $nombre = (string) ($tutor->nombre ?? '');
+                        $tituloAcad = (string) ($tutor->titulo_academico ?? '');
+                    }
+                } else {
+                    $tribunal = Tribunal::find($m->miembro_id);
+                    if ($tribunal) {
+                        $apellidoP = (string) ($tribunal->apellido_p ?? '');
+                        $apellidoM = (string) ($tribunal->apellido_m ?? '');
+                        $nombre = (string) ($tribunal->nombre ?? '');
+                        $tituloAcad = (string) ($tribunal->titulo_academico ?? '');
+                    }
+                }
+
+                $nombrePlano = trim(implode(' ', array_filter([
+                    $apellidoP,
+                    $apellidoM,
+                    $nombre,
+                ])));
+
+                $nombreMiembro = trim(implode(' ', array_filter([
+                    $tituloAcad,
+                    $nombrePlano,
+                ])));
+
+                if ($nombreMiembro === '') {
+                    $nombreMiembro = 'Miembro #' . (string) $m->miembro_id;
+                }
+
+                // Un solo tabulador entre el nombre y la etiqueta; Word lo alineará usando la tabulación configurada
+                $lineas[] = $nombreMiembro . "\t(Tribunal Evaluador)";
+            }
+
+            $tpl->setValue('TRIBUNAL_NOMBRE', implode(PHP_EOL, $lineas));
+
+            // Nota final (por ahora vacía; se puede rellenar luego)
+            $tpl->setValue('NOTA_FINAL_LITERAL', '');
+            $tpl->setValue('NOTA_FINAL_NUM', '');
+
+            $tpl->setValue('HORA_CONCLUSION_TEXTO', (string) $horaFin);
+
+            $path = storage_path('app/tmp');
+            if (!is_dir($path)) {
+                @mkdir($path, 0777, true);
+            }
+
+            $fileName = 'acta-defensa-' . (string) ($row->cod_ceta ?? $defensa->id) . '.docx';
+            $temp = $path . DIRECTORY_SEPARATOR . $fileName;
+            $tpl->saveAs($temp);
+
+            return response()->download($temp, $fileName, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ])->deleteFileAfterSend(true);
+        } catch (\Throwable $e) {
+            Log::error('Error generando acta de defensa DOCX', [
+                'defensa_id' => $defensa->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al generar el acta de defensa',
             ], 500);
         }
     }

@@ -54,7 +54,7 @@ $transition: all 0.3s ease;
 
   // Asegurar que la tabla pueda crecer lo suficiente para no verse apretada
   .table {
-    min-width: 2400px;
+    min-width: 2200px;
   }
 }
 
@@ -824,8 +824,8 @@ input {
 
     // Hacer más estrecha la columna de Postulante
     .table-fixed thead th.postulante-col, .table-fixed tbody td.postulante-cell {
-      width: 180px;
-      max-width: 180px;
+      width: 220px;
+      max-width: 220px;
     }
 
     // Hacer más compacta la columna de Inscripción (2da columna)

@@ -229,6 +229,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('defensas/{id}/planilla-evaluacion-final-docx', [DefensaController::class, 'planillaEvaluacionFinalDocx'])
         ->where(['id' => '\\d+'])
         ->middleware('permission:defensas.leer');
+    Route::get('defensas/{id}/acta-defensa-docx', [DefensaController::class, 'actaDefensaDocx'])
+        ->where(['id' => '\\d+'])
+        ->middleware('permission:defensas.leer');
     Route::get('defensas/por-postulante/{cod_ceta}', [DefensaController::class, 'byPostulanteWithTribunal'])
         ->middleware('permission:defensas.leer');
 
