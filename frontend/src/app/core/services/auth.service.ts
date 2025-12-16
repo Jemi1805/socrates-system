@@ -119,4 +119,9 @@ export class AuthService {
     const elapsedMs = Date.now() - ts;
     return elapsedMs >= maxMinutes * 60 * 1000;
   }
+
+  // Actualiza la marca de última actividad a "ahora" para implementar expiración por inactividad
+  touchActivity(): void {
+    this.setLoginAt(Date.now());
+  }
 }

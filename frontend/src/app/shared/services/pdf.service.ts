@@ -303,7 +303,7 @@ export class PdfService {
     let y = margin;
 
     // Encabezado con logo (preservando proporción)
-    const logoUrl = options?.logoUrl || 'assets/images/LOGO.png';
+    const logoUrl = options?.logoUrl || 'assets/images/logo24.png';
     try {
       const meta = await this.loadImageWithMeta(logoUrl);
       const logoW = options?.logoWidthMm ?? 22; // ancho deseado en mm
@@ -648,7 +648,7 @@ export class PdfService {
     const nestedTabStop = 34;
     const labelColumnIndent = 12;
 
-    const logoUrl = options?.logoUrl || 'assets/images/LOGO.png';
+    const logoUrl = options?.logoUrl || 'assets/images/logo24.png';
     let logoMeta: { dataUrl: string; naturalWidth: number; naturalHeight: number; } | null = null;
     let logoImage: string | null = null;
     try {
@@ -1224,7 +1224,7 @@ export class PdfService {
 
       // Logo centrado
       try {
-        const meta2 = await this.loadImageWithMeta('assets/images/LOGO.png');
+        const meta2 = await this.loadImageWithMeta('assets/images/logo24.png');
         const desiredW = 44; // ~4.39 cm de ancho
         const aspect2 = meta2.naturalHeight ? meta2.naturalWidth / meta2.naturalHeight : 1;
         const finalW2 = desiredW;
