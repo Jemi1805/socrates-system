@@ -10,10 +10,11 @@ import { DesignarTutorComponent } from './features/admin/tutores/designar-tutor.
 import { RegistroTemaComponent } from './features/admin/proyectos/registro-tema.component';
 import { SeguimientoProyectoComponent } from './features/admin/proyectos/seguimiento-proyecto.component';
 import { ConfiguracionComponent } from './features/admin/configuracion/configuracion.component';
+import { DashboardComponent } from './features/admin/dashboard/dashboard.component';
 import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
-  { path: '', redirectTo: '/postulantes', pathMatch: 'full' },
+  { path: '', component: DashboardComponent, canActivate: [authGuard] },
   { path: 'login', component: LoginComponent },
   { path: 'modalidad-graduacion', component: ModalidadGraduacionComponent, canActivate: [authGuard] },
   { path: 'postulantes/nuevo', component: PostulantesListComponent, canActivate: [authGuard] },

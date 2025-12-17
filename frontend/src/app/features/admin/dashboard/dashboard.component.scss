@@ -1,0 +1,293 @@
+@use "sass:color";
+
+// Variables
+$primary-color: #4C9DBD;
+$secondary-color: #FF9800;
+$success-color: #4CAF50;
+$danger-color: #F44336;
+$info-color: #17a2b8;
+$light-gray: #f5f5f5;
+$border-color: #e0e0e0;
+$text-dark-blue: #052544;
+$text-light: #666;
+$shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+$border-radius: 12px;
+$transition: all 0.3s ease;
+
+.dashboard-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #052544 0%, #4C9DBD 100%);
+  padding: 0;
+  .content-wrapper {
+    padding: 1rem;
+    // Layout en columna: primero las dos cards superiores, luego la card del proceso
+    max-width: 1800px;
+    margin: 0 auto;
+    background: transparent;
+  }
+
+  // Contenedor principal de las dos cards del dashboard
+  .hero-cards {
+    text-align: left;
+    max-width: 1800px;
+    margin: 1rem auto 0;
+    .modalidad-item:hover {
+      background: rgba(239, 246, 255, 0.98);
+      border-color: $primary-color;
+    }
+
+    display: flex;
+    gap: 2rem;
+    align-items: stretch;
+    justify-content: space-between;
+  }
+
+  // Card inferior con el flujo del proceso
+  .process-card {
+    max-width: 1800px;
+    margin: 1.25rem auto 0;
+    padding: 1rem;
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  }
+
+  .process-title {
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: $text-dark-blue;
+    margin-bottom: 0.9rem;
+  }
+
+  .process-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+  }
+
+  .process-step {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.97);
+    border: 1px solid rgba(23, 162, 184, 0.35);
+  }
+
+  .process-step-badge {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: $primary-color;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .process-step-content {
+    .process-step-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .process-step-desc {
+      font-size: 0.78rem;
+      color: #4b5563;
+    }
+  }
+
+  // Flecha sutil hacia el siguiente paso (solo en pantallas grandes, usando pseudo-elemento)
+  @media (min-width: 769px) {
+    .process-step {
+      &::after {
+        content: "";
+        position: absolute;
+        right: -0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 10px;
+        height: 10px;
+        border-right: 2px solid $primary-color;
+        border-bottom: 2px solid $primary-color;
+        transform: translateY(-50%) rotate(-45deg);
+      }
+
+      &:last-child::after {
+        content: none;
+      }
+    }
+  }
+
+  .hero-card {
+    flex: 1 1 0;
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
+    padding: 1.5rem 1.7rem;
+  }
+
+  .hero-card-left {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .hero-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+
+    .hero-logo {
+      max-width: 150px;
+      height: auto;
+    }
+
+    .hero-text {
+      .hero-title {
+        font-size: 1.8rem;
+        margin-bottom: 0.1rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        color: $text-dark-blue;
+      }
+
+      .hero-subtitle {
+        font-size: 1rem;
+        color: #4b5563;
+        margin-bottom: 0.35rem;
+      }
+
+      .hero-hint {
+        font-size: 0.78rem;
+        color: #6b7280;
+      }
+    }
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem;
+    margin: 2rem 0 1.5rem;
+
+    .stat-card {
+      background: #f5f7ff;
+      border-radius: 0.6rem;
+      padding: 0.75rem 0.9rem;
+      border: 1px solid rgba(23, 162, 184, 0.35);
+      text-align: left;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+
+      .stat-label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        color: #4b5563;
+        text-transform: uppercase;
+        margin-bottom: 0.25rem;
+      }
+
+      .stat-value {
+        margin-top: 0.2rem;
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: $primary-color;
+        font-size: 1.6rem;
+        font-weight: 600;
+        color: $primary-color;
+      }
+    }
+  }
+
+  .modalidades {
+    margin-top: 0.25rem;
+    text-align: left;
+
+    h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .modalidades-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+
+      .mod-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 0.55rem 0.7rem;
+        border-radius: 0.6rem;
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+
+        .mod-icon {
+          flex: 0 0 auto;
+          width: 32px;
+          height: 32px;
+          border-radius: 999px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: $primary-color;
+          color: $primary-color;
+
+          i {
+            font-size: 1.1rem;
+          }
+        }
+
+        .mod-content {
+          .mod-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 0.1rem;
+            color: #111827;
+          }
+
+          .mod-desc {
+            font-size: 0.84rem;
+            color: #4b5563;
+          }
+        }
+
+        &:hover {
+          border-color: $primary-color;
+          box-shadow: 0 6px 18px rgba(37, 99, 235, 0.15);
+          transform: translateY(-2px);
+        }
+      }
+    }
+  }
+
+  @media (max-width: 768px) {
+    .content-wrapper {
+      padding: 1.25rem 1rem 1.75rem;
+    }
+
+    .hero-cards {
+      flex-direction: column;
+      padding: 1.25rem 1.5rem 1.75rem;
+    }
+
+    .process-card {
+      margin-top: 1rem;
+      padding: 1.25rem 1.25rem 1.4rem;
+    }
+
+    .stats {
+      grid-template-columns: 1fr;
+    }
+  }
+}

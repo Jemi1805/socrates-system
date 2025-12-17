@@ -45,7 +45,7 @@ export class LoginComponent implements OnInit {
     this.authService.login(this.credentials).subscribe({
       next: (response) => {
         this.loading = false;
-        this.router.navigate(['/postulantes']);
+        this.router.navigate(['/']);
       },
       error: (error) => {
         this.loading = false;

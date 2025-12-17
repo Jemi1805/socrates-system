@@ -1740,11 +1740,11 @@ export class ModalidadGraduacionComponent implements OnInit {
   // Métodos para mejorar la UI de modalidades
   getModalidadIcon(modalidadId: number): string {
     const icons = {
-      1: 'bi bi-journal-text',     // Tesis
+      1: 'bi bi-journal-text',     // Proyecto de Grado
       2: 'bi bi-gear-fill',        // Proyecto Sociocomunitario Productivo
       3: 'bi bi-building',         // Proyecto de Emprendimiento Productivo
       4: 'bi bi-clipboard-check',   // Trabajo Dirigido Externo
-      5: 'bi bi-award-fill',       // Graduacion por Experiencia Laboral
+      5: 'bi bi-award-fill',       // Graduación por Experiencia Laboral
       6: 'bi bi-lightning-fill'    // Graduación por Excelencia Académica
     };
     return icons[modalidadId as keyof typeof icons] || 'bi bi-mortarboard';

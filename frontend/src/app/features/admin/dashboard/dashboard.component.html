@@ -1,0 +1,127 @@
+<div class="dashboard-container">
+  <app-header
+    pageTitle="Inicio"
+    [breadcrumbItems]="[{ label: 'Inicio' }]">
+  </app-header>
+
+  <div class="content-wrapper">
+    <div class="hero-cards">
+        <!-- Card izquierda: logo + datos/resumen -->
+        <div class="hero-card hero-card-left">
+          <div class="hero-header">
+            <img src="assets/images/logo24.png" alt="Logo CETA" class="hero-logo" />
+            <div class="hero-text">
+              <h2 class="hero-title">SOCRATES</h2>
+              <p class="hero-subtitle">Sistema de Seguimiento de Modalidades de Graduación y Titulación</p>
+              <p class="hero-hint">Use el menú para navegar por las distintas secciones.</p>
+            </div>
+          </div>
+
+          <div class="stats" *ngIf="!loading">
+            <div class="stat-card">
+              <div class="stat-label">Postulantes inscritos</div>
+              <div class="stat-value">{{ totalPostulantesInscritos }}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Convocatorias (activas / total)</div>
+              <div class="stat-value">{{ convocatoriasActivas }} / {{ totalConvocatorias }}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Carreras registradas</div>
+              <div class="stat-value">{{ totalCarreras }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card derecha: modalidades con iconos -->
+        <div class="hero-card hero-card-right" *ngIf="modalidadesResumen?.length">
+          <div class="modalidades">
+            <h3>Modalidades de graduación</h3>
+            <div class="modalidades-grid">
+              <div class="mod-item" *ngFor="let m of modalidadesResumen; let i = index">
+                <div class="mod-icon">
+                  <i
+                    class="bi"
+                    [ngClass]="{
+                      'bi-journal-text': i === 0,
+                      'bi-gear-fill': i === 1,
+                      'bi-building': i === 2,
+                      'bi-clipboard-check': i === 3,
+                      'bi-award-fill': i === 4,
+                      'bi-lightning-fill': i === 5
+                    }"
+                  ></i>
+                </div>
+                <div class="mod-content">
+                  <div class="mod-title">{{ m.nombre }}</div>
+                  <div class="mod-desc">{{ m.descripcion }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+    </div>
+
+    <!-- Card inferior: proceso de titulación -->
+    <div class="process-card">
+      <h3 class="process-title">Proceso de titulación</h3>
+      <div class="process-steps">
+        <div class="process-step">
+          <div class="process-step-badge">1</div>
+          <div class="process-step-content">
+            <div class="process-step-title">Inscripción a modalidad</div>
+            <div class="process-step-desc">Se inscribe al postulante en la modalidad de graduación elegida.</div>
+          </div>
+        </div>
+
+        <div class="process-step">
+          <div class="process-step-badge">2</div>
+          <div class="process-step-content">
+            <div class="process-step-title">Registro de tema</div>
+            <div class="process-step-desc">Se registra el tema del proyecto que esta realizando.</div>
+          </div>
+        </div>
+
+        <div class="process-step">
+          <div class="process-step-badge">3</div>
+          <div class="process-step-content">
+            <div class="process-step-title">Designación de tutor</div>
+            <div class="process-step-desc">Se asigna un tutor responsable del seguimiento académico.</div>
+          </div>
+        </div>
+
+        <div class="process-step">
+          <div class="process-step-badge">4</div>
+          <div class="process-step-content">
+            <div class="process-step-title">Seguimiento del proyecto</div>
+            <div class="process-step-desc">Se realiza el acompañamiento y control de avances del proyecto.</div>
+          </div>
+        </div>
+
+        <div class="process-step">
+          <div class="process-step-badge">5</div>
+          <div class="process-step-content">
+            <div class="process-step-title">Programación de defensa</div>
+            <div class="process-step-desc">Se agenda la fecha y hora de la defensa.</div>
+          </div>
+        </div>
+
+        <div class="process-step">
+          <div class="process-step-badge">6</div>
+          <div class="process-step-content">
+            <div class="process-step-title">Designación de tribunal</div>
+            <div class="process-step-desc">Se conforma el tribunal evaluador de la defensa.</div>
+          </div>
+        </div>
+
+        <div class="process-step">
+          <div class="process-step-badge">7</div>
+          <div class="process-step-content">
+            <div class="process-step-title">Defensa</div>
+            <div class="process-step-desc">El postulante realiza la defensa pública de su trabajo.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
