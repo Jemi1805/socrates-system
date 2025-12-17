@@ -162,6 +162,35 @@ export class ConfiguracionComponent implements OnInit {
     });
   }
 
+  // Normaliza nombres y apellidos: trim y cada palabra con inicial mayúscula, resto minúscula
+  private normalizeName(value: string | null | undefined): string {
+    const v = (value || '').trim().toLowerCase();
+    if (!v) return '';
+    return v
+      .split(/\s+/)
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  }
+
+  // Handler común para inputs de nombre y apellidos en el modal de usuario
+  onUserNameFieldInput(field: 'nombre' | 'apellido_p' | 'apellido_m', ev: Event) {
+    const input = ev.target as HTMLInputElement | null;
+    if (!input) return;
+    const normalized = this.normalizeName(input.value);
+
+    // Actualizar visualmente el input
+    if (input.value !== normalized) {
+      input.value = normalized;
+    }
+
+    // Actualizar el form control correspondiente según el modo (crear/editar)
+    const form = this.isCreateUserMode ? this.newUserForm : this.editUserForm;
+    const ctrl = form.get(field);
+    if (ctrl) {
+      ctrl.setValue(normalized, { emitEvent: false });
+    }
+  }
+
   // === Nueva Pertinencia ===
   openNewPert() {
     if (!this.newPertForm) {
@@ -389,23 +418,36 @@ export class ConfiguracionComponent implements OnInit {
       this.newUserForm.markAllAsTouched();
       return;
     }
-    const payload = this.newUserForm.value;
-    this.sga.createUsuario(payload).subscribe({
-      next: (resp) => {
-        if (resp?.success && resp.data) {
-          // Refrescar listado y limpiar formulario
-          this.loadUsuarios();
-          this.newUserForm.reset({ activo: true });
-          this.newUserOpen = false;
-          this.closeUserModal();
-        } else {
-          this.errorUsuarios = resp?.message || 'No se pudo crear el usuario';
+    this.modalSaving = true;
+    this.loading.showModal();
+    const raw = this.newUserForm.value;
+    const payload = {
+      ...raw,
+      nombre: this.normalizeName(raw.nombre),
+      apellido_p: this.normalizeName(raw.apellido_p),
+      apellido_m: this.normalizeName(raw.apellido_m),
+    };
+    this.sga.createUsuario(payload)
+      .pipe(finalize(() => {
+        this.modalSaving = false;
+        this.loading.hideModal();
+      }))
+      .subscribe({
+        next: (resp) => {
+          if (resp?.success && resp.data) {
+            // Refrescar listado y limpiar formulario
+            this.loadUsuarios();
+            this.newUserForm.reset({ activo: true });
+            this.newUserOpen = false;
+            this.closeUserModal();
+          } else {
+            this.errorUsuarios = resp?.message || 'No se pudo crear el usuario';
+          }
+        },
+        error: (err) => {
+          this.errorUsuarios = err?.message || 'Error al crear usuario';
         }
-      },
-      error: (err) => {
-        this.errorUsuarios = err?.message || 'Error al crear usuario';
-      }
-    });
+      });
   }
 
   // --- Editar Usuario ---
@@ -459,9 +501,9 @@ export class ConfiguracionComponent implements OnInit {
     }
     const formVal = this.editUserForm.value;
     const payload: any = {
-      nombre: formVal.nombre,
-      apellido_p: formVal.apellido_p,
-      apellido_m: formVal.apellido_m,
+      nombre: this.normalizeName(formVal.nombre),
+      apellido_p: this.normalizeName(formVal.apellido_p),
+      apellido_m: this.normalizeName(formVal.apellido_m),
       nombre_usuario: formVal.nombre_usuario,
       rol_id: formVal.rol_id,
       activo: formVal.activo,

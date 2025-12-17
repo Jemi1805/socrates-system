@@ -286,15 +286,15 @@
             <div class="row g-3">
               <div class="col-12 col-md-4">
                 <label class="form-label">Nombre <span class="text-danger">*</span></label>
-                <input class="form-control" formControlName="nombre" placeholder="Nombre" autocomplete="off" />
+                <input class="form-control" formControlName="nombre" placeholder="Nombre" autocomplete="off" (input)="onUserNameFieldInput('nombre', $event)" />
               </div>
               <div class="col-12 col-md-4">
                 <label class="form-label">Apellido Paterno</label>
-                <input class="form-control" formControlName="apellido_p" placeholder="Apellido paterno" autocomplete="off" />
+                <input class="form-control" formControlName="apellido_p" placeholder="Apellido paterno" autocomplete="off" (input)="onUserNameFieldInput('apellido_p', $event)" />
               </div>
               <div class="col-12 col-md-4">
                 <label class="form-label">Apellido Materno</label>
-                <input class="form-control" formControlName="apellido_m" placeholder="Apellido materno" autocomplete="off" />
+                <input class="form-control" formControlName="apellido_m" placeholder="Apellido materno" autocomplete="off" (input)="onUserNameFieldInput('apellido_m', $event)" />
               </div>
 
               <div class="col-12 col-md-4">
@@ -313,11 +313,13 @@
               <div class="col-12 col-md-4" *ngIf="isCreateUserMode; else editPwd">
                 <label class="form-label">Contraseña <span class="text-danger">*</span></label>
                 <input type="password" class="form-control" formControlName="contrasena" placeholder="********" autocomplete="new-password" pattern="^\S+$" (keydown.space)="$event.preventDefault()" (input)="onNewPasswordInput($event, 'contrasena')" />
+                <div class="form-text">La contraseña debe tener al menos 8 caracteres y no contener espacios.</div>
               </div>
               <ng-template #editPwd>
                 <div class="col-12 col-md-4">
                   <label class="form-label">Contraseña (opcional)</label>
                   <input type="password" class="form-control" formControlName="contrasena" placeholder="********" autocomplete="new-password" pattern="^\S+$" (keydown.space)="$event.preventDefault()" (input)="onEditPasswordInput($event, 'contrasena')" />
+                  <div class="form-text">Si la cambia, la nueva contraseña debe tener al menos 8 caracteres y no contener espacios.</div>
                 </div>
               </ng-template>
               <div class="col-12 col-md-4">
