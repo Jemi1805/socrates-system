@@ -103,7 +103,7 @@
                         <i class="bi bi-pencil-square"></i>
                         Editar
                       </button>
-                      <button class="btn btn-outline-secondary btn-sm ms-1" (click)="openPerms(u)">
+                      <button class="btn btn-primary btn-sm ms-1" (click)="openPerms(u)">
                         <i class="bi bi-shield-lock"></i>
                         Permisos
                       </button>
@@ -365,17 +365,26 @@
         <div class="modal-body">
           <div *ngIf="permsLoading" class="text-muted small">Cargando permisos...</div>
           <div *ngIf="permsError" class="alert alert-danger py-2">{{ permsError }}</div>
-          <div class="row" *ngIf="!permsLoading && permsOptions?.length">
+
+          <div class="row" *ngIf="!permsLoading && permsGroups?.length">
             <div class="col-12">
-              <div class="list-group small perms-grid">
-                <label class="list-group-item" *ngFor="let p of permsOptions">
-                  <input class="form-check-input me-1" type="checkbox" [checked]="p.assigned" (change)="onTogglePerm(p, $event)" />
-                  <span class="fw-semibold">{{ p.codigo }}</span> - {{ p.nombre }}
-                </label>
+              <div class="perms-sections small">
+                <div class="perms-section mb-3" *ngFor="let group of permsGroups">
+                  <div class="perms-section-header fw-semibold text-uppercase text-primary mb-1">
+                    {{ group.label }}
+                  </div>
+                  <div class="list-group perms-grid">
+                    <label class="list-group-item" *ngFor="let p of group.items">
+                      <input class="form-check-input me-1" type="checkbox" [checked]="p.assigned" (change)="onTogglePerm(p, $event)" />
+                      <span class="fw-semibold">{{ p.codigo }}</span>
+                      <span class="text-muted">- {{ p.nombre }}</span>
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-          <div *ngIf="!permsLoading && !permsOptions?.length" class="text-muted small">No hay permisos definidos.</div>
+          <div *ngIf="!permsLoading && !permsGroups?.length" class="text-muted small">No hay permisos definidos.</div>
         </div>
         <div class="modal-footer py-2">
           <button class="btn btn-success btn-sm" type="button" (click)="savePerms()" [disabled]="savingPerms">

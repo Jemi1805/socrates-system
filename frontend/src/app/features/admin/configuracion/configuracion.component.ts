@@ -98,6 +98,7 @@ export class ConfiguracionComponent implements OnInit {
   permsError: string | null = null;
   permsTargetUser: Usuario | null = null;
   permsOptions: Array<{ id: number; codigo: string; nombre: string; assigned: boolean }> = [];
+  permsGroups: Array<{ key: string; label: string; items: Array<{ id: number; codigo: string; nombre: string; assigned: boolean }> }> = [];
   savingPerms = false;
 
   constructor(private sga: SgaService, private fb: FormBuilder, private loading: LoadingService) {}
@@ -106,6 +107,43 @@ export class ConfiguracionComponent implements OnInit {
     this.buildNewUserForm();
     this.loadRoles();
     this.buildNewConvForm();
+  }
+
+  // Agrupar permisos por módulo (prefijo del código antes del punto)
+  private buildPermsGroups() {
+    const moduleLabels: Record<string, string> = {
+      postulantes: 'Postulantes inscritos',
+      inscripciones: 'Inscripciones',
+      inscrip_modalidad: 'Inscripción de modalidad',
+      temas: 'Temas / Proyectos',
+      tutores: 'Tutores y tribunales',
+      convocatorias: 'Convocatorias',
+      defensas: 'Defensas',
+      pertinencias: 'Pertinencias',
+      usuarios: 'Usuarios',
+      permisos: 'Administración de permisos',
+      sga: 'Conectividad SGA',
+    };
+
+    const groups: Record<string, { key: string; label: string; items: Array<{ id: number; codigo: string; nombre: string; assigned: boolean }> }> = {};
+
+    for (const p of this.permsOptions) {
+      const parts = (p.codigo || '').split('.');
+      const key = parts[0] || 'otros';
+      const label = moduleLabels[key] || key.charAt(0).toUpperCase() + key.slice(1);
+      if (!groups[key]) {
+        groups[key] = { key, label, items: [] };
+      }
+      groups[key].items.push(p);
+    }
+
+    // Ordenar grupos por etiqueta y permisos por código
+    this.permsGroups = Object.values(groups)
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .map(group => ({
+        ...group,
+        items: group.items.slice().sort((a, b) => a.codigo.localeCompare(b.codigo)),
+      }));
   }
 
   private actualizarMetadatosConvocatorias() {
@@ -577,12 +615,14 @@ export class ConfiguracionComponent implements OnInit {
     this.permsLoading = true;
     this.permsError = null;
     this.permsOptions = [];
+    this.permsGroups = [];
     this.setBodyModalOpen(true);
     this.sga.getUserPermissions(u.id).subscribe({
       next: (resp) => {
         this.permsLoading = false;
         if (resp?.success) {
           this.permsOptions = resp.data || [];
+          this.buildPermsGroups();
         } else {
           this.permsError = resp?.message || 'No se pudo cargar permisos';
         }
@@ -601,6 +641,7 @@ export class ConfiguracionComponent implements OnInit {
     this.permsError = null;
     this.permsTargetUser = null;
     this.permsOptions = [];
+    this.permsGroups = [];
     this.setBodyModalOpen(false);
   }
 
@@ -615,9 +656,14 @@ export class ConfiguracionComponent implements OnInit {
     if (!this.permsTargetUser) return;
     this.savingPerms = true;
     const ids = this.permsOptions.filter(p => p.assigned).map(p => p.id);
-    this.sga.setUserPermissions(this.permsTargetUser.id, ids).subscribe({
-      next: (resp) => {
+    this.loading.showModal();
+    this.sga.setUserPermissions(this.permsTargetUser.id, ids).pipe(
+      finalize(() => {
         this.savingPerms = false;
+        this.loading.hideModal();
+      })
+    ).subscribe({
+      next: (resp) => {
         if (resp?.success) {
           // Opcional: refrescar usuario listado
           this.loadUsuarios();
@@ -627,7 +673,6 @@ export class ConfiguracionComponent implements OnInit {
         }
       },
       error: (err) => {
-        this.savingPerms = false;
         this.permsError = err?.message || 'Error al guardar permisos';
       }
     });

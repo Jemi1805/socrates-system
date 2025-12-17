@@ -28,6 +28,7 @@ export class AuthService {
   private tokenKey = 'auth_token';
   private userKey = 'auth_user';
   private loginAtKey = 'auth_login_at';
+  private permissionCodes: string[] | null = null;
   
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(this.isLoggedIn());
   public isAuthenticated$ = this.isAuthenticatedSubject.asObservable();
@@ -68,13 +69,19 @@ export class AuthService {
 
   private setUser(user: any): void {
     localStorage.setItem(this.userKey, JSON.stringify(user));
+    this.permissionCodes = this.extractPermissionCodes(user);
   }
 
   getUser(): any {
     const raw = localStorage.getItem(this.userKey);
     if (!raw) return null;
     try {
-      return JSON.parse(raw);
+      const user = JSON.parse(raw);
+      // Actualizar cache de permisos si no está cargada
+      if (this.permissionCodes === null) {
+        this.permissionCodes = this.extractPermissionCodes(user);
+      }
+      return user;
     } catch (e) {
       console.warn('auth_user inválido en localStorage, limpiando...', e);
       localStorage.removeItem(this.userKey);
@@ -123,5 +130,38 @@ export class AuthService {
   // Actualiza la marca de última actividad a "ahora" para implementar expiración por inactividad
   touchActivity(): void {
     this.setLoginAt(Date.now());
+  }
+
+  // --- Permisos en frontend ---
+  private extractPermissionCodes(user: any): string[] {
+    if (!user) return [];
+    const perms = (user.permisos || user.permissions || []);
+    if (!Array.isArray(perms)) return [];
+    return perms
+      .map((p: any) => (p && (p.codigo || p.code)) as string | undefined)
+      .filter((c): c is string => !!c)
+      .map((c) => c.trim().toLowerCase());
+  }
+
+  private getPermissionCodes(): string[] {
+    if (this.permissionCodes !== null) {
+      return this.permissionCodes;
+    }
+    const user = this.getUser();
+    this.permissionCodes = this.extractPermissionCodes(user);
+    return this.permissionCodes;
+  }
+
+  hasPermission(code: string): boolean {
+    if (!code) return false;
+    const target = code.trim().toLowerCase();
+    return this.getPermissionCodes().includes(target);
+  }
+
+  hasAnyPermission(codes: string[]): boolean {
+    if (!Array.isArray(codes) || codes.length === 0) return false;
+    const targets = codes.map(c => c.trim().toLowerCase());
+    const current = this.getPermissionCodes();
+    return targets.some(t => current.includes(t));
   }
 }

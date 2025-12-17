@@ -117,7 +117,12 @@
                     </div>
                   </ng-container>
                   <ng-template #noTemaTpl>
-                    <button type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irRegistrarTema(ins)">
+                    <button
+                      type="button"
+                      class="btn btn-outline-primary btn-sm px-2 py-1"
+                      (click)="irRegistrarTema(ins)"
+                      *ngIf="hasPerm('temas.crear')"
+                    >
                       <i class="bi bi-plus-circle"></i>
                       <span class="ms-1">Registrar</span>
                     </button>
@@ -132,7 +137,12 @@
                         <div class="tutor-cel ellipsis-1" *ngIf="ins.designacion?.tutor_celular">Cel: {{ ins.designacion?.tutor_celular }}</div>
                       </ng-container>
                       <ng-template #noTutorTpl>
-                        <button *ngIf="tieneProyecto(ins)" type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irDesignarTutor(ins)">
+                        <button
+                          *ngIf="tieneProyecto(ins) && hasPerm('tutores.designar')"
+                          type="button"
+                          class="btn btn-outline-primary btn-sm px-2 py-1"
+                          (click)="irDesignarTutor(ins)"
+                        >
                           <i class="bi bi-person-plus"></i>
                           <span class="ms-1">Designar</span>
                         </button>
@@ -159,11 +169,22 @@
                           'bg-warning text-dark': seguimientoEstadoUI(ins) === 'Reprogramado',
                           'bg-dark': seguimientoEstadoUI(ins) === 'Abandono'
                         }">{{ seguimientoEstadoUI(ins) }}</span>
-                        <button *ngIf="isSeguimientoEnProceso(ins)" type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irSeguimiento(ins)">
+                        <button
+                          *ngIf="isSeguimientoEnProceso(ins) && hasPerm('temas.actualizar')"
+                          type="button"
+                          class="btn btn-outline-primary btn-sm px-2 py-1"
+                          (click)="irSeguimiento(ins)"
+                        >
                           <i class="bi bi-journal-plus"></i>
                           <span class="ms-1">Registrar</span>
                         </button>
-                        <button *ngIf="!isSeguimientoEnProceso(ins)" type="button" class="btn btn-outline-secondary btn-sm px-2 py-1" (click)="irSeguimiento(ins)" title="Editar seguimiento">
+                        <button
+                          *ngIf="!isSeguimientoEnProceso(ins) && hasPerm('temas.actualizar')"
+                          type="button"
+                          class="btn btn-outline-secondary btn-sm px-2 py-1"
+                          (click)="irSeguimiento(ins)"
+                          title="Editar seguimiento"
+                        >
                           <i class="bi bi-pencil"></i>
                         </button>
                       </div>
@@ -200,7 +221,7 @@
                           <button
                             type="button"
                             class="btn btn-outline-primary btn-sm px-2 py-1"
-                            *ngIf="puedeProgramarDefensa(ins) && !tieneDefensaProgramada(ins)"
+                            *ngIf="puedeProgramarDefensa(ins) && !tieneDefensaProgramada(ins) && hasPerm('defensas.programar')"
                             (click)="abrirModalDefensa(ins, 'programar')">
                             <i class="bi bi-calendar-plus"></i>
                             <span class="ms-1">Programar</span>
@@ -208,7 +229,7 @@
                           <button
                             type="button"
                             class="btn btn-outline-warning btn-sm px-2 py-1"
-                            *ngIf="puedeProgramarDefensa(ins) && tieneDefensaProgramada(ins)"
+                            *ngIf="puedeProgramarDefensa(ins) && tieneDefensaProgramada(ins) && hasPerm('defensas.reprogramar')"
                             (click)="abrirModalDefensa(ins, 'reprogramar')">
                             <i class="bi bi-arrow-repeat"></i>
                             <span class="ms-1">Reprogramar</span>
@@ -244,7 +265,12 @@
                                 </div>
                               </div>
                               <ng-template #tribDesignarBtn>
-                                <button type="button" class="btn btn-outline-primary btn-sm px-2 py-1" (click)="irDesignarTribunal(ins)">
+                                <button
+                                  type="button"
+                                  class="btn btn-outline-primary btn-sm px-2 py-1"
+                                  (click)="irDesignarTribunal(ins)"
+                                  *ngIf="hasPerm('defensas.programar')"
+                                >
                                   <i class="bi bi-people"></i>
                                   <span class="ms-1">Designar</span>
                                 </button>
@@ -271,10 +297,10 @@
                 <td class="docs-cell" data-label="Documentos">
                   <ng-container *ngIf="ins?.proyecto?.nombre || ins?.designacion?.numero_documento || ins?.proyecto?.seguimiento_pdf; else noDocsTpl">
                     <ul class="docs-list">
-                      <li *ngIf="ins?.proyecto?.nombre">
+                      <li *ngIf="ins?.proyecto?.nombre && hasPerm('temas.leer')">
                         <a href="" (click)="verFmdg(ins); $event.preventDefault()">FDMG-1</a>
                       </li>
-                      <li *ngIf="ins?.designacion?.numero_documento">
+                      <li *ngIf="ins?.designacion?.numero_documento && hasPerm('tutores.leer')">
                         <a href="" (click)="verDesignacion(ins); $event.preventDefault()">Designación Tutor</a>
                       </li>
                       <li *ngIf="ins?.designacion?.numero_documento">
@@ -285,7 +311,7 @@
                           </button>
                         </span>
                       </li>
-                      <li *ngIf="ins?.defensa?.id && ins?.tribunal?.length">
+                      <li *ngIf="ins?.defensa?.id && ins?.tribunal?.length && hasPerm('defensas.leer')">
                         <span class="docs-inline">
                           <span>Planilla de Evaluación</span>
                           <button
@@ -728,7 +754,11 @@
               Guardar cambios
             </button>
           </div>
-          <button class="btn btn-sm btn-primary" *ngIf="viewInscripcion" (click)="toggleEditConvocatoria()">
+          <button
+            class="btn btn-sm btn-primary"
+            *ngIf="viewInscripcion && hasPerm('convocatorias.actualizar')"
+            (click)="toggleEditConvocatoria()"
+          >
             <i class="bi" [ngClass]="editConvocatoria ? 'bi-x-circle me-1' : 'bi-pencil-square'"></i>
             {{ editConvocatoria ? 'Cancelar' : 'Editar' }}
           </button>

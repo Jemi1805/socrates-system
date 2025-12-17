@@ -175,7 +175,13 @@ class UserController extends Controller
             'activo' => $request->get('activo', true),
         ]);
 
-        $usuario->load('rol');
+        // Asignar por defecto permiso para ver la lista de postulantes inscritos
+        $permisoPostulantes = Permiso::porCodigo('postulantes.inscritos.leer');
+        if ($permisoPostulantes) {
+            $usuario->permisos()->attach($permisoPostulantes->id, ['concedido' => true]);
+        }
+
+        $usuario->load(['rol', 'permisos']);
 
         return response()->json([
             'success' => true,

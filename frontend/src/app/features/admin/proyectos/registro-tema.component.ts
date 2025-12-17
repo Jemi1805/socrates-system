@@ -8,6 +8,7 @@ import { PostulanteService } from '../postulantes/postulante.service';
 import { PdfService } from '../../../shared/services/pdf.service';
 import { LoadingService } from '../../../core/services/loading.service';
 import { SgaService } from '../../../shared/services/sga.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 interface EstudianteCtx {
   cod_ceta?: string | number;
@@ -95,7 +96,16 @@ export class RegistroTemaComponent implements OnInit {
     private route: ActivatedRoute,
     private loadingService: LoadingService,
     private sgaService: SgaService,
+    private auth: AuthService,
   ) {}
+
+  hasPerm(code: string): boolean {
+    return this.auth.hasPermission(code);
+  }
+
+  hasAnyPerm(codes: string[]): boolean {
+    return this.auth.hasAnyPermission(codes);
+  }
 
   ngOnInit(): void {
     // 1) Cargar contexto desde sessionStorage si existe

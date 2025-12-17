@@ -48,8 +48,11 @@ class UsuarioPermisoSeeder extends Seeder
     {
         // Solo permisos generalizados solicitados por el usuario
         $permisos = [
-            // Búsqueda de estudiantes
+            // Búsqueda de estudiantes (SGA)
             ['codigo' => 'sga.estudiantes.buscar', 'nombre' => 'Buscar Estudiantes', 'descripcion' => 'Permite buscar/consultar estudiantes en el SGA'],
+
+            // Postulantes inscritos (vista principal)
+            ['codigo' => 'postulantes.inscritos.leer', 'nombre' => 'Ver Postulantes Inscritos', 'descripcion' => 'Permite ver la lista de postulantes inscritos'],
 
             // Inscripción de modalidad
             ['codigo' => 'inscripciones.crear', 'nombre' => 'Inscribir Modalidad', 'descripcion' => 'Permite registrar la inscripción de modalidad'],
@@ -58,9 +61,10 @@ class UsuarioPermisoSeeder extends Seeder
 
             // Temas (alias de Proyectos)
             ['codigo' => 'temas.crear', 'nombre' => 'Registrar Tema', 'descripcion' => 'Permite registrar temas'],
+            ['codigo' => 'temas.leer', 'nombre' => 'Ver Tema', 'descripcion' => 'Permite ver/listar temas y proyectos'],
             ['codigo' => 'temas.actualizar', 'nombre' => 'Editar Tema', 'descripcion' => 'Permite editar temas'],
 
-            // Tutores
+            // Tutores y tribunales
             ['codigo' => 'tutores.crear', 'nombre' => 'Registrar Tutor', 'descripcion' => 'Permite registrar tutores'],
             ['codigo' => 'tutores.leer', 'nombre' => 'Ver Tutor', 'descripcion' => 'Permite ver/listar tutores'],
             ['codigo' => 'tutores.actualizar', 'nombre' => 'Editar Tutor', 'descripcion' => 'Permite editar tutores'],
@@ -74,7 +78,12 @@ class UsuarioPermisoSeeder extends Seeder
             ['codigo' => 'convocatorias.eliminar', 'nombre' => 'Eliminar Convocatoria', 'descripcion' => 'Permite eliminar convocatorias'],
             ['codigo' => 'convocatorias.activar_desactivar', 'nombre' => 'Activar o Desactivar Convocatoria', 'descripcion' => 'Permite activar o desactivar convocatorias'],
 
-            // Usuarios
+            // Defensas (programación y lectura)
+            ['codigo' => 'defensas.programar', 'nombre' => 'Programar Defensa', 'descripcion' => 'Permite programar o actualizar defensas de proyecto'],
+            ['codigo' => 'defensas.reprogramar', 'nombre' => 'Reprogramar Defensa', 'descripcion' => 'Permite reprogramar defensas ya registradas'],
+            ['codigo' => 'defensas.leer', 'nombre' => 'Ver Defensas', 'descripcion' => 'Permite ver/listar defensas y documentos asociados'],
+
+            // Usuarios y administración
             ['codigo' => 'usuarios.crear', 'nombre' => 'Crear Usuario', 'descripcion' => 'Permite crear usuarios'],
             ['codigo' => 'usuarios.actualizar', 'nombre' => 'Editar Usuario', 'descripcion' => 'Permite editar usuarios y permisos'],
             ['codigo' => 'usuarios.activar_desactivar', 'nombre' => 'Desactivar Usuario', 'descripcion' => 'Permite activar o desactivar usuarios'],

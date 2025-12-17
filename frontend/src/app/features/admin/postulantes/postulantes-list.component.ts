@@ -13,6 +13,7 @@ import { environment } from '../../../environments/environment';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { SgaService, Convocatoria } from '../../../shared/services/sga.service';
 import { LoadingService } from '../../../core/services/loading.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { ProyectoService } from '../proyectos/proyecto.service';
 import { PdfService } from '../../../shared/services/pdf.service';
 
@@ -1229,7 +1230,25 @@ get labelNuevoArancelGestion(): string {
   return this.nuevoArancel?.gestion || 'Seleccione gestión';
 }
 
-constructor(private postulanteService: PostulanteService, private sgaService: SgaService, private router: Router, private route: ActivatedRoute, private loadingService: LoadingService, private proyectoService: ProyectoService, private pdfService: PdfService, private sanitizer: DomSanitizer) {}
+constructor(
+  private postulanteService: PostulanteService,
+  private sgaService: SgaService,
+  private router: Router,
+  private route: ActivatedRoute,
+  private loadingService: LoadingService,
+  private proyectoService: ProyectoService,
+  private pdfService: PdfService,
+  private sanitizer: DomSanitizer,
+  private auth: AuthService,
+) {}
+
+hasPerm(code: string): boolean {
+  return this.auth.hasPermission(code);
+}
+
+hasAnyPerm(codes: string[]): boolean {
+  return this.auth.hasAnyPermission(codes);
+}
 
 // Normalizador para Tipo de Bachiller: siempre 'Nacional' o 'Extranjero'
 private formatTipoBachiller(v: string | null | undefined): string | null {
@@ -1572,11 +1591,20 @@ cargarDetallesTabla() {
   this.loadingDetalles = true;
   const items = this.postulantesInscritos.slice();
   let remaining = items.length * 6; // proyecto + designación + postulante(SGA) + inscripciones + aranceles
-  const done = () => { remaining--; if (remaining <= 0) { this.loadingDetalles = false; this.loadingService.hideModal(); } };
+  const done = () => {
+    remaining--;
+    if (remaining <= 0) {
+      this.loadingDetalles = false;
+      this.loadingService.hideModal();
+    }
+  };
   for (const ins of items) {
     const cod = ins.cod_ceta;
     // Proyecto (tema/objetivo)
-    this.proyectoService.getByCod(String(cod)).subscribe({
+    this.proyectoService
+      .getByCod(String(cod))
+      .pipe(finalize(() => done()))
+      .subscribe({
       next: (res) => {
         const p = this.pickProyectoFromResponse(res, String(cod));
         if (p) {
@@ -1611,11 +1639,15 @@ cargarDetallesTabla() {
           ins.proyecto = null;
         }
       },
-      error: () => { ins.proyecto = ins.proyecto || null; },
-      complete: () => done()
+      error: () => {
+        ins.proyecto = ins.proyecto || null;
+      },
     });
     // Designación (tutor/área)
-    this.sgaService.getTutoresDesignados({ cod_ceta: String(cod) }).subscribe({
+    this.sgaService
+      .getTutoresDesignados({ cod_ceta: String(cod) })
+      .pipe(finalize(() => done()))
+      .subscribe({
       next: (resp) => {
         const list = (resp as any)?.data ?? resp;
         const arr: any[] = Array.isArray(list) ? list : [];
@@ -1644,8 +1676,9 @@ cargarDetallesTabla() {
           ins.designacion = null;
         }
       },
-      error: () => { ins.designacion = ins.designacion || null; },
-      complete: () => done()
+      error: () => {
+        ins.designacion = ins.designacion || null;
+      },
     });
     // Tribunal de defensa (miembros y roles)
     const defensaId: number | null =
@@ -1653,7 +1686,10 @@ cargarDetallesTabla() {
       ((ins as any)?.defensa?.id ?? null);
 
     if (defensaId) {
-      this.sgaService.getDefensaTribunal(defensaId).subscribe({
+      this.sgaService
+        .getDefensaTribunal(defensaId)
+        .pipe(finalize(() => done()))
+        .subscribe({
         next: (resp) => {
           const base = (resp as any)?.data ?? resp;
           const list: any[] = Array.isArray(base) ? base : [];
@@ -1671,14 +1707,16 @@ cargarDetallesTabla() {
         error: () => {
           ins.tribunal = ins.tribunal || null;
         },
-        complete: () => done(),
       });
     } else {
       // No hay defensa aún; no se carga tribunal
       done();
     }
     // Datos del postulante desde SGA (para celular seguro y otros campos)
-    this.sgaService.getPostulanteById(cod).subscribe({
+    this.sgaService
+      .getPostulanteById(cod)
+      .pipe(finalize(() => done()))
+      .subscribe({
       next: (resp) => {
         let data = (resp as any)?.data ?? resp;
         let obj: any = Array.isArray((data as any)?.data) ? (data as any).data[0] : data;
@@ -1712,10 +1750,12 @@ cargarDetallesTabla() {
         }
       },
       error: () => {},
-      complete: () => done()
     });
     // Inscripciones del postulante: obtener la primera fecha de inscripción
-    this.sgaService.getInscripModalidadByPostulante(cod).subscribe({
+    this.sgaService
+      .getInscripModalidadByPostulante(cod)
+      .pipe(finalize(() => done()))
+      .subscribe({
       next: (resp) => {
         const list = (resp as any)?.data ?? resp;
         const arr: any[] = Array.isArray(list) ? list : [];
@@ -1732,10 +1772,12 @@ cargarDetallesTabla() {
         }
       },
       error: () => {},
-      complete: () => done()
     });
     // Aranceles del postulante: estado de pago (sin_pagos, parcial, completo)
-    this.sgaService.getArancelesEst(cod).subscribe({
+    this.sgaService
+      .getArancelesEst(cod)
+      .pipe(finalize(() => done()))
+      .subscribe({
       next: (resp) => {
         const list = (resp as any)?.data ?? resp;
         const arr: any[] = Array.isArray(list) ? list : [];
@@ -1756,8 +1798,9 @@ cargarDetallesTabla() {
           if ((ins as any).estado_arancel == null) ins.estado_arancel = 'parcial';
         }
       },
-      error: () => { ins.pago_estado = ins.pago_estado ?? null; },
-      complete: () => done()
+      error: () => {
+        ins.pago_estado = ins.pago_estado ?? null;
+      },
     });
   }
 }

@@ -108,7 +108,12 @@
             Resumen del registro de tema
           </h5>
           <ng-container *ngIf="!editFromResumen; else headerAccionesEdicion">
-            <button type="button" class="btn btn-edit-header" (click)="iniciarEdicionResumen()">
+            <button
+              type="button"
+              class="btn btn-edit-header"
+              (click)="iniciarEdicionResumen()"
+              *ngIf="hasPerm('temas.actualizar')"
+            >
               <i class="bi bi-pencil-square"></i>
               Editar
             </button>

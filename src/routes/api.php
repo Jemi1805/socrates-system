@@ -90,11 +90,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('modalidad', ModalidadController::class);
     Route::apiResource('pract_ind', PractIndController::class);
     // Proyectos/Temas con permisos granulares
+    // Crear tema/proyecto
     Route::apiResource('proyecto', ProyectoController::class)
         ->only(['store'])
         ->middleware('permission:temas.crear');
+    // Ver/listar temas/proyectos
     Route::apiResource('proyecto', ProyectoController::class)
-        ->except(['store'])
+        ->only(['index', 'show'])
+        ->where(['proyecto' => '\\d+'])
+        ->middleware('permission:temas.leer');
+    // Actualizar/eliminar temas/proyectos
+    Route::apiResource('proyecto', ProyectoController::class)
+        ->only(['update', 'destroy'])
         ->where(['proyecto' => '\\d+']) // evita colisión con 'by_cod'
         ->middleware('permission:temas.actualizar');
     Route::post('proyecto/{id}/seguimiento_pdf', [ProyectoController::class, 'uploadSeguimientoPdf'])
