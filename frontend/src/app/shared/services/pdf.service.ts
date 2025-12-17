@@ -383,10 +383,9 @@ export class PdfService {
       ]);
     };
 
-    pushRow('NOMBRES', (data.nombreCompleto || '').split(' ').slice(0, -1).join(' ') || data.nombreCompleto || '-');
-    // Apellidos: si es posible, lo derivamos del final del nombreCompleto (heurística simple)
-    const possibleAp = (data.nombreCompleto || '').split(' ').slice(-1).join(' ');
-    pushRow('APELLIDOS', possibleAp || '-');
+    // Usar directamente los campos proporcionados para evitar heurísticas incorrectas
+    pushRow('NOMBRES', (data.nombres || '').toString() || '-');
+    pushRow('APELLIDOS', (data.apellidos || '').toString() || '-');
 
     // Fila de C.I. con 3 celdas en el valor: Nº:, EXPEDIDO:, Nº DE CELULAR:
     // Dejamos el contenido vacío y lo dibujamos manualmente en didDrawCell para aplicar negritas parciales
